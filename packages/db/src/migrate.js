@@ -115,15 +115,15 @@ export function runMigrations(targetDb) {
   if (existing.length === 0) {
     defaultMerchant = merchantRepo.create({
       id: '00000000-0000-0000-0000-000000000001',
-      businessName: 'YOUPI Demo Store',
+      businessName: 'Sanbook Pay Store',
       slug: 'demo-store',
-      contactEmail: 'merchant@youpi.local',
+      contactEmail: 'support@sanbookpay.com',
       contactPhone: '9876543210',
       webhookUrl: process.env.COIN_STORE_WEBHOOK_URL || 'http://localhost:5000/api/webhook',
       webhookSecret: getCoinStoreWebhookSecret(),
       branding: {
-        appName: 'YOUPI PG',
-        primaryColor: '#2563eb',
+        appName: 'Sanbook Pay',
+        primaryColor: '#059669',
         logoUrl: null
       }
     });

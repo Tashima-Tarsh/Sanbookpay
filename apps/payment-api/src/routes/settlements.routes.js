@@ -90,7 +90,7 @@ export function registerSettlementsRoutes(server, ctx) {
     let unsettledOrders = poRepo.listUnsettled(merchantId);
 
     const unsettledSessions = db.query(
-      `SELECT ps.id, ps.order_id, ps.amount_paise, ps.completed_at, ps.utr
+      `SELECT ps.id, ps.order_id, ps.amount_paise, ps.completed_at
        FROM payment_sessions ps
        LEFT JOIN settlement_entries se ON se.payment_order_id = ps.id
        WHERE ps.merchant_id = $1 AND ps.status = 'SUCCESS' AND se.id IS NULL`,
