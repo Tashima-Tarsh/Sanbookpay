@@ -243,5 +243,16 @@ export class PaymentOrderRepository {
     `;
     return this.db.queryOne(sql, [merchantId]);
   }
+
+  listUnsettled(merchantId) {
+    const sql = `
+      SELECT po.* FROM payment_orders po
+      LEFT JOIN settlement_entries se ON se.payment_order_id = po.id
+      WHERE po.merchant_id = $1 AND po.status = 'SUCCESS' AND se.id IS NULL
+      ORDER BY po.created_at ASC
+    `;
+    return this.db.query(sql, [merchantId]);
+  }
 }
+
 

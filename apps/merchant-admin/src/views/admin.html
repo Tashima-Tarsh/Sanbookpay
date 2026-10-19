@@ -1050,6 +1050,10 @@
       <span>🔄</span>
       <span>Refunds</span>
     </button>
+    <button class="main-nav-btn" id="mainNavDeveloperSetup" onclick="switchSection('developerSetup')" style="background:rgba(5, 150, 105, 0.1); border:1px solid rgba(5, 150, 105, 0.3);">
+      <span>🔑</span>
+      <span style="color:#059669; font-weight:700;">API Keys &amp; Setup</span>
+    </button>
     <button class="main-nav-btn" id="mainNavOperations" onclick="switchSection('operations')">
       <span>⚡</span>
       <span>Operations &amp; Slots</span>
@@ -1344,8 +1348,12 @@
           <h2 style="margin:0; font-size:1.6rem; font-weight:800; color:var(--text-heading);">Settlements &amp; Financial Ledger</h2>
           <p style="margin:0.25rem 0 0 0; color:var(--text-muted); font-size:0.9rem;">Automated banking reconciliation, immutable double-entry ledger, and verified bank credits.</p>
         </div>
-        <div style="display:flex; gap:0.5rem;">
-          <button class="btn-sm" onclick="triggerReconciliationAction()">⚡ Run Reconciliation</button>
+        <div style="display:flex; gap:0.5rem; align-items:center;">
+          <button class="btn btn-primary" onclick="triggerInstantSettlementAction()" style="background:#059669; border-color:#059669; font-weight:700; display:flex; align-items:center; gap:0.35rem;">
+            <span>⚡</span>
+            <span>Trigger Instant Settlement Fallback</span>
+          </button>
+          <button class="btn-sm" onclick="triggerReconciliationAction()">Run Reconciliation</button>
           <button class="btn-sm btn-outline" onclick="downloadReport('settlements')">📥 Settlements CSV</button>
           <button class="btn-sm btn-outline" onclick="downloadReport('collections')">📥 Collections CSV</button>
         </div>
@@ -1461,6 +1469,94 @@
               <tr><td colspan="6" class="empty-state">No refunds recorded.</td></tr>
             </tbody>
           </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- SECTION: DEVELOPER ONBOARDING & API CREDENTIALS                           -->
+    <!-- ========================================================================= -->
+    <div id="sectionDeveloperSetup" class="sp-section" hidden>
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <h2 style="margin:0; font-size:1.6rem; font-weight:800; color:var(--text-heading);">API Credentials &amp; Customer Integration</h2>
+          <p style="margin:0.25rem 0 0 0; color:var(--text-muted); font-size:0.9rem;">Copy your production API credentials and SDK snippets to integrate into your e-commerce apps.</p>
+        </div>
+      </div>
+
+      <!-- CREDENTIALS BOX -->
+      <div class="sp-card" style="border-left: 4px solid #059669;">
+        <h3 style="margin-top:0; font-size:1.15rem; font-weight:700; color:var(--text-heading);">Production API Credentials</h3>
+        <p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:1rem;">Provide these credentials to your developers or backend applications. Keep your Secret API Key confidential.</p>
+        
+        <div class="sp-grid-2">
+          <div class="form-group">
+            <label>Merchant ID (Public Publishable ID)</label>
+            <div style="display:flex; gap:0.5rem;">
+              <input type="text" readonly value="00000000-0000-0000-0000-000000000001" id="credMerchantId" style="font-family:monospace; font-weight:700;" />
+              <button class="btn-sm btn-outline" type="button" onclick="copyToClipboard('credMerchantId')">Copy</button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Live Secret API Key (Backend Authentication)</label>
+            <div style="display:flex; gap:0.5rem;">
+              <input type="text" readonly value="sb_live_00000000000000000000000000000001" id="credApiKey" style="font-family:monospace; font-weight:700;" />
+              <button class="btn-sm btn-outline" type="button" onclick="copyToClipboard('credApiKey')">Copy</button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Webhook Signing Secret (HMAC-SHA256)</label>
+            <div style="display:flex; gap:0.5rem;">
+              <input type="text" readonly value="sb_whsec_production_key_2026" id="credWebhookSecret" style="font-family:monospace; font-weight:700;" />
+              <button class="btn-sm btn-outline" type="button" onclick="copyToClipboard('credWebhookSecret')">Copy</button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Live Base API URL</label>
+            <div style="display:flex; gap:0.5rem;">
+              <input type="text" readonly value="http://localhost:6100" id="credApiUrl" style="font-family:monospace; font-weight:700;" />
+              <button class="btn-sm btn-outline" type="button" onclick="copyToClipboard('credApiUrl')">Copy</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- INTEGRATION CODE SNIPPETS -->
+      <div class="sp-grid-2">
+        <div class="sp-card">
+          <h3 style="margin-top:0; font-size:1.15rem; font-weight:700;">Frontend One-Script Integration</h3>
+          <p style="color:var(--text-muted); font-size:0.85rem;">Add one script and tag any payment button. Sanbook Pay automatically renders the responsive payment modal.</p>
+          <pre style="background:#090d16; color:#a5f3fc; padding:1rem; border-radius:8px; font-size:0.8rem; overflow-x:auto;"><code>&lt;!-- 1. Include Sanbook Pay Script --&gt;
+&lt;script src="http://localhost:7000/youpi.js" 
+  data-youpi-key="00000000-0000-0000-0000-000000000001"&gt;
+&lt;/script&gt;
+
+&lt;!-- 2. Tag Any Buy/Checkout Button --&gt;
+&lt;button data-youpi-pay 
+  data-order-id="ORDER-1001" 
+  data-amount="499.00" 
+  data-currency="INR"
+  data-customer-name="Rohan Sharma"
+  data-customer-phone="9876543210"&gt;
+  Pay Now with UPI
+&lt;/button&gt;</code></pre>
+        </div>
+
+        <div class="sp-card">
+          <h3 style="margin-top:0; font-size:1.15rem; font-weight:700;">Backend Collection API (cURL / REST)</h3>
+          <p style="color:var(--text-muted); font-size:0.85rem;">Create orders server-to-server and receive the dynamic payment checkout link and QR code.</p>
+          <pre style="background:#090d16; color:#a5f3fc; padding:1rem; border-radius:8px; font-size:0.8rem; overflow-x:auto;"><code>curl -X POST http://localhost:6100/api/v1/collections \
+  -H "Content-Type: application/json" \
+  -H "X-Merchant-Key: sb_live_00000000000000000000000000000001" \
+  -d '{
+    "orderId": "ORDER-1001",
+    "amount": 499.00,
+    "customerName": "Rohan Sharma",
+    "customerPhone": "9876543210"
+  }'</code></pre>
         </div>
       </div>
     </div>
@@ -3955,7 +4051,7 @@
       if (activeNavBtn) activeNavBtn.classList.add('active');
 
       // Show/hide sections
-      const allSections = ['overview', 'collections', 'payouts', 'banking', 'settlements', 'refunds', 'operations', 'storeSettings', 'developerHub', 'security'];
+      const allSections = ['overview', 'collections', 'payouts', 'banking', 'settlements', 'refunds', 'developerSetup', 'operations', 'storeSettings', 'developerHub', 'security'];
       for (const s of allSections) {
         const el = document.getElementById(`section${s.charAt(0).toUpperCase() + s.slice(1)}`);
         if (el) el.hidden = (sectionId !== s);
@@ -7528,7 +7624,7 @@
     }
 
     // --- INITIALIZATION ---
-    const validSections = ['overview', 'collections', 'payouts', 'banking', 'settlements', 'refunds', 'operations', 'storeSettings', 'developerHub', 'security'];
+    const validSections = ['overview', 'collections', 'payouts', 'banking', 'settlements', 'refunds', 'developerSetup', 'operations', 'storeSettings', 'developerHub', 'security'];
     const hashSec = (window.location.hash || '').replace('#', '').trim();
     const searchSec = new URLSearchParams(window.location.search).get('section');
     const initialSec = validSections.includes(hashSec) ? hashSec : (validSections.includes(searchSec) ? searchSec : 'overview');

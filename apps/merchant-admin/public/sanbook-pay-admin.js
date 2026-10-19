@@ -869,6 +869,45 @@ function toggleBeneFields() {
   }
 }
 
+async function triggerInstantSettlementAction() {
+  if (!confirm('Execute live settlement fallback now? This will bundle all unsettled successful collections, deduct 1.5% fee + GST, and credit net funds to your merchant bank account.')) return;
+  try {
+    const res = await fetch('/api/v1/settlements/trigger', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      alert(`Settlement Notice: ${data.error || 'Failed to trigger settlement'}`);
+      return;
+    }
+    alert(`🎉 Live Settlement Executed Successfully!\n\nSettlement Ref: ${data.settlementId}\nNet Bank Credit: ₹${data.netAmount}\nBank UTR: ${data.bankUtr}\nDestination Account: ${data.bankAccount}\nOrders Settled: ${data.ordersSettledCount}`);
+    loadSettlementsData();
+    loadOverviewData();
+  } catch (err) {
+    alert(`Settlement Error: ${err.message}`);
+  }
+}
+
+function copyToClipboard(elementId) {
+  const el = document.getElementById(elementId);
+  if (!el) return;
+  const text = el.value || el.textContent;
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(text).then(() => {
+      alert('Copied to clipboard: ' + text);
+    }).catch(() => {
+      el.select();
+      document.execCommand('copy');
+      alert('Copied to clipboard!');
+    });
+  } else {
+    el.select();
+    document.execCommand('copy');
+    alert('Copied to clipboard!');
+  }
+}
+
 // Global dispatcher hook called by switchSection
 window.onSanbookPaySectionSwitch = function(sectionId) {
   if (sectionId === 'overview') loadOverviewData();

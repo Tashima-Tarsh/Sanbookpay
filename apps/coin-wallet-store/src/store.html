@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>YOUPI Store · Enterprise Payment Gateway Suite</title>
+  <title>Sanbook Pay Store · Enterprise Payment Gateway Suite</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <!-- OFFICIAL YOUPI PG UNIVERSAL INTEGRATION SCRIPT -->
@@ -972,10 +972,10 @@
   <header>
     <div class="header-inner">
       <a href="/" class="brand-group">
-        <div class="brand-logo-badge">⚡</div>
+        <div class="brand-logo-badge" style="background:#059669; color:#fff;">💳</div>
         <div class="brand-text">
-          <span class="brand-title">YOUPI Store</span>
-          <span class="brand-subtitle">Official Payment Gateway Demo</span>
+          <span class="brand-title">Sanbook Pay Store</span>
+          <span class="brand-subtitle">Official Payment Gateway Showcase · Self-Hosted UPI Payment Gateway</span>
         </div>
       </a>
       <nav style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
@@ -1073,15 +1073,15 @@
                   data-order-id=""
                   data-amount="1.00"
                   data-currency="INR"
-                  data-name="YOUPI Store"
-                  data-description="YOUPI PG Enterprise Suite Top-Up"
+                  data-name="Sanbook Pay Store"
+                  data-description="Sanbook Pay Enterprise Suite Top-Up"
                   data-success-url="/order-success"
                   data-failed-url="/order-failed"
                   data-suspicious-url="/order-suspicious"
                   data-expired-url="/order-expired"
                   data-cancelled-url="/order-cancelled"
                   onclick="startGatewayPurchase()">
-            <span>⚡ Buy Now with YOUPI PG · <span id="btnAmountDisplay">₹1.00</span></span>
+            <span>⚡ Buy Now with Sanbook Pay · <span id="btnAmountDisplay">₹1.00</span></span>
           </button>
 
           <div class="security-guarantee-note">
@@ -1603,12 +1603,12 @@ app.post('/api/youpi-webhook', express.raw({ type: 'application/json' }), (req, 
       <div class="footer-brand">
         <div class="brand-logo-badge">⚡</div>
         <div>
-          <div style="font-family:'Outfit', sans-serif; font-size:1.2rem; font-weight:800; color:#ffffff;">YOUPI Store</div>
+          <div style="font-family:'Outfit', sans-serif; font-size:1.2rem; font-weight:800; color:#ffffff;">Sanbook Pay Store</div>
           <div style="font-size:0.75rem; color:#94a3b8;">Official Demo Store &amp; E-Commerce Gateway Showcase</div>
         </div>
       </div>
       <div style="font-size:0.8rem; color:#94a3b8;">
-        © 2026 YOUPI PG · Sovereign Small Scale Payment Gateway Suite
+        © 2026 Sanbook Pay · Sovereign Small Scale Payment Gateway Suite
       </div>
     </div>
   </footer>
@@ -1784,8 +1784,8 @@ app.post('/api/youpi-webhook', express.raw({ type: 'application/json' }), (req, 
           order_id: data.orderId,
           amount: currentAmount,
           currency: 'INR',
-          name: 'YOUPI Store',
-          description: 'YOUPI PG Enterprise Suite Top-Up',
+          name: 'Sanbook Pay Store',
+          description: 'Sanbook Pay Enterprise Suite Top-Up',
           successUrl: `/order-success?order_id=${encodeURIComponent(data.orderId)}&amount=${encodeURIComponent(currentAmount)}`,
           failedUrl: `/order-failed?order_id=${encodeURIComponent(data.orderId)}`,
           suspiciousUrl: `/order-suspicious?order_id=${encodeURIComponent(data.orderId)}`,

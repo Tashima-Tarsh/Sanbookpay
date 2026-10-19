@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Customer Account · YOUPI Store</title>
+  <title>Customer Account · Sanbook Pay Store</title>
   <style>
     :root {
       --bg: #090d16;
@@ -153,8 +153,8 @@
 
 <header>
   <a href="/" class="brand">
-    <span class="brand-icon">⚡</span>
-    <span>YOUPI Store</span>
+    <span class="brand-icon" style="color:#059669;">💳</span>
+    <span>Sanbook Pay Store</span>
   </a>
   <a href="/" class="btn btn-buy" style="padding:0.45rem 1rem; font-size:0.85rem; text-decoration:none;">
     ← Back to Store
@@ -312,7 +312,7 @@
             checkoutUrl: data.checkoutUrl,
             order_id: data.orderId,
             amount: price,
-            name: 'YOUPI Store',
+            name: 'Sanbook Pay Store',
             description: `${packName}`,
             handler: async function(paymentResponse) {
               // Direct instant credit
