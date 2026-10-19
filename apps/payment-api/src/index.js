@@ -47,6 +47,13 @@ import { registerPollerRoutes } from './routes/pollers.routes.js';
 import { registerAdminRoutes } from './routes/admin.routes.js';
 import { registerCustomerRoutes } from './routes/customer.routes.js';
 import { registerDeviceRoutes } from './routes/device.routes.js';
+import { registerCollectionsRoutes } from './routes/collections.routes.js';
+import { registerPayoutsRoutes } from './routes/payouts.routes.js';
+import { registerBankingRoutes } from './routes/banking.routes.js';
+import { registerProviderWebhooksRoutes } from './routes/provider-webhooks.routes.js';
+import { registerSettlementsRoutes } from './routes/settlements.routes.js';
+import { registerRefundsRoutes } from './routes/refunds.routes.js';
+import { registerOperationsRoutes } from './routes/operations.routes.js';
 import { getWhatsAppBerryService, WhatsAppBerryService } from './services/whatsapp-berry.service.js';
 
 export function createPaymentApp(customDb = null, options = {}) {
@@ -441,6 +448,13 @@ export function createPaymentApp(customDb = null, options = {}) {
   registerAdminRoutes(server, context);
   registerCustomerRoutes(server, context);
   registerDeviceRoutes(server, context);
+  registerCollectionsRoutes(server, context);
+  registerPayoutsRoutes(server, context);
+  registerBankingRoutes(server, context);
+  registerProviderWebhooksRoutes(server, context);
+  registerSettlementsRoutes(server, context);
+  registerRefundsRoutes(server, context);
+  registerOperationsRoutes(server, context);
 
   function destroy() {
     clearInterval(queueSyncDaemon);

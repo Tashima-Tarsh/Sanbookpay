@@ -1,0 +1,83 @@
+apiVersion: codeengine.cloud.ibm.com/v1
+kind: App
+metadata:
+  name: sanbook-pay-api
+  labels:
+    app.kubernetes.io/name: sanbook-pay-api
+spec:
+  image: icr.io/sanbook-pay/payment-api:latest
+  imagePort: 6100
+  scaleTargetSize: 100
+  scaleTargetConcurrency: 50
+  scaleMinInstances: 1
+  scaleMaxInstances: 10
+  scaleCpuLimit: "1"
+  scaleMemoryLimit: "2G"
+  env:
+    - name: NODE_ENV
+      value: "production"
+    - name: PORT
+      value: "6100"
+    - name: DATABASE_URL
+      valueFrom:
+        secretKeyRef:
+          name: sanbook-pay-secrets
+          key: DATABASE_URL
+    - name: REDIS_URL
+      valueFrom:
+        secretKeyRef:
+          name: sanbook-pay-secrets
+          key: REDIS_URL
+    - name: ENCRYPTION_KEY
+      valueFrom:
+        secretKeyRef:
+          name: sanbook-pay-secrets
+          key: ENCRYPTION_KEY
+    - name: INTERNAL_TOKEN
+      valueFrom:
+        secretKeyRef:
+          name: sanbook-pay-secrets
+          key: INTERNAL_TOKEN
+---
+apiVersion: codeengine.cloud.ibm.com/v1
+kind: App
+metadata:
+  name: sanbook-pay-checkout
+  labels:
+    app.kubernetes.io/name: sanbook-pay-checkout
+spec:
+  image: icr.io/sanbook-pay/checkout-portal:latest
+  imagePort: 7000
+  scaleMinInstances: 1
+  scaleMaxInstances: 5
+  scaleCpuLimit: "0.5"
+  scaleMemoryLimit: "1G"
+  env:
+    - name: NODE_ENV
+      value: "production"
+    - name: PORT
+      value: "7000"
+    - name: BASE_PAYMENT_API_URL
+      value: "https://sanbook-pay-api.private.<region>.codeengine.appdomain.cloud"
+---
+apiVersion: codeengine.cloud.ibm.com/v1
+kind: App
+metadata:
+  name: sanbook-pay-admin
+  labels:
+    app.kubernetes.io/name: sanbook-pay-admin
+spec:
+  image: icr.io/sanbook-pay/merchant-admin:latest
+  imagePort: 6001
+  scaleMinInstances: 1
+  scaleMaxInstances: 2
+  scaleCpuLimit: "0.5"
+  scaleMemoryLimit: "1G"
+  env:
+    - name: NODE_ENV
+      value: "production"
+    - name: PORT
+      value: "6001"
+    - name: BASE_PAYMENT_API_URL
+      value: "https://sanbook-pay-api.private.<region>.codeengine.appdomain.cloud"
+

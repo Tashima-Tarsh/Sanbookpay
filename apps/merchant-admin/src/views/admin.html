@@ -4,7 +4,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Merchant Portal & Control Hub — YOUPI PG</title>
+  <title>Sanbook Pay Merchant Console</title>
+  <link rel="stylesheet" href="/sanbook-pay-admin.css" />
   <style>
     :root,
     [data-theme="light"] {
@@ -980,9 +981,9 @@
   <header>
     <div class="brand-group">
       <div class="brand-title">
-        <span>🛡️ YOUPI PG</span>
+        <span>🛡️ SANBOOK PAY</span>
       </div>
-      <span class="brand-badge">Merchant &amp; Supervisor Hub</span>
+      <span class="brand-badge">Merchant Console</span>
     </div>
 
     <div class="header-quick-stats">
@@ -1023,11 +1024,35 @@
     </div>
   </header>
 
-  <!-- MAIN NAVIGATION BAR: 3 HIGH-LEVEL SECTIONS -->
+  <!-- MAIN NAVIGATION BAR: SANBOOK PAY FINTECH PLATFORM -->
   <nav class="main-nav-bar">
-    <button class="main-nav-btn active" id="mainNavOperations" onclick="switchSection('operations')">
-      <span>🏪</span>
-      <span>Daily Merchant Operations</span>
+    <button class="main-nav-btn active" id="mainNavOverview" onclick="switchSection('overview')">
+      <span>📊</span>
+      <span>Overview</span>
+    </button>
+    <button class="main-nav-btn" id="mainNavCollections" onclick="switchSection('collections')">
+      <span>💳</span>
+      <span>Collections</span>
+    </button>
+    <button class="main-nav-btn" id="mainNavPayouts" onclick="switchSection('payouts')">
+      <span>💸</span>
+      <span>Payouts</span>
+    </button>
+    <button class="main-nav-btn" id="mainNavBanking" onclick="switchSection('banking')">
+      <span>🏦</span>
+      <span>Banking</span>
+    </button>
+    <button class="main-nav-btn" id="mainNavSettlements" onclick="switchSection('settlements')">
+      <span>⚖️</span>
+      <span>Settlements</span>
+    </button>
+    <button class="main-nav-btn" id="mainNavRefunds" onclick="switchSection('refunds')">
+      <span>🔄</span>
+      <span>Refunds</span>
+    </button>
+    <button class="main-nav-btn" id="mainNavOperations" onclick="switchSection('operations')">
+      <span>⚡</span>
+      <span>Operations &amp; Slots</span>
     </button>
     <button class="main-nav-btn" id="mainNavStoreSettings" onclick="switchSection('storeSettings')">
       <span>⚙️</span>
@@ -1035,7 +1060,7 @@
     </button>
     <button class="main-nav-btn" id="mainNavDeveloperHub" onclick="switchSection('developerHub')">
       <span>🛠️</span>
-      <span>Developer &amp; Infrastructure Hub</span>
+      <span>Developers</span>
     </button>
     <button class="main-nav-btn" id="mainNavSecurity" onclick="switchSection('security')">
       <span>🛡️</span>
@@ -1051,9 +1076,399 @@
   <main>
 
     <!-- ========================================================================= -->
-    <!-- SECTION 1: DAILY MERCHANT OPERATIONS                                      -->
+    <!-- SECTION: OVERVIEW                                                         -->
     <!-- ========================================================================= -->
-    <div id="sectionOperations">
+    <div id="sectionOverview" class="sp-section">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <h2 style="margin:0; font-size:1.6rem; font-weight:800; color:var(--text-heading);">Executive Overview</h2>
+          <p style="margin:0.25rem 0 0 0; color:var(--text-muted); font-size:0.9rem;">Real-time settlement status, gross collections, and active banking provider connectivity.</p>
+        </div>
+        <div id="ovProviderBadge" class="badge-no-bank">⚠️ Checking connection...</div>
+      </div>
+
+      <!-- KPI Summary Cards -->
+      <div class="sp-grid-4">
+        <div class="kpi-card-emerald">
+          <div class="kpi-label">Gross Collections</div>
+          <div class="kpi-value" id="ovGrossCollections">₹0.00</div>
+        </div>
+        <div class="kpi-card-emerald">
+          <div class="kpi-label">Net Payable</div>
+          <div class="kpi-value" id="ovNetPayable">₹0.00</div>
+        </div>
+        <div class="kpi-card-emerald">
+          <div class="kpi-label">Available Balance</div>
+          <div class="kpi-value" id="ovAvailableBalance">₹0.00</div>
+        </div>
+        <div class="kpi-card-emerald">
+          <div class="kpi-label">Confirmed Bank Credit</div>
+          <div class="kpi-value" id="ovConfirmedSettled">₹0.00</div>
+        </div>
+      </div>
+
+      <div class="sp-card" style="margin-top:0.5rem;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+          <h3 style="margin:0; font-size:1.15rem; font-weight:700;">Recent Collection Transactions</h3>
+          <button class="btn-sm btn-outline" onclick="switchSection('collections')">View All Collections →</button>
+        </div>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Order ID</th>
+              <th>Amount</th>
+              <th>Status</th>
+              <th>Bank UTR</th>
+              <th>Time</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="ovRecentTxBody">
+            <tr><td colspan="6" class="empty-state">Loading transactions...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- SECTION: COLLECTIONS                                                      -->
+    <!-- ========================================================================= -->
+    <div id="sectionCollections" class="sp-section" hidden>
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <h2 style="margin:0; font-size:1.6rem; font-weight:800; color:var(--text-heading);">Payment Collections</h2>
+          <p style="margin:0.25rem 0 0 0; color:var(--text-muted); font-size:0.9rem;">Universal UPI &amp; card payment orders processed through authorized payment gateway.</p>
+        </div>
+        <div style="display:flex; gap:0.75rem;">
+          <button class="btn-emerald" onclick="openModal('createCollectionModal')">+ Create Collection</button>
+          <button class="btn-sm" onclick="loadCollectionsData()">🔄 Refresh</button>
+        </div>
+      </div>
+
+      <div class="sp-card">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Order / Payment ID</th>
+              <th>Amount</th>
+              <th>Status</th>
+              <th>Method</th>
+              <th>Bank Reference (UTR)</th>
+              <th>Created At</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="collectionsTableBody">
+            <tr><td colspan="7" class="empty-state">Loading collections...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- SECTION: PAYOUTS                                                          -->
+    <!-- ========================================================================= -->
+    <div id="sectionPayouts" class="sp-section" hidden>
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <h2 style="margin:0; font-size:1.6rem; font-weight:800; color:var(--text-heading);">Outbound Disbursements &amp; Payouts</h2>
+          <p style="margin:0.25rem 0 0 0; color:var(--text-muted); font-size:0.9rem;">Authorized real-money transfers to Bank Accounts and UPI IDs with maker-checker security.</p>
+        </div>
+        <button class="btn-emerald" onclick="openModal('addBeneficiaryModal')">+ Add Beneficiary</button>
+      </div>
+
+      <div class="sp-grid-2">
+        <div class="sp-card">
+          <h3 style="margin-top:0; font-size:1.15rem; font-weight:700;">💸 Send Money</h3>
+          <form onsubmit="handleSendMoneySubmit(event)">
+            <div class="form-group">
+              <label>Select Beneficiary *</label>
+              <select id="payoutSelectBene" required>
+                <option value="">Loading beneficiaries...</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Amount (INR) *</label>
+              <input type="number" id="payoutInputAmount" step="0.01" min="1" placeholder="e.g. 1500.00" required />
+            </div>
+            <div class="form-group">
+              <label>Payout Rail</label>
+              <select id="payoutSelectRail">
+                <option value="IMPS">IMPS (Instant Real-Time)</option>
+                <option value="UPI">UPI (Instant VPA Credit)</option>
+                <option value="NEFT">NEFT (Standard Batch)</option>
+                <option value="RTGS">RTGS (High Value)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Purpose / Remarks</label>
+              <input type="text" id="payoutInputRemarks" placeholder="e.g. Vendor Invoice #402" />
+            </div>
+            <div class="form-group" style="display:flex; align-items:center; gap:0.5rem;">
+              <input type="checkbox" id="payoutCheckApproval" style="width:auto;" checked />
+              <label for="payoutCheckApproval" style="margin:0; cursor:pointer;">Require Maker-Checker Authorization before release</label>
+            </div>
+            <button type="submit" class="btn-emerald" style="width:100%; margin-top:0.5rem;">Authorize &amp; Dispatch Transfer</button>
+          </form>
+        </div>
+
+        <div class="sp-card">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+            <h3 style="margin:0; font-size:1.15rem; font-weight:700;">Beneficiaries</h3>
+            <button class="btn-sm" onclick="loadPayoutsData()">Refresh</button>
+          </div>
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Type</th>
+                <th>Account / VPA</th>
+                <th>Verification</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="payoutsBenesTableBody">
+              <tr><td colspan="5" class="empty-state">Loading beneficiaries...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="sp-card" style="margin-top:0.5rem;">
+        <h3 style="margin-top:0; font-size:1.15rem; font-weight:700;">Outbound Transfer History</h3>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Transfer ID</th>
+              <th>Amount</th>
+              <th>Rail</th>
+              <th>Status</th>
+              <th>Bank UTR</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="payoutsTableBody">
+            <tr><td colspan="6" class="empty-state">Loading transfers...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- SECTION: BANKING & CONNECTIONS                                            -->
+    <!-- ========================================================================= -->
+    <div id="sectionBanking" class="sp-section" hidden>
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <h2 style="margin:0; font-size:1.6rem; font-weight:800; color:var(--text-heading);">Banking &amp; Provider Connections</h2>
+          <p style="margin:0.25rem 0 0 0; color:var(--text-muted); font-size:0.9rem;">Configure production banking gateways, corporate payout accounts, and mutual TLS credentials.</p>
+        </div>
+        <div style="display:flex; align-items:center; gap:0.75rem;">
+          <span style="font-size:0.85rem; color:var(--text-muted);">Connection Status:</span>
+          <span id="bankingConnStatusPill" class="status-pill status-unconfigured">NOT CONFIGURED</span>
+        </div>
+      </div>
+
+      <div class="sp-grid-2">
+        <div class="sp-card">
+          <h3 style="margin-top:0; font-size:1.15rem; font-weight:700;">Provider Configuration</h3>
+          <form onsubmit="handleSaveConnectionSubmit(event)">
+            <input type="hidden" id="bankFormConnId" />
+            <div class="form-group">
+              <label>Payment / Banking Provider *</label>
+              <select id="bankFormSelectProvider">
+                <option value="CASHFREE">Cashfree Payments (PG, Payouts &amp; Settlements)</option>
+                <option value="HDFC">HDFC Bank Direct Acquiring (Corporate H2H)</option>
+                <option value="ICICI">ICICI Bank Corporate Banking API</option>
+                <option value="AXIS">Axis Bank Acquiring Gateway</option>
+                <option value="SBI">State Bank of India Corporate e-Pay</option>
+                <option value="KOTAK">Kotak Mahindra Bank Payout Gateway</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Environment</label>
+              <select id="bankFormEnv">
+                <option value="PRODUCTION">Production (Live Money)</option>
+                <option value="SANDBOX">Sandbox / Gamma (Testing)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Client ID / App ID *</label>
+              <input type="text" id="bankFormClientId" placeholder="e.g. CF10003498877" required />
+            </div>
+            <div class="form-group">
+              <label>Client Secret (AES-256-GCM Encrypted) *</label>
+              <input type="password" id="bankFormClientSecret" placeholder="Enter new secret to update" />
+            </div>
+            <div class="form-group">
+              <label>Webhook Secret</label>
+              <input type="password" id="bankFormWebhookSecret" placeholder="Webhook signing secret" />
+            </div>
+            <div class="form-group">
+              <label>Merchant Receiving VPA</label>
+              <input type="text" id="bankFormVpa" placeholder="e.g. merchant@icici" />
+            </div>
+            <button type="submit" class="btn-emerald" style="width:100%;">Save Connection</button>
+          </form>
+        </div>
+
+        <div class="sp-card" style="display:flex; flex-direction:column; justify-content:space-between;">
+          <div>
+            <h3 style="margin-top:0; font-size:1.15rem; font-weight:700;">Authorized Verification &amp; Actions</h3>
+            <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:1.25rem;">Execute live authenticated verification tests against the banking network.</p>
+
+            <div style="display:flex; flex-direction:column; gap:0.75rem;">
+              <button class="btn-sm btn-outline" id="btnTestConnection" onclick="testConnectionAction()">🔍 Test Authenticated Connection</button>
+              <button class="btn-sm" onclick="checkCapabilitiesAction()">📋 Check Available Capabilities</button>
+              <button class="btn-sm btn-success" onclick="activateCollectionsAction()">🟢 Activate Collections</button>
+              <button class="btn-sm btn-success" onclick="activatePayoutsAction()">🟢 Activate Payouts</button>
+              <button class="btn-sm" onclick="checkWebhookConfigAction()">🔗 Check Webhook Configuration</button>
+              <button class="btn-sm btn-outline" style="border-color:#ef4444; color:#ef4444;" onclick="disconnectConnectionAction()">⚠️ Disconnect</button>
+            </div>
+          </div>
+
+          <div style="margin-top:1.5rem;">
+            <div style="font-size:0.85rem; font-weight:700; color:var(--text-muted); margin-bottom:0.4rem;">Diagnostics &amp; Audit Response:</div>
+            <pre class="diagnostics-panel" id="bankingDiagnosticsText">Select or save a connection to inspect live diagnostics.</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- SECTION: SETTLEMENTS & FINANCIAL LEDGER                                   -->
+    <!-- ========================================================================= -->
+    <div id="sectionSettlements" class="sp-section" hidden>
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <h2 style="margin:0; font-size:1.6rem; font-weight:800; color:var(--text-heading);">Settlements &amp; Financial Ledger</h2>
+          <p style="margin:0.25rem 0 0 0; color:var(--text-muted); font-size:0.9rem;">Automated banking reconciliation, immutable double-entry ledger, and verified bank credits.</p>
+        </div>
+        <div style="display:flex; gap:0.5rem;">
+          <button class="btn-sm" onclick="triggerReconciliationAction()">⚡ Run Reconciliation</button>
+          <button class="btn-sm btn-outline" onclick="downloadReport('settlements')">📥 Settlements CSV</button>
+          <button class="btn-sm btn-outline" onclick="downloadReport('collections')">📥 Collections CSV</button>
+        </div>
+      </div>
+
+      <div class="sp-grid-4">
+        <div class="kpi-card-emerald">
+          <div class="kpi-label">Gross Collections</div>
+          <div class="kpi-value" id="settleGrossText">₹0.00</div>
+        </div>
+        <div class="kpi-card-emerald">
+          <div class="kpi-label">Processing Fees</div>
+          <div class="kpi-value" id="settleFeeText">₹0.00</div>
+        </div>
+        <div class="kpi-card-emerald">
+          <div class="kpi-label">Net Payable</div>
+          <div class="kpi-value" id="settleNetText">₹0.00</div>
+        </div>
+        <div class="kpi-card-emerald">
+          <div class="kpi-label">Confirmed Bank Credit</div>
+          <div class="kpi-value" id="settleConfirmedText">₹0.00</div>
+        </div>
+      </div>
+
+      <div class="sp-card" style="margin-top:0.5rem;">
+        <h3 style="margin-top:0; font-size:1.15rem; font-weight:700;">Settlement Batches</h3>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Settlement ID</th>
+              <th>Gross Amount</th>
+              <th>Fee</th>
+              <th>Net Amount</th>
+              <th>Status</th>
+              <th>Bank UTR</th>
+              <th>Settled At</th>
+            </tr>
+          </thead>
+          <tbody id="settlementBatchesBody">
+            <tr><td colspan="7" class="empty-state">Loading settlement records...</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="sp-grid-2" style="margin-top:0.5rem;">
+        <div class="sp-card">
+          <h3 style="margin-top:0; font-size:1.15rem; font-weight:700;">Double-Entry Chart of Accounts</h3>
+          <table class="data-table">
+            <thead><tr><th>Code</th><th>Account Name</th><th>Type</th><th>Balance (INR)</th></tr></thead>
+            <tbody id="ledgerAccountsBody">
+              <tr><td colspan="4" class="empty-state">Loading ledger...</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="sp-card">
+          <h3 style="margin-top:0; font-size:1.15rem; font-weight:700;">Reconciliation Discrepancies</h3>
+          <table class="data-table">
+            <thead><tr><th>Exception Type</th><th>Expected</th><th>Actual</th><th>Status</th><th>Action</th></tr></thead>
+            <tbody id="reconciliationExceptionsBody">
+              <tr><td colspan="5" class="empty-state">No reconciliation discrepancies detected.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- SECTION: REFUNDS                                                          -->
+    <!-- ========================================================================= -->
+    <div id="sectionRefunds" class="sp-section" hidden>
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <h2 style="margin:0; font-size:1.6rem; font-weight:800; color:var(--text-heading);">Payment Refunds &amp; Reversals</h2>
+          <p style="margin:0.25rem 0 0 0; color:var(--text-muted); font-size:0.9rem;">Initiate customer refunds directly through provider APIs and reverse double-entry ledger balances.</p>
+        </div>
+      </div>
+
+      <div class="sp-grid-2">
+        <div class="sp-card">
+          <h3 style="margin-top:0; font-size:1.15rem; font-weight:700;">🔄 Initiate Refund</h3>
+          <form onsubmit="handleInitiateRefundSubmit(event)">
+            <div class="form-group">
+              <label>Payment / Order ID *</label>
+              <input type="text" id="refundInputPaymentId" placeholder="e.g. ORD_REAL_1001" required />
+            </div>
+            <div class="form-group">
+              <label>Refund Amount (INR) *</label>
+              <input type="number" id="refundInputAmount" step="0.01" min="1" placeholder="e.g. 499.00" required />
+            </div>
+            <div class="form-group">
+              <label>Reason</label>
+              <input type="text" id="refundInputReason" placeholder="Customer cancellation" />
+            </div>
+            <button type="submit" class="btn-emerald" style="width:100%;">Process Refund</button>
+          </form>
+        </div>
+
+        <div class="sp-card">
+          <h3 style="margin-top:0; font-size:1.15rem; font-weight:700;">Refund History</h3>
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Refund ID</th>
+                <th>Order ID</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th>Reason</th>
+                <th>Date</th>
+              </tr>
+            </thead>
+            <tbody id="refundsTableBody">
+              <tr><td colspan="6" class="empty-state">No refunds recorded.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- SECTION: DAILY MERCHANT OPERATIONS & SLOTS                                -->
+    <!-- ========================================================================= -->
+    <div id="sectionOperations" hidden>
 
       <!-- KPI Summary Cards -->
       <div class="kpi-row">
@@ -3536,16 +3951,20 @@
 
       // Update main nav buttons
       document.querySelectorAll('.main-nav-btn').forEach(b => b.classList.remove('active'));
-      if (sectionId === 'operations') document.getElementById('mainNavOperations').classList.add('active');
-      if (sectionId === 'storeSettings') document.getElementById('mainNavStoreSettings').classList.add('active');
-      if (sectionId === 'developerHub') document.getElementById('mainNavDeveloperHub').classList.add('active');
-      if (sectionId === 'security') document.getElementById('mainNavSecurity').classList.add('active');
+      const activeNavBtn = document.getElementById(`mainNav${sectionId.charAt(0).toUpperCase() + sectionId.slice(1)}`);
+      if (activeNavBtn) activeNavBtn.classList.add('active');
 
       // Show/hide sections
-      document.getElementById('sectionOperations').hidden = (sectionId !== 'operations');
-      document.getElementById('sectionStoreSettings').hidden = (sectionId !== 'storeSettings');
-      document.getElementById('sectionDeveloperHub').hidden = (sectionId !== 'developerHub');
-      document.getElementById('sectionSecurity').hidden = (sectionId !== 'security');
+      const allSections = ['overview', 'collections', 'payouts', 'banking', 'settlements', 'refunds', 'operations', 'storeSettings', 'developerHub', 'security'];
+      for (const s of allSections) {
+        const el = document.getElementById(`section${s.charAt(0).toUpperCase() + s.slice(1)}`);
+        if (el) el.hidden = (sectionId !== s);
+      }
+
+      // Hook for Sanbook Pay engine
+      if (typeof window.onSanbookPaySectionSwitch === 'function') {
+        window.onSanbookPaySectionSwitch(sectionId);
+      }
 
       // Render sub-navigation bar
       renderSubNavBar(sectionId, targetSubTab);
@@ -7109,10 +7528,10 @@
     }
 
     // --- INITIALIZATION ---
-    const validSections = ['operations', 'storeSettings', 'developerHub', 'security'];
+    const validSections = ['overview', 'collections', 'payouts', 'banking', 'settlements', 'refunds', 'operations', 'storeSettings', 'developerHub', 'security'];
     const hashSec = (window.location.hash || '').replace('#', '').trim();
     const searchSec = new URLSearchParams(window.location.search).get('section');
-    const initialSec = validSections.includes(hashSec) ? hashSec : (validSections.includes(searchSec) ? searchSec : 'operations');
+    const initialSec = validSections.includes(hashSec) ? hashSec : (validSections.includes(searchSec) ? searchSec : 'overview');
     switchSection(initialSec);
 
     window.addEventListener('hashchange', () => {
@@ -7142,6 +7561,102 @@
     setInterval(fetchTestModeStatus, 15000);
   </script>
 
+  <!-- ========================================== -->
+  <!-- SANBOOK PAY PRODUCTION MODALS              -->
+  <!-- ========================================== -->
+
+  <!-- Modal 1: Create Collection -->
+  <div id="createCollectionModal" class="sp-modal-overlay">
+    <div class="sp-modal-card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; border-bottom:1px solid var(--border); padding-bottom:1rem;">
+        <h3 style="margin:0; font-size:1.25rem; font-weight:700;">Create Collection Order</h3>
+        <button type="button" onclick="closeModal('createCollectionModal')" style="background:none; border:none; font-size:1.5rem; cursor:pointer; color:var(--text-muted);">&times;</button>
+      </div>
+      <form onsubmit="handleCreateCollectionSubmit(event)">
+        <div class="form-group">
+          <label>Merchant Order ID *</label>
+          <input type="text" id="collInputOrderId" required placeholder="ORD-2026-001" />
+        </div>
+        <div class="form-group">
+          <label>Amount (INR) *</label>
+          <input type="number" id="collInputAmount" required step="0.01" min="1" placeholder="499.00" />
+        </div>
+        <div class="form-group">
+          <label>Customer Name</label>
+          <input type="text" id="collInputCustName" placeholder="Rohan Sharma" />
+        </div>
+        <div class="form-group">
+          <label>Customer Phone</label>
+          <input type="tel" id="collInputCustPhone" placeholder="9876543210" />
+        </div>
+        <div class="form-group">
+          <label>Customer Email</label>
+          <input type="email" id="collInputCustEmail" placeholder="rohan@example.com" />
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:0.75rem; margin-top:1.5rem;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('createCollectionModal')">Cancel</button>
+          <button type="submit" class="btn btn-primary" style="background:#059669; border-color:#059669;">Create Order</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal 2: Collection Details -->
+  <div id="collectionDetailsModal" class="sp-modal-overlay">
+    <div class="sp-modal-card" style="max-width:680px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; border-bottom:1px solid var(--border); padding-bottom:1rem;">
+        <h3 style="margin:0; font-size:1.25rem; font-weight:700;">Payment Collection Details</h3>
+        <button type="button" onclick="closeModal('collectionDetailsModal')" style="background:none; border:none; font-size:1.5rem; cursor:pointer; color:var(--text-muted);">&times;</button>
+      </div>
+      <div id="collectionDetailsBody">
+        <!-- Dynamically rendered -->
+      </div>
+      <div style="display:flex; justify-content:flex-end; margin-top:1.5rem;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('collectionDetailsModal')">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 3: Add Beneficiary -->
+  <div id="addBeneficiaryModal" class="sp-modal-overlay">
+    <div class="sp-modal-card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; border-bottom:1px solid var(--border); padding-bottom:1rem;">
+        <h3 style="margin:0; font-size:1.25rem; font-weight:700;">Register Beneficiary</h3>
+        <button type="button" onclick="closeModal('addBeneficiaryModal')" style="background:none; border:none; font-size:1.5rem; cursor:pointer; color:var(--text-muted);">&times;</button>
+      </div>
+      <form onsubmit="handleAddBeneficiarySubmit(event)">
+        <div class="form-group">
+          <label>Transfer Destination Type *</label>
+          <select id="beneInputType" onchange="toggleBeneFields()">
+            <option value="BANK_ACCOUNT">Bank Account (IMPS / NEFT / RTGS)</option>
+            <option value="UPI_ID">UPI Virtual Payment Address (VPA)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Beneficiary Full Name *</label>
+          <input type="text" id="beneInputName" required placeholder="Rohit Kumar" />
+        </div>
+        <div class="form-group" id="beneAccountGroup">
+          <label>Bank Account Number *</label>
+          <input type="text" id="beneInputAccount" placeholder="50100234567890" />
+        </div>
+        <div class="form-group" id="beneIfscGroup">
+          <label>Bank IFSC Code *</label>
+          <input type="text" id="beneInputIfsc" placeholder="HDFC0001234" style="text-transform:uppercase;" />
+        </div>
+        <div class="form-group" id="beneUpiGroup" style="display:none;">
+          <label>UPI ID (VPA) *</label>
+          <input type="text" id="beneInputUpi" placeholder="rohit@upi" />
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:0.75rem; margin-top:1.5rem;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('addBeneficiaryModal')">Cancel</button>
+          <button type="submit" class="btn btn-primary" style="background:#059669; border-color:#059669;">Register</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="/sanbook-pay-admin.js"></script>
 </body>
 
 </html>

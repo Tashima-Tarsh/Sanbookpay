@@ -2,10 +2,12 @@
  * Public and Internal API Contracts, DTO definitions, and Webhook Payloads.
  */
 
+import { PRODUCT_NAME, SanbookPayConfig } from './branding.js';
+
 export const DefaultBranding = Object.freeze({
-  appName: 'YOUPI PG',
-  primaryColor: '#2563eb',
-  logoUrl: null
+  appName: process.env.DEFAULT_APP_NAME || PRODUCT_NAME,
+  primaryColor: process.env.DEFAULT_PRIMARY_COLOR || SanbookPayConfig.defaultPrimaryColor,
+  logoUrl: process.env.DEFAULT_LOGO_URL || null
 });
 
 /**

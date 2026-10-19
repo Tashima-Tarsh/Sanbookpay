@@ -1,10 +1,12 @@
 openapi: 3.0.3
 info:
-  title: YOUPI PG V2 — Public Developer Integration API
-  version: 2.0.0
+  title: SANBOOK PAY — Real-Money Sovereign Payment Platform API
+  version: 2.1.0
   description: |
-    Official public integration API and webhook contract for YOUPI PG V2 Sovereign Payment Gateway.
-    Allows merchants to create payment sessions, query verification status, and receive authoritative HMAC-SHA256 signed webhooks.
+    Official production integration API for Sanbook Pay.
+    Supports authenticated real-money UPI collections, Cashfree/bank gateway routing,
+    authenticated payouts, penny-drop verification, double-entry financial ledgering,
+    settlements, and HMAC-SHA256 authoritative signed webhooks.
 
 servers:
   - url: http://localhost:7000
@@ -15,28 +17,331 @@ servers:
     description: Production Gateway Base URL
 
 paths:
-  /api/v1/payments:
+  # -------------------------------------------------------------------------
+  # REAL COLLECTIONS API
+  # -------------------------------------------------------------------------
+  /api/v1/collections:
     post:
-      summary: Create Payment Session / Order
+      summary: Create Real Payment Collection Order
       description: |
-        Initializes a new payment session. Returns the payment identifier and the checkoutUrl
-        to be loaded inside the YOUPI modal iframe or standalone browser window.
-      operationId: createPayment
+        Initializes an authentic payment collection order with upstream banking/payment provider
+        (e.g., Cashfree PG or Direct Bank). Enforces idempotency and records immutable financial order.
+      operationId: createCollection
       parameters:
-        - name: X-Merchant-Id
-          in: header
-          required: false
-          description: Public publishable merchant identifier. If omitted, uses the default configured merchant.
-          schema:
-            type: string
-            example: "00000000-0000-0000-0000-000000000001"
         - name: Idempotency-Key
           in: header
           required: false
-          description: Unique idempotency key preventing duplicate payment creation.
           schema:
             type: string
-            example: "idem_9f82b71e"
+            example: "idem_coll_9a8b7c"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCollectionRequest'
+      responses:
+        '201':
+          description: Collection order created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CollectionOrder'
+        '200':
+          description: Idempotent replay of existing order.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CollectionOrder'
+        '400':
+          description: Invalid order parameters.
+
+    get:
+      summary: List Payment Collections
+      description: Returns recent payment collections with status, UTR, and confirmation latency.
+      operationId: listCollections
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 50
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: List of collection records.
+
+  /api/v1/collections/{id}:
+    get:
+      summary: Get Collection Details
+      description: Returns full payment order details, banking provider references, and audit event lifecycle trail.
+      operationId: getCollection
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Payment details returned.
+        '404':
+          description: Order not found.
+
+  /api/v1/collections/{id}/status:
+    get:
+      summary: Query Collection Status
+      description: Returns lightweight payment status, bank reference (UTR), and confirmation time for fast polling.
+      operationId: getCollectionStatus
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Payment status.
+
+  /api/v1/collections/{id}/refresh-status:
+    post:
+      summary: Force Status Refresh from Provider
+      description: Queries upstream banking provider API directly to reconcile payment state.
+      operationId: refreshCollectionStatus
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Fresh status from upstream provider.
+
+  # -------------------------------------------------------------------------
+  # BENEFICIARIES & PAYOUTS API
+  # -------------------------------------------------------------------------
+  /api/v1/beneficiaries:
+    post:
+      summary: Register Payout Beneficiary
+      description: Registers an authorized bank account or UPI VPA for payout disbursements.
+      operationId: registerBeneficiary
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterBeneficiaryRequest'
+      responses:
+        '201':
+          description: Beneficiary registered.
+        '400':
+          description: Invalid beneficiary data.
+
+    get:
+      summary: List Payout Beneficiaries
+      operationId: listBeneficiaries
+      responses:
+        '200':
+          description: Beneficiaries list.
+
+  /api/v1/beneficiaries/verify:
+    post:
+      summary: Penny-Drop Account Verification
+      description: Verifies bank account or UPI ID with upstream provider via penny-drop or name enquiry.
+      operationId: verifyBeneficiary
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [beneficiaryId]
+              properties:
+                beneficiaryId:
+                  type: string
+      responses:
+        '200':
+          description: Verification result and account holder registered name.
+
+  /api/v1/payouts:
+    post:
+      summary: Create Payout Transfer
+      description: Initiates a real money transfer to a verified beneficiary via IMPS, NEFT, RTGS, or UPI.
+      operationId: createPayout
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: false
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePayoutRequest'
+      responses:
+        '201':
+          description: Payout transfer submitted or pending operator approval.
+        '400':
+          description: Invalid payout request or insufficient balance.
+
+    get:
+      summary: List Payout Transfers
+      operationId: listPayouts
+      responses:
+        '200':
+          description: List of payouts.
+
+  /api/v1/payouts/{id}:
+    get:
+      summary: Get Payout Details
+      operationId: getPayout
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Payout transfer details.
+
+  /api/v1/payouts/{id}/approve:
+    post:
+      summary: Authorize Payout Transfer
+      description: Explicit operator authorization required to disburse real funds when approval policy is active.
+      operationId: approvePayout
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision]
+              properties:
+                decision:
+                  type: string
+                  enum: [APPROVED, REJECTED]
+                approverId:
+                  type: string
+      responses:
+        '200':
+          description: Approval processed and transfer dispatched.
+
+  /api/v1/payouts/{id}/refresh-status:
+    post:
+      summary: Refresh Payout Transfer Status
+      description: Reconciles payout status and bank UTR directly with upstream bank/provider.
+      operationId: refreshPayoutStatus
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Payout status updated.
+
+  # -------------------------------------------------------------------------
+  # REFUNDS API
+  # -------------------------------------------------------------------------
+  /api/v1/refunds:
+    post:
+      summary: Issue Payment Refund
+      description: Initiates an actual refund through the upstream provider for a settled or collected payment.
+      operationId: createRefund
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRefundRequest'
+      responses:
+        '201':
+          description: Refund initiated.
+
+    get:
+      summary: List Refunds
+      operationId: listRefunds
+      responses:
+        '200':
+          description: List of refunds.
+
+  /api/v1/refunds/{id}:
+    get:
+      summary: Get Refund Details
+      operationId: getRefund
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Refund details.
+
+  # -------------------------------------------------------------------------
+  # BANKING & SETTLEMENTS API
+  # -------------------------------------------------------------------------
+  /api/v1/banking/connections:
+    get:
+      summary: List Configured Bank Connections
+      operationId: listBankConnections
+      responses:
+        '200':
+          description: Configured banking and payment provider connections.
+    post:
+      summary: Register / Update Banking Provider Connection
+      operationId: createBankConnection
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BankConnectionRequest'
+      responses:
+        '201':
+          description: Bank connection configured.
+
+  /api/v1/banking/balance:
+    get:
+      summary: Query Available Banking Balance
+      operationId: getBankingBalance
+      responses:
+        '200':
+          description: Live balance in paise and INR.
+
+  /api/v1/settlements/overview:
+    get:
+      summary: Settlement & Financial Ledger Summary
+      operationId: getSettlementOverview
+      responses:
+        '200':
+          description: Gross collections, net payable, confirmed bank credit, and pending settlement totals.
+
+  # -------------------------------------------------------------------------
+  # LEGACY / CHECKOUT SESSIONS
+  # -------------------------------------------------------------------------
+  /api/v1/payments:
+    post:
+      summary: Create Payment Session / Order (Checkout Portal)
+      operationId: createPayment
       requestBody:
         required: true
         content:
@@ -51,138 +356,188 @@ paths:
               schema:
                 $ref: '#/components/schemas/CreatePaymentResponse'
         '200':
-          description: Existing session returned for idempotent request or ongoing active session.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CreatePaymentResponse'
-        '400':
-          description: Missing or invalid request parameters.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '403':
-          description: Access blocked due to security/fraud flagging on customer account.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '409':
-          description: Duplicate active payment session detected on another device.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DuplicateSessionResponse'
+          description: Existing session returned.
 
-  /api/v1/payments/{id}:
+  /api/v1/payments/{paymentId}:
     get:
-      summary: Get Payment Status
-      description: |
-        Retrieves current lifecycle status and outcome of a payment session.
-      operationId: getPaymentStatus
+      summary: Query Payment Session Details
+      operationId: getPayment
       parameters:
-        - name: id
+        - name: paymentId
           in: path
           required: true
-          description: Unique payment session UUID.
-          schema:
-            type: string
-            example: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
-      responses:
-        '200':
-          description: Payment details and outcome.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PaymentDetailsResponse'
-        '404':
-          description: Payment session not found.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-
-  /api/v1/checkout/{id}/cancel:
-    post:
-      summary: Cancel Payment Session
-      description: |
-        Explicitly cancels an active or queued payment session, immediately releasing the UPI concurrency slot.
-      operationId: cancelPaymentSession
-      parameters:
-        - name: id
-          in: path
-          required: true
-          description: Payment session UUID to cancel.
           schema:
             type: string
       responses:
         '200':
-          description: Session transitioned to CANCELLED.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                    example: true
-                  status:
-                    type: string
-                    example: "CANCELLED"
-        '404':
-          description: Session not found.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
+          description: Full payment details.
 
 components:
   schemas:
-    CreatePaymentRequest:
+    CreateCollectionRequest:
       type: object
-      required:
-        - orderId
-        - amount
+      required: [orderId, amount]
       properties:
         orderId:
           type: string
-          description: Merchant order identifier.
+          example: "ORD-2026-001"
+        amount:
+          type: number
+          example: 499.00
+        currency:
+          type: string
+          default: "INR"
+          example: "INR"
+        customerName:
+          type: string
+          example: "Rohan Sharma"
+        customerPhone:
+          type: string
+          example: "9876543210"
+        customerEmail:
+          type: string
+          example: "rohan@example.com"
+        method:
+          type: string
+          default: "UPI"
+          example: "UPI"
+        metadata:
+          type: object
+          additionalProperties: true
+
+    CollectionOrder:
+      type: object
+      properties:
+        paymentId:
+          type: string
+          example: "c7942127-14e3-469a-9e4a-9359a16f903a"
+        merchantOrderId:
+          type: string
+          example: "ORD-2026-001"
+        amount:
+          type: string
+          example: "499.00"
+        amountPaise:
+          type: integer
+          example: 49900
+        status:
+          type: string
+          enum: [INITIATED, PENDING, SUCCESS, FAILED, EXPIRED]
+          example: "PENDING"
+        paymentLink:
+          type: string
+          example: "https://payments.cashfree.com/order/#..."
+        bankReference:
+          type: string
+          example: "629817263541"
+        createdAt:
+          type: string
+          format: date-time
+
+    RegisterBeneficiaryRequest:
+      type: object
+      required: [name, beneficiaryType]
+      properties:
+        name:
+          type: string
+          example: "Rohit Kumar"
+        beneficiaryType:
+          type: string
+          enum: [BANK_ACCOUNT, UPI_ID]
+          example: "BANK_ACCOUNT"
+        bankAccount:
+          type: string
+          example: "50100234567890"
+        ifsc:
+          type: string
+          example: "HDFC0001234"
+        upiId:
+          type: string
+          example: "rohit@upi"
+        phone:
+          type: string
+          example: "9876543210"
+        email:
+          type: string
+          example: "rohit@example.com"
+
+    CreatePayoutRequest:
+      type: object
+      required: [beneficiaryId, amount]
+      properties:
+        beneficiaryId:
+          type: string
+          example: "bene_uuid_123"
+        amount:
+          type: number
+          example: 1000.00
+        payoutRail:
+          type: string
+          enum: [IMPS, NEFT, RTGS, UPI]
+          default: "IMPS"
+          example: "IMPS"
+        remarks:
+          type: string
+          example: "Vendor Settlement"
+        requireApproval:
+          type: boolean
+          default: false
+
+    CreateRefundRequest:
+      type: object
+      required: [paymentId, amount]
+      properties:
+        paymentId:
+          type: string
+          example: "c7942127-14e3-469a-9e4a-9359a16f903a"
+        amount:
+          type: number
+          example: 499.00
+        refundReason:
+          type: string
+          example: "Customer Return"
+
+    BankConnectionRequest:
+      type: object
+      required: [providerName, environment, clientId, clientSecret]
+      properties:
+        providerName:
+          type: string
+          example: "CASHFREE"
+        environment:
+          type: string
+          enum: [SANDBOX, PRODUCTION]
+          example: "SANDBOX"
+        clientId:
+          type: string
+        clientSecret:
+          type: string
+        webhookSecret:
+          type: string
+        merchantVpa:
+          type: string
+          example: "sanbookpay@hdfcbank"
+
+    CreatePaymentRequest:
+      type: object
+      required: [orderId, amount]
+      properties:
+        orderId:
+          type: string
           example: "ORDER-1001"
         amount:
           type: string
-          description: Amount in Indian Rupees (INR) with up to 2 decimal places.
           example: "499.00"
         currency:
           type: string
           default: "INR"
           example: "INR"
-        customer:
-          type: object
-          properties:
-            name:
-              type: string
-              example: "Mohit Kumar"
-            email:
-              type: string
-              example: "mohit@example.com"
-            phoneNumber:
-              type: string
-              example: "9876543210"
-        description:
-          type: string
-          example: "Order Payment #1001"
         returnUrl:
           type: string
-          description: Merchant URL to redirect customer upon completion.
-          example: "https://mystore.example/order-success?orderId=ORDER-1001"
+          example: "https://merchant.example.com/checkout/complete"
         metadata:
           type: object
-          description: Unmodified custom key-value pairs preserved by YOUPI PG.
           additionalProperties: true
-          example:
-            product_id: "TSHIRT-01"
-            cart_id: "CART-88"
 
     CreatePaymentResponse:
       type: object
@@ -204,56 +559,14 @@ components:
           example: "INR"
         status:
           type: string
-          enum: [INITIATED, ACTIVE, QUEUED, PROCESSING, SUCCESS, FAILED, EXPIRED, CANCELLED]
           example: "INITIATED"
-        queuePosition:
-          type: integer
-          example: 0
         checkoutUrl:
           type: string
           example: "http://localhost:7000/checkout/c7942127-14e3-469a-9e4a-9359a16f903a"
 
-    PaymentDetailsResponse:
-      type: object
-      properties:
-        paymentId:
-          type: string
-          example: "c7942127-14e3-469a-9e4a-9359a16f903a"
-        orderId:
-          type: string
-          example: "ORDER-1001"
-        amount:
-          type: string
-          example: "499.00"
-        amountPaise:
-          type: string
-          example: "49900"
-        currency:
-          type: string
-          example: "INR"
-        status:
-          type: string
-          enum: [INITIATED, ACTIVE, QUEUED, PROCESSING, SUCCESS, FAILED, EXPIRED, CANCELLED]
-          example: "SUCCESS"
-        method:
-          type: string
-          example: "UPI"
-        verificationLevel:
-          type: integer
-          description: 0 = unverified, 1 = SMS observed, 2 = Dual SMS + Gmail verified.
-          example: 2
-        completedAt:
-          type: string
-          format: date-time
-          nullable: true
-          example: "2026-10-07T12:00:00.000Z"
-        metadata:
-          type: object
-          additionalProperties: true
-
     WebhookPayload:
       type: object
-      description: Payload delivered to merchant configured webhook URL via HTTPS POST.
+      description: Signed HMAC-SHA256 event delivered to merchant HTTPS endpoint.
       properties:
         event:
           type: string
@@ -279,40 +592,11 @@ components:
           example: "UPI"
         utr:
           type: string
-          description: 12-digit bank reference number extracted by banking observers.
           example: "123456789012"
         completedAt:
           type: string
           format: date-time
-          example: "2026-10-07T12:00:00.000Z"
+          example: "2026-10-19T12:00:00.000Z"
         metadata:
           type: object
           additionalProperties: true
-
-    DuplicateSessionResponse:
-      type: object
-      properties:
-        error:
-          type: string
-          example: "DUPLICATE_SESSION_DETECTED"
-        code:
-          type: string
-          example: "DEVICE_SESSION_MISMATCH"
-        session_id:
-          type: string
-          example: "c7942127-14e3-469a-9e4a-9359a16f903a"
-        action:
-          type: string
-          example: "END_SESSION_AND_CREATE_NEW"
-        message:
-          type: string
-
-    ErrorResponse:
-      type: object
-      properties:
-        error:
-          type: string
-          example: "Missing required fields: orderId and amount."
-        message:
-          type: string
-          nullable: true

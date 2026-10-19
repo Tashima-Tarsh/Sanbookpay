@@ -212,6 +212,25 @@ export class AdminServer {
         }
       }
 
+      // Static assets from public/
+      const cleanPath = pathname.replace(/^\/+/, '');
+      const publicFilePath = path.join(__dirname, '../public', cleanPath);
+      if (cleanPath && fs.existsSync(publicFilePath) && fs.statSync(publicFilePath).isFile()) {
+        const ext = path.extname(publicFilePath).toLowerCase();
+        const mimeTypes = {
+          '.js': 'application/javascript; charset=utf-8',
+          '.css': 'text/css; charset=utf-8',
+          '.svg': 'image/svg+xml',
+          '.png': 'image/png',
+          '.json': 'application/json',
+          '.apk': 'application/vnd.android.package-archive'
+        };
+        const contentType = mimeTypes[ext] || 'application/octet-stream';
+        res.writeHead(200, { 'Content-Type': contentType, ...BASE_SECURITY_HEADERS });
+        fs.createReadStream(publicFilePath).pipe(res);
+        return;
+      }
+
       // Dashboard View: GET / or GET /admin
       if (pathname === '/' || pathname === '/admin') {
         const html = this.renderHtml();

@@ -154,6 +154,17 @@ export function runMigrations(targetDb) {
     });
   }
 
+  // Ensure default merchant has an active API key
+  try {
+    const credRow = db.queryOne("SELECT * FROM merchant_credentials WHERE merchant_id = $1", [defaultMerchant.id]);
+    if (!credRow) {
+      db.execute(
+        "INSERT INTO merchant_credentials (id, merchant_id, key_type, api_key, api_secret_hash, permissions, status) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+        ['00000000-0000-0000-0000-000000000003', defaultMerchant.id, 'LIVE', 'sb_live_00000000000000000000000000000001', 'hash_sb_live', '["collections","payouts","refunds"]', 'ACTIVE']
+      );
+    }
+  } catch {}
+
   // Demo customer seeding is opt-in and never carries real personal data.
   // Previously this unconditionally created a customer with a real name, phone number and
   // email, and flagged the phone as verified — shipping someone's PII (and a pre-authorised

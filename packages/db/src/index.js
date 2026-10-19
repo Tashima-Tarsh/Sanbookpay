@@ -9,4 +9,15 @@ export * from './repositories/observation.repository.js';
 export * from './repositories/support-ticket.repository.js';
 export * from './repositories/audit-log.repository.js';
 export * from './repositories/device.repository.js';
+export * from './repositories/provider-connection.repository.js';
+export * from './repositories/merchant-credential.repository.js';
+export * from './repositories/payment-order.repository.js';
+export * from './repositories/beneficiary.repository.js';
+export * from './repositories/payout.repository.js';
+export * from './repositories/refund.repository.js';
+export * from './repositories/settlement.repository.js';
+export * from './repositories/ledger.repository.js';
+export * from './repositories/reconciliation.repository.js';
+export * from './repositories/operational-alert.repository.js';
+export * from './repositories/idempotency.repository.js';
 

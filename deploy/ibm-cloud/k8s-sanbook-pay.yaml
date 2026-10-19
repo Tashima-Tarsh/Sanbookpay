@@ -1,0 +1,123 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sanbook-pay-api
+  labels:
+    app: sanbook-pay-api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: sanbook-pay-api
+  template:
+    metadata:
+      labels:
+        app: sanbook-pay-api
+    spec:
+      containers:
+        - name: payment-api
+          image: icr.io/sanbook-pay/payment-api:latest
+          ports:
+            - containerPort: 6100
+          envFrom:
+            - secretRef:
+                name: sanbook-pay-secrets
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 6100
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 6100
+            initialDelaySeconds: 10
+            periodSeconds: 15
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sanbook-pay-api
+spec:
+  selector:
+    app: sanbook-pay-api
+  ports:
+    - protocol: TCP
+      port: 6100
+      targetPort: 6100
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sanbook-pay-checkout
+  labels:
+    app: sanbook-pay-checkout
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: sanbook-pay-checkout
+  template:
+    metadata:
+      labels:
+        app: sanbook-pay-checkout
+    spec:
+      containers:
+        - name: checkout-portal
+          image: icr.io/sanbook-pay/checkout-portal:latest
+          ports:
+            - containerPort: 7000
+          env:
+            - name: BASE_PAYMENT_API_URL
+              value: "http://sanbook-pay-api:6100"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 7000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sanbook-pay-checkout
+spec:
+  selector:
+    app: sanbook-pay-checkout
+  ports:
+    - protocol: TCP
+      port: 7000
+      targetPort: 7000
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: sanbook-pay-ingress
+  annotations:
+    kubernetes.io/ingress.class: "public-iks-k8s-nginx"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  tls:
+    - hosts:
+        - pay.yourdomain.com
+      secretName: sanbook-pay-tls-cert
+  rules:
+    - host: pay.yourdomain.com
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: sanbook-pay-api
+                port:
+                  number: 6100
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: sanbook-pay-checkout
+                port:
+                  number: 7000
+

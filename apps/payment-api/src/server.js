@@ -173,6 +173,30 @@ export class HttpServer {
   }
 
   /**
+   * Reads raw string body from request for HMAC signature verification.
+   */
+  static async parseRawBody(req) {
+    return new Promise((resolve, reject) => {
+      let body = '';
+      let tooLarge = false;
+      req.on('data', chunk => {
+        if (tooLarge) return;
+        body += chunk;
+        if (body.length > 2 * 1024 * 1024) {
+          tooLarge = true;
+          body = '';
+          reject(new Error('Payload Too Large'));
+        }
+      });
+      req.on('end', () => {
+        if (tooLarge) return;
+        resolve(body);
+      });
+      req.on('error', reject);
+    });
+  }
+
+  /**
    * Creates native HTTP server.
    */
   createServer() {

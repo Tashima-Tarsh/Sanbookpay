@@ -10,4 +10,9 @@ export * from './bank-email-parser.js';
 export * from './qr.js';
 export * from './verification-pipeline.js';
 export * from './device-security.js';
+export * from './providers/payment-provider.interface.js';
+export * from './providers/cashfree-provider.js';
+export * from './providers/direct-bank-provider.js';
+export * from './providers/provider-registry.js';
+
 

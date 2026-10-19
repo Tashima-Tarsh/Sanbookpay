@@ -237,4 +237,375 @@ CREATE INDEX IF NOT EXISTS idx_devices_fingerprint ON devices (fingerprint_hash)
 CREATE INDEX IF NOT EXISTS idx_devices_token ON devices (device_token);
 CREATE INDEX IF NOT EXISTS idx_payment_sessions_device ON payment_sessions (device_id);
 
+-- ============================================================
+-- SANBOOK PAY PRODUCTION FINANCIAL SCHEMA EXTENSIONS
+-- ============================================================
+
+-- 12. Merchant Credentials (Scoped API Keys)
+CREATE TABLE IF NOT EXISTS merchant_credentials (
+    id TEXT PRIMARY KEY,
+    merchant_id TEXT NOT NULL REFERENCES merchants(id) ON DELETE CASCADE,
+    key_type TEXT NOT NULL DEFAULT 'LIVE',
+    api_key TEXT UNIQUE NOT NULL,
+    api_secret_hash TEXT NOT NULL,
+    permissions TEXT NOT NULL DEFAULT '["collections","payouts","refunds"]',
+    status TEXT NOT NULL DEFAULT 'ACTIVE',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    revoked_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_merchant_credentials_key ON merchant_credentials (api_key);
+
+-- 13. Provider Connections (Cashfree, HDFC, ICICI, etc.)
+CREATE TABLE IF NOT EXISTS provider_connections (
+    id TEXT PRIMARY KEY,
+    merchant_id TEXT NOT NULL REFERENCES merchants(id) ON DELETE CASCADE,
+    provider_name TEXT NOT NULL,
+    environment TEXT NOT NULL DEFAULT 'PRODUCTION',
+    business_merchant_id TEXT,
+    client_id TEXT,
+    client_secret_encrypted TEXT,
+    approved_account_id TEXT,
+    merchant_vpa TEXT,
+    corporate_id TEXT,
+    terminal_id TEXT,
+    public_key_pem TEXT,
+    private_key_encrypted TEXT,
+    webhook_url TEXT,
+    webhook_secret_encrypted TEXT,
+    ip_allowlist TEXT DEFAULT '[]',
+    status TEXT NOT NULL DEFAULT 'NOT CONFIGURED',
+    last_tested_at TEXT,
+    test_result TEXT,
+    diagnostics TEXT DEFAULT '{}',
+    is_active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_provider_connections_merchant ON provider_connections (merchant_id, provider_name);
+
+-- 14. Provider Capabilities
+CREATE TABLE IF NOT EXISTS provider_capabilities (
+    id TEXT PRIMARY KEY,
+    connection_id TEXT NOT NULL REFERENCES provider_connections(id) ON DELETE CASCADE,
+    capability_code TEXT NOT NULL,
+    is_enabled INTEGER NOT NULL DEFAULT 0,
+    verified_at TEXT,
+    verification_details TEXT,
+    UNIQUE(connection_id, capability_code)
+);
+
+-- 15. Payout Accounts (Source bank accounts for payouts)
+CREATE TABLE IF NOT EXISTS payout_accounts (
+    id TEXT PRIMARY KEY,
+    merchant_id TEXT NOT NULL REFERENCES merchants(id) ON DELETE CASCADE,
+    account_number TEXT NOT NULL,
+    ifsc TEXT NOT NULL,
+    bank_name TEXT,
+    holder_name TEXT NOT NULL,
+    balance_paise INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'ACTIVE',
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- 16. Beneficiaries (Bank accounts & UPI IDs for payouts)
+CREATE TABLE IF NOT EXISTS beneficiaries (
+    id TEXT PRIMARY KEY,
+    merchant_id TEXT NOT NULL REFERENCES merchants(id) ON DELETE CASCADE,
+    beneficiary_type TEXT NOT NULL DEFAULT 'BANK_ACCOUNT',
+    name TEXT NOT NULL,
+    email TEXT,
+    phone TEXT,
+    bank_account TEXT,
+    ifsc TEXT,
+    upi_id TEXT,
+    provider_bene_id TEXT,
+    verification_status TEXT NOT NULL DEFAULT 'UNVERIFIED',
+    verified_name TEXT,
+    verification_source TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_beneficiaries_merchant ON beneficiaries (merchant_id);
+
+-- 17. Payment Orders (Sanbook Pay Universal Collections)
+CREATE TABLE IF NOT EXISTS payment_orders (
+    id TEXT PRIMARY KEY,
+    merchant_id TEXT NOT NULL REFERENCES merchants(id) ON DELETE CASCADE,
+    merchant_order_id TEXT NOT NULL,
+    provider_order_id TEXT,
+    payment_session_id TEXT,
+    provider_name TEXT NOT NULL DEFAULT 'CASHFREE',
+    amount_paise INTEGER NOT NULL CHECK (amount_paise > 0),
+    currency TEXT NOT NULL DEFAULT 'INR',
+    status TEXT NOT NULL DEFAULT 'CREATED',
+    customer_name TEXT,
+    customer_email TEXT,
+    customer_phone TEXT,
+    checkout_url TEXT,
+    payment_method TEXT DEFAULT 'UPI',
+    bank_reference TEXT,
+    provider_payment_id TEXT,
+    provider_response TEXT DEFAULT '{}',
+    initiation_time_ms INTEGER DEFAULT 0,
+    confirmation_time_ms INTEGER DEFAULT 0,
+    webhook_delivery_time_ms INTEGER DEFAULT 0,
+    settlement_time_ms INTEGER DEFAULT 0,
+    metadata TEXT DEFAULT '{}',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    confirmed_at TEXT,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(merchant_id, merchant_order_id)
+);
+CREATE INDEX IF NOT EXISTS idx_payment_orders_status ON payment_orders (merchant_id, status);
+CREATE INDEX IF NOT EXISTS idx_payment_orders_provider ON payment_orders (provider_order_id);
+
+-- 18. Payment Attempts
+CREATE TABLE IF NOT EXISTS payment_attempts (
+    id TEXT PRIMARY KEY,
+    payment_order_id TEXT NOT NULL REFERENCES payment_orders(id) ON DELETE CASCADE,
+    attempt_number INTEGER NOT NULL DEFAULT 1,
+    provider_payment_id TEXT,
+    method TEXT NOT NULL DEFAULT 'UPI',
+    status TEXT NOT NULL DEFAULT 'INITIATED',
+    bank_reference TEXT,
+    error_code TEXT,
+    error_message TEXT,
+    raw_details TEXT DEFAULT '{}',
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- 19. Collection Events (Immutable State Audit)
+CREATE TABLE IF NOT EXISTS collection_events (
+    id TEXT PRIMARY KEY,
+    payment_order_id TEXT NOT NULL REFERENCES payment_orders(id) ON DELETE CASCADE,
+    event_type TEXT NOT NULL,
+    previous_status TEXT,
+    new_status TEXT NOT NULL,
+    actor_type TEXT NOT NULL,
+    actor_id TEXT,
+    payload TEXT DEFAULT '{}',
+    latency_ms INTEGER DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_collection_events_order ON collection_events (payment_order_id);
+
+-- 20. Payouts (Real Outbound Disbursements)
+CREATE TABLE IF NOT EXISTS payouts (
+    id TEXT PRIMARY KEY,
+    merchant_id TEXT NOT NULL REFERENCES merchants(id) ON DELETE CASCADE,
+    transfer_id TEXT UNIQUE NOT NULL,
+    idempotency_key TEXT UNIQUE NOT NULL,
+    beneficiary_id TEXT REFERENCES beneficiaries(id),
+    provider_connection_id TEXT REFERENCES provider_connections(id),
+    amount_paise INTEGER NOT NULL CHECK (amount_paise > 0),
+    currency TEXT NOT NULL DEFAULT 'INR',
+    payout_rail TEXT NOT NULL DEFAULT 'IMPS',
+    fee_paise INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'CREATED',
+    provider_transfer_id TEXT,
+    provider_name TEXT NOT NULL DEFAULT 'CASHFREE',
+    utr TEXT,
+    failure_reason TEXT,
+    remarks TEXT,
+    initiated_by TEXT,
+    approved_by TEXT,
+    payout_account_id TEXT REFERENCES payout_accounts(id),
+    initiation_time_ms INTEGER DEFAULT 0,
+    confirmation_time_ms INTEGER DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    submitted_at TEXT,
+    confirmed_at TEXT,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_payouts_merchant_status ON payouts (merchant_id, status);
+
+-- 21. Payout Approvals (Maker-Checker / Authorization)
+CREATE TABLE IF NOT EXISTS payout_approvals (
+    id TEXT PRIMARY KEY,
+    payout_id TEXT NOT NULL REFERENCES payouts(id) ON DELETE CASCADE,
+    step TEXT NOT NULL DEFAULT 'MAKER_CHECKER',
+    approver_id TEXT NOT NULL,
+    decision TEXT NOT NULL,
+    comments TEXT,
+    ip_address TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- 22. Payout Events (Immutable Audit Trail)
+CREATE TABLE IF NOT EXISTS payout_events (
+    id TEXT PRIMARY KEY,
+    payout_id TEXT NOT NULL REFERENCES payouts(id) ON DELETE CASCADE,
+    event_type TEXT NOT NULL,
+    previous_status TEXT,
+    new_status TEXT NOT NULL,
+    payload TEXT DEFAULT '{}',
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- 23. Refunds
+CREATE TABLE IF NOT EXISTS refunds (
+    id TEXT PRIMARY KEY,
+    merchant_id TEXT NOT NULL REFERENCES merchants(id) ON DELETE CASCADE,
+    payment_order_id TEXT REFERENCES payment_orders(id),
+    refund_id TEXT UNIQUE NOT NULL,
+    provider_refund_id TEXT,
+    amount_paise INTEGER NOT NULL CHECK (amount_paise > 0),
+    currency TEXT NOT NULL DEFAULT 'INR',
+    reason TEXT,
+    status TEXT NOT NULL DEFAULT 'PENDING',
+    utr TEXT,
+    provider_response TEXT DEFAULT '{}',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    confirmed_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_refunds_order ON refunds (payment_order_id);
+
+-- 24. Reversals
+CREATE TABLE IF NOT EXISTS reversals (
+    id TEXT PRIMARY KEY,
+    merchant_id TEXT NOT NULL REFERENCES merchants(id) ON DELETE CASCADE,
+    payment_order_id TEXT REFERENCES payment_orders(id),
+    amount_paise INTEGER NOT NULL,
+    reason TEXT NOT NULL,
+    bank_reference TEXT,
+    status TEXT NOT NULL DEFAULT 'CONFIRMED',
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- 25. Settlements
+CREATE TABLE IF NOT EXISTS settlements (
+    id TEXT PRIMARY KEY,
+    merchant_id TEXT NOT NULL REFERENCES merchants(id) ON DELETE CASCADE,
+    provider_connection_id TEXT REFERENCES provider_connections(id),
+    settlement_id TEXT UNIQUE NOT NULL,
+    provider_settlement_id TEXT,
+    gross_amount_paise INTEGER NOT NULL,
+    fee_paise INTEGER NOT NULL DEFAULT 0,
+    tax_paise INTEGER NOT NULL DEFAULT 0,
+    net_amount_paise INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'PENDING',
+    bank_utr TEXT,
+    bank_account_number TEXT,
+    settled_at TEXT,
+    bank_confirmed_at TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_settlements_merchant ON settlements (merchant_id);
+
+-- 26. Settlement Entries
+CREATE TABLE IF NOT EXISTS settlement_entries (
+    id TEXT PRIMARY KEY,
+    settlement_id TEXT NOT NULL REFERENCES settlements(id) ON DELETE CASCADE,
+    payment_order_id TEXT REFERENCES payment_orders(id),
+    amount_paise INTEGER NOT NULL,
+    fee_paise INTEGER NOT NULL DEFAULT 0,
+    tax_paise INTEGER NOT NULL DEFAULT 0,
+    net_paise INTEGER NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- 27. Double-Entry Financial Ledger: Accounts
+CREATE TABLE IF NOT EXISTS ledger_accounts (
+    id TEXT PRIMARY KEY,
+    merchant_id TEXT NOT NULL REFERENCES merchants(id) ON DELETE CASCADE,
+    account_code TEXT NOT NULL,
+    account_name TEXT NOT NULL,
+    account_type TEXT NOT NULL,
+    currency TEXT NOT NULL DEFAULT 'INR',
+    balance_paise INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(merchant_id, account_code)
+);
+
+-- 28. Ledger Transactions (Atomic Transaction Groups)
+CREATE TABLE IF NOT EXISTS ledger_transactions (
+    id TEXT PRIMARY KEY,
+    merchant_id TEXT NOT NULL REFERENCES merchants(id) ON DELETE CASCADE,
+    reference_type TEXT NOT NULL,
+    reference_id TEXT NOT NULL,
+    narration TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'POSTED',
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- 29. Ledger Entries (Debits and Credits)
+CREATE TABLE IF NOT EXISTS ledger_entries (
+    id TEXT PRIMARY KEY,
+    transaction_id TEXT NOT NULL REFERENCES ledger_transactions(id) ON DELETE CASCADE,
+    account_id TEXT NOT NULL REFERENCES ledger_accounts(id),
+    direction TEXT NOT NULL,
+    amount_paise INTEGER NOT NULL CHECK (amount_paise > 0),
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_ledger_entries_account ON ledger_entries (account_id);
+
+-- 30. Reconciliation Runs
+CREATE TABLE IF NOT EXISTS reconciliation_runs (
+    id TEXT PRIMARY KEY,
+    merchant_id TEXT NOT NULL REFERENCES merchants(id) ON DELETE CASCADE,
+    provider_name TEXT NOT NULL DEFAULT 'CASHFREE',
+    period_start TEXT,
+    period_end TEXT,
+    total_orders_checked INTEGER NOT NULL DEFAULT 0,
+    total_matched INTEGER NOT NULL DEFAULT 0,
+    total_discrepancies INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'COMPLETED',
+    details TEXT DEFAULT '{}',
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- 31. Reconciliation Exceptions
+CREATE TABLE IF NOT EXISTS reconciliation_exceptions (
+    id TEXT PRIMARY KEY,
+    run_id TEXT NOT NULL REFERENCES reconciliation_runs(id) ON DELETE CASCADE,
+    merchant_id TEXT NOT NULL REFERENCES merchants(id) ON DELETE CASCADE,
+    payment_order_id TEXT REFERENCES payment_orders(id),
+    provider_order_id TEXT,
+    exception_type TEXT NOT NULL,
+    expected_value TEXT,
+    actual_value TEXT,
+    status TEXT NOT NULL DEFAULT 'OPEN',
+    resolution_notes TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    resolved_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_reconciliation_exceptions_merchant ON reconciliation_exceptions (merchant_id, status);
+
+-- 32. Webhook Endpoints
+CREATE TABLE IF NOT EXISTS webhook_endpoints (
+    id TEXT PRIMARY KEY,
+    merchant_id TEXT NOT NULL REFERENCES merchants(id) ON DELETE CASCADE,
+    url TEXT NOT NULL,
+    secret TEXT NOT NULL,
+    events TEXT NOT NULL DEFAULT '["payment.success","payment.failed","payout.success","payout.failed","refund.success","settlement.completed"]',
+    is_active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- 33. Idempotency Keys
+CREATE TABLE IF NOT EXISTS idempotency_keys (
+    key TEXT PRIMARY KEY,
+    merchant_id TEXT NOT NULL REFERENCES merchants(id) ON DELETE CASCADE,
+    scope TEXT NOT NULL,
+    request_hash TEXT NOT NULL,
+    response_payload TEXT NOT NULL,
+    status_code INTEGER NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    expires_at TEXT NOT NULL
+);
+
+-- 34. Operational Alerts
+CREATE TABLE IF NOT EXISTS operational_alerts (
+    id TEXT PRIMARY KEY,
+    severity TEXT NOT NULL DEFAULT 'INFO',
+    category TEXT NOT NULL,
+    title TEXT NOT NULL,
+    message TEXT NOT NULL,
+    metadata TEXT DEFAULT '{}',
+    is_acknowledged INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+
 

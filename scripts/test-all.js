@@ -9,6 +9,7 @@ const testFiles = [
   'packages/core/src/__tests__/queue-timing.test.js',
   'packages/core/src/__tests__/webhook-engine.test.js',
   'packages/merchant-sdk/src/__tests__/merchant-sdk.test.js',
+  'packages/merchant-sdk/src/__tests__/sanbook-pay-sdk.test.js',
   'packages/merchant-sdk/src/__tests__/youpi-universal-integration.test.js',
   'apps/checkout-portal/src/__tests__/checkout-portal.test.js',
   'apps/coin-wallet-store/src/__tests__/coin-wallet-store.test.js',
@@ -31,6 +32,7 @@ const testFiles = [
   'apps/payment-api/src/__tests__/whatsapp-berry-auth.test.js',
   'apps/payment-api/src/__tests__/whitelabel-branding.test.js',
   'apps/payment-api/src/__tests__/cod-parallel-timer-decoupling.test.js',
+  'apps/payment-api/src/__tests__/sanbook-pay-production.test.js',
   'scripts/chaos-concurrency.test.js',
   'scripts/production-infrastructure.test.js'
 ];

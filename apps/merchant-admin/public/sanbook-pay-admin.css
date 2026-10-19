@@ -1,0 +1,288 @@
+/**
+ * Sanbook Pay — FinTech Responsive UI Stylesheet
+ * Dark navy (#090d16), white surfaces, emerald green (#059669) accents.
+ */
+
+:root {
+  --sb-primary: #059669;
+  --sb-primary-hover: #047857;
+  --sb-dark-navy: #090d16;
+  --sb-card-dark: #0f172a;
+  --sb-border-dark: #1e293b;
+  --sb-emerald-glow: rgba(5, 150, 105, 0.25);
+  --sb-emerald-light: rgba(5, 150, 105, 0.1);
+}
+
+.sp-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 1.5rem 0;
+}
+
+.sp-card {
+  background: var(--bg-card, #ffffff);
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: var(--card-shadow, 0 1px 3px rgba(0,0,0,0.05));
+}
+
+.sp-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+
+.sp-grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.25rem;
+}
+
+@media (max-width: 900px) {
+  .sp-grid-2, .sp-grid-4 {
+    grid-template-columns: 1fr;
+  }
+}
+
+.kpi-card-emerald {
+  background: var(--bg-card, #ffffff);
+  border: 1px solid var(--border, #e2e8f0);
+  border-left: 4px solid #059669;
+  border-radius: 10px;
+  padding: 1.25rem;
+}
+
+.kpi-card-emerald .kpi-label {
+  font-size: 0.85rem;
+  color: var(--text-muted, #64748b);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+
+.kpi-card-emerald .kpi-value {
+  font-size: 1.85rem;
+  font-weight: 800;
+  color: var(--text, #0f172a);
+  margin-top: 0.35rem;
+}
+
+.badge-live {
+  background: rgba(5, 150, 105, 0.15);
+  color: #059669;
+  border: 1px solid rgba(5, 150, 105, 0.3);
+  padding: 0.35rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.badge-no-bank {
+  background: rgba(220, 38, 38, 0.15);
+  color: #dc2626;
+  border: 1px solid rgba(220, 38, 38, 0.3);
+  padding: 0.35rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.status-pill {
+  display: inline-block;
+  padding: 0.25rem 0.6rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.status-success, .status-verified, .status-live {
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+}
+
+.status-pending, .status-processing, .status-submitted {
+  background: #fffbeb;
+  color: #92400e;
+  border: 1px solid #fde68a;
+}
+
+.status-failed, .status-rejected {
+  background: #fef2f2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+
+.status-approval_required {
+  background: #eff6ff;
+  color: #1e40af;
+  border: 1px solid #bfdbfe;
+}
+
+.status-unconfigured {
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 2.5rem 1rem !important;
+  color: var(--text-muted, #64748b);
+  font-style: italic;
+}
+
+.btn-emerald {
+  background: #059669;
+  color: #ffffff;
+  border: none;
+  padding: 0.5rem 1.25rem;
+  border-radius: 8px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.btn-emerald:hover {
+  background: #047857;
+}
+
+.btn-sm {
+  padding: 0.3rem 0.75rem;
+  font-size: 0.8rem;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--bg-surface, #f8fafc);
+  color: var(--text, #0f172a);
+  border: 1px solid var(--border, #cbd5e1);
+}
+
+.btn-sm:hover {
+  background: var(--border, #e2e8f0);
+}
+
+.btn-outline {
+  background: transparent;
+  border: 1px solid #059669;
+  color: #059669;
+}
+
+.btn-outline:hover {
+  background: rgba(5, 150, 105, 0.08);
+}
+
+.btn-success {
+  background: #059669;
+  color: #ffffff;
+  border: none;
+}
+
+.btn-success:hover {
+  background: #047857;
+}
+
+.diagnostics-panel {
+  background: #090d16;
+  color: #38bdf8;
+  font-family: monospace;
+  font-size: 0.85rem;
+  padding: 1rem;
+  border-radius: 8px;
+  border: 1px solid #1e293b;
+  overflow-x: auto;
+  max-height: 200px;
+}
+
+.alert-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.85rem 1.25rem;
+  border-radius: 8px;
+  margin-bottom: 0.75rem;
+}
+
+.alert-item.alert-critical {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+}
+
+.alert-item.alert-warning {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  color: #92400e;
+}
+
+.alert-item.alert-info {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1e40af;
+}
+
+.sp-modal-overlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  z-index: 9999;
+  align-items: center;
+  justify-content: center;
+}
+
+.sp-modal-overlay.active {
+  display: flex;
+}
+
+.sp-modal-card {
+  background: var(--bg-card, #ffffff);
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 14px;
+  width: 90%;
+  max-width: 600px;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 2rem;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
+}
+
+.form-group {
+  margin-bottom: 1.25rem;
+}
+
+.form-group label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-muted, #64748b);
+  margin-bottom: 0.4rem;
+}
+
+.form-group input, .form-group select, .form-group textarea {
+  width: 100%;
+  padding: 0.65rem 0.85rem;
+  border-radius: 8px;
+  border: 1px solid var(--border, #cbd5e1);
+  background: var(--bg-input, #ffffff);
+  color: var(--text, #0f172a);
+  font-size: 0.95rem;
+  box-sizing: border-box;
+}
+
+.form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+  outline: none;
+  border-color: #059669;
+  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.15);
+}
+

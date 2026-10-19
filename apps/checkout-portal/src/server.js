@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { generateQrSvg } from './qr.js';
-import { getInternalServiceToken } from '@youpi/common';
+import { getInternalServiceToken, PRODUCT_NAME } from '@youpi/common';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -104,8 +104,8 @@ export class CheckoutServer {
 
     let html = this.template;
 
-    const appName = state?.branding?.appName || 'YouPI PG';
-    const primaryColor = state?.branding?.primaryColor || '#0b63e5';
+    const appName = state?.branding?.appName || PRODUCT_NAME || 'Sanbook Pay';
+    const primaryColor = state?.branding?.primaryColor || '#059669';
     const merchantName = state?.merchantName || 'Merchant Checkout';
     const orderId = state?.orderId || '';
     const logoUrl = state?.branding?.logoUrl || '';
