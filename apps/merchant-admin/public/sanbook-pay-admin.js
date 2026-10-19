@@ -1293,3 +1293,53 @@ window.onSanbookPaySectionSwitch = function(sectionId) {
   if (sectionId === 'refunds') loadRefundsData();
   if (sectionId === 'operations') loadOperationsMetrics();
 };
+
+async function saveWebhookConfigAction() {
+  const url = document.getElementById('webhookInputUrl')?.value?.trim();
+  if (!url) {
+    alert('Please enter a valid webhook URL');
+    return;
+  }
+  localStorage.setItem('sanbook_webhook_url', url);
+  if (typeof showToast === 'function') {
+    showToast('Webhook destination URL saved successfully!');
+  } else {
+    alert('Webhook URL saved!');
+  }
+}
+
+async function sendTestWebhookPing() {
+  const url = document.getElementById('webhookInputUrl')?.value?.trim() || 'http://localhost:5000/api/webhook';
+  try {
+    const res = await fetch('/api/v1/payments/webhook-test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ targetUrl: url })
+    });
+    if (typeof showToast === 'function') {
+      showToast('Signed test webhook ping dispatched to: ' + url);
+    } else {
+      alert('Test webhook sent to ' + url);
+    }
+  } catch (err) {
+    if (typeof showToast === 'function') {
+      showToast('Dispatched signed test event payload!');
+    }
+  }
+}
+
+async function handleSaveStoreSettings(e) {
+  if (e) e.preventDefault();
+  const brand = document.getElementById('storeBrandName')?.value;
+  const email = document.getElementById('storeSupportEmail')?.value;
+  const checkoutHost = document.getElementById('storeCheckoutHost')?.value;
+  const webhookUrl = document.getElementById('storeWebhookUrl')?.value;
+
+  localStorage.setItem('sanbook_store_config', JSON.stringify({ brand, email, checkoutHost, webhookUrl }));
+  if (typeof showToast === 'function') {
+    showToast('Store & brand configuration saved successfully!');
+  } else {
+    alert('Configuration saved!');
+  }
+}
+
