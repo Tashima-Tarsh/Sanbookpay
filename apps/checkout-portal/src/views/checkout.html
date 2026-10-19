@@ -3380,6 +3380,16 @@
               <img src="/icons/upi.svg" alt="UPI" class="ypg-tab-icon" style="height:15px;" />
               <span>UPI QR</span>
             </button>
+            <button type="button" class="ypg-method-tab" id="tabMethodCardOnline" onclick="selectPaymentMethod('CARD')"
+              style="{{TAB_ONLINE_CARD_STYLE}}">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px; vertical-align:middle;"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+              <span>Cards</span>
+            </button>
+            <button type="button" class="ypg-method-tab" id="tabMethodNetbanking" onclick="selectPaymentMethod('NETBANKING')"
+              style="{{TAB_NETBANKING_STYLE}}">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px; vertical-align:middle;"><path d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11M20 10v11M8 14v4M12 14v4M16 14v4"/></svg>
+              <span>NetBanking</span>
+            </button>
             <button type="button" class="ypg-method-tab" id="tabMethodCod" onclick="selectPaymentMethod('COD')"
               style="{{TAB_COD_STYLE}}">
               <img src="/icons/cash.svg" alt="COD" class="ypg-tab-icon" style="height:14px; width:14px;" />
@@ -3417,6 +3427,34 @@
                     onerror="if(window.FALLBACK_ICONS)this.src=window.FALLBACK_ICONS.paytm" alt="Paytm" />
                   <img class="ypg-pc-mini-icon" src="/icons/cred.png"
                     onerror="if(window.FALLBACK_ICONS)this.src=window.FALLBACK_ICONS.cred" alt="CRED" />
+                </div>
+              </div>
+
+              <!-- Online Cards (Online Mode) -->
+              <div class="ypg-pc-method-card" id="pcMethodCardOnline" onclick="selectPaymentMethod('CARD')" style="{{PC_ONLINE_CARD_STYLE}}">
+                <div class="ypg-pc-method-header">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px; vertical-align:middle; color:#0b63e5;"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+                  <div class="ypg-pc-method-title">Cards</div>
+                  <span class="ypg-pc-cash-pill" style="background:#e0f2fe; color:#0369a1;">Online</span>
+                </div>
+                <div class="ypg-pc-method-sub">Credit, Debit &amp; Prepaid Cards</div>
+                <div class="ypg-pc-method-icons" style="gap:5px; margin-top:6px; display:flex; align-items:center;">
+                  <img src="/icons/visa.svg" alt="Visa" style="height:14px; width:auto; object-fit:contain;" />
+                  <img src="/icons/mastercard.svg" alt="Mastercard" style="height:14px; width:auto; object-fit:contain;" />
+                  <img src="/icons/rupay.svg" alt="RuPay" style="height:14px; width:auto; object-fit:contain;" />
+                </div>
+              </div>
+
+              <!-- Online NetBanking (Online Mode) -->
+              <div class="ypg-pc-method-card" id="pcMethodNetbanking" onclick="selectPaymentMethod('NETBANKING')" style="{{PC_NETBANKING_STYLE}}">
+                <div class="ypg-pc-method-header">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px; vertical-align:middle; color:#0b63e5;"><path d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11M20 10v11M8 14v4M12 14v4M16 14v4"/></svg>
+                  <div class="ypg-pc-method-title">NetBanking</div>
+                  <span class="ypg-pc-cash-pill" style="background:#f0fdf4; color:#15803d;">Instant</span>
+                </div>
+                <div class="ypg-pc-method-sub">All major Indian banks</div>
+                <div class="ypg-pc-method-icons" style="margin-top:6px; font-size:11px; color:#64748b; font-weight:600;">
+                  HDFC · SBI · ICICI · Axis
                 </div>
               </div>
 
@@ -3560,6 +3598,121 @@
                     <div>Payment is detected automatically, or tap <strong>Continue</strong> below after paying.</div>
                   </div>
                 </div>
+              <!-- VIEW ONLINE CARD: CREDIT / DEBIT CARDS -->
+              <div id="viewOnlineCardContent" hidden>
+                <div class="ypg-section-label-row" style="margin-top:0; margin-bottom:12px;">
+                  <h2 class="ypg-page-title" style="margin-bottom:0;">Pay via Card</h2>
+                  <div class="ypg-countdown-pill" id="cardTimerBadge">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
+                    <span id="cardTimerText">05:00</span>
+                  </div>
+                </div>
+
+                <div class="ypg-offers-pill" style="background:#eff6ff; border-color:#dbeafe; margin-bottom:14px;">
+                  <div class="ypg-offers-left">
+                    <div class="ypg-offer-icon-badge" style="background:#2563eb; color:#fff; display:flex; align-items:center; justify-content:center;">
+                      💳
+                    </div>
+                    <span style="color:#1e40af; font-weight:700;">Cards Accepted</span>
+                  </div>
+                  <div class="ypg-offers-right" style="display:flex; gap:6px; align-items:center;">
+                    <img src="/icons/visa.svg" alt="Visa" style="height:14px;" />
+                    <img src="/icons/mastercard.svg" alt="Mastercard" style="height:14px;" />
+                    <img src="/icons/rupay.svg" alt="RuPay" style="height:14px;" />
+                  </div>
+                </div>
+
+                <div style="background:#ffffff; border:1px solid var(--ypg-border); border-radius:12px; padding:16px; margin-bottom:14px;">
+                  <div class="ypg-input-group" style="margin-bottom:12px;">
+                    <label class="ypg-input-label" style="font-size:12px; font-weight:700; color:#334155; margin-bottom:4px; display:block;">Card Number</label>
+                    <div style="position:relative; display:flex; align-items:center;">
+                      <input type="text" id="onlineCardNumber" class="ypg-input-control" placeholder="4532 •••• •••• 8910" maxlength="19" inputmode="numeric" style="padding-right:50px; font-family:monospace; font-size:14px; letter-spacing:1px;" oninput="formatCardNumberInput(this)" />
+                      <span id="onlineCardBrandBadge" style="position:absolute; right:12px; font-size:11px; font-weight:800; color:#2563eb;">CARD</span>
+                    </div>
+                  </div>
+
+                  <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:12px;">
+                    <div class="ypg-input-group">
+                      <label class="ypg-input-label" style="font-size:12px; font-weight:700; color:#334155; margin-bottom:4px; display:block;">Expiry (MM/YY)</label>
+                      <input type="text" id="onlineCardExpiry" class="ypg-input-control" placeholder="12/28" maxlength="5" inputmode="numeric" style="font-family:monospace; text-align:center;" oninput="formatCardExpiryInput(this)" />
+                    </div>
+                    <div class="ypg-input-group">
+                      <label class="ypg-input-label" style="font-size:12px; font-weight:700; color:#334155; margin-bottom:4px; display:block;">CVV / CVC</label>
+                      <input type="password" id="onlineCardCvv" class="ypg-input-control" placeholder="•••" maxlength="4" inputmode="numeric" style="font-family:monospace; text-align:center;" />
+                    </div>
+                  </div>
+
+                  <div class="ypg-input-group" style="margin-bottom:14px;">
+                    <label class="ypg-input-label" style="font-size:12px; font-weight:700; color:#334155; margin-bottom:4px; display:block;">Cardholder Name</label>
+                    <input type="text" id="onlineCardHolder" class="ypg-input-control" placeholder="Name on card" />
+                  </div>
+
+                  <div style="display:flex; align-items:center; gap:8px; font-size:11.5px; color:#64748b; margin-bottom:14px;">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#10b981" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                    <span>Secured with 256-bit encryption &amp; RBI compliance</span>
+                  </div>
+
+                  <button type="button" class="ypg-btn-auth-action" id="btnPayCard" onclick="handleOnlineCardPay()" style="background:#0b63e5; font-size:14px; padding:12px; width:100%;">
+                    <span>Pay ₹{{AMOUNT}} securely</span> &rsaquo;
+                  </button>
+                </div>
+              </div>
+
+              <!-- VIEW ONLINE NETBANKING: POPULAR BANKS & SELECTOR -->
+              <div id="viewOnlineNetbankingContent" hidden>
+                <div class="ypg-section-label-row" style="margin-top:0; margin-bottom:12px;">
+                  <h2 class="ypg-page-title" style="margin-bottom:0;">NetBanking</h2>
+                  <div class="ypg-countdown-pill" id="nbTimerBadge">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
+                    <span id="nbTimerText">05:00</span>
+                  </div>
+                </div>
+
+                <div style="font-size:12px; color:#64748b; margin-bottom:12px;">Select your bank to authenticate and pay directly:</div>
+
+                <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:10px; margin-bottom:14px;">
+                  <button type="button" class="nb-bank-tile active" data-bank="HDFC" onclick="selectNetBank('HDFC', this)" style="border:1.5px solid #0b63e5; background:#eff6ff; border-radius:10px; padding:12px 6px; text-align:center; cursor:pointer;">
+                    <div style="font-size:18px; margin-bottom:4px;">🏦</div>
+                    <div style="font-size:12px; font-weight:800; color:#1e293b;">HDFC</div>
+                  </button>
+                  <button type="button" class="nb-bank-tile" data-bank="SBI" onclick="selectNetBank('SBI', this)" style="border:1px solid #cbd5e1; background:#ffffff; border-radius:10px; padding:12px 6px; text-align:center; cursor:pointer;">
+                    <div style="font-size:18px; margin-bottom:4px;">🏛️</div>
+                    <div style="font-size:12px; font-weight:800; color:#1e293b;">SBI</div>
+                  </button>
+                  <button type="button" class="nb-bank-tile" data-bank="ICICI" onclick="selectNetBank('ICICI', this)" style="border:1px solid #cbd5e1; background:#ffffff; border-radius:10px; padding:12px 6px; text-align:center; cursor:pointer;">
+                    <div style="font-size:18px; margin-bottom:4px;">💳</div>
+                    <div style="font-size:12px; font-weight:800; color:#1e293b;">ICICI</div>
+                  </button>
+                  <button type="button" class="nb-bank-tile" data-bank="AXIS" onclick="selectNetBank('AXIS', this)" style="border:1px solid #cbd5e1; background:#ffffff; border-radius:10px; padding:12px 6px; text-align:center; cursor:pointer;">
+                    <div style="font-size:18px; margin-bottom:4px;">🏢</div>
+                    <div style="font-size:12px; font-weight:800; color:#1e293b;">Axis</div>
+                  </button>
+                  <button type="button" class="nb-bank-tile" data-bank="KOTAK" onclick="selectNetBank('KOTAK', this)" style="border:1px solid #cbd5e1; background:#ffffff; border-radius:10px; padding:12px 6px; text-align:center; cursor:pointer;">
+                    <div style="font-size:18px; margin-bottom:4px;">💼</div>
+                    <div style="font-size:12px; font-weight:800; color:#1e293b;">Kotak</div>
+                  </button>
+                  <button type="button" class="nb-bank-tile" data-bank="PNB" onclick="selectNetBank('PNB', this)" style="border:1px solid #cbd5e1; background:#ffffff; border-radius:10px; padding:12px 6px; text-align:center; cursor:pointer;">
+                    <div style="font-size:18px; margin-bottom:4px;">🏛️</div>
+                    <div style="font-size:12px; font-weight:800; color:#1e293b;">PNB</div>
+                  </button>
+                </div>
+
+                <div class="ypg-input-group" style="margin-bottom:16px;">
+                  <label class="ypg-input-label" style="font-size:12px; font-weight:700; color:#334155; margin-bottom:4px; display:block;">Or Choose Any Other Bank</label>
+                  <select id="otherBanksSelect" class="ypg-input-control" onchange="selectOtherBank(this.value)" style="width:100%; padding:10px; border-radius:8px; border:1px solid #cbd5e1;">
+                    <option value="">-- Select Bank --</option>
+                    <option value="BOB">Bank of Baroda</option>
+                    <option value="CANARA">Canara Bank</option>
+                    <option value="UNION">Union Bank of India</option>
+                    <option value="INDUSIND">IndusInd Bank</option>
+                    <option value="YES">Yes Bank</option>
+                    <option value="IDBI">IDBI Bank</option>
+                  </select>
+                </div>
+
+                <button type="button" class="ypg-btn-auth-action" id="btnPayNetbanking" onclick="handleOnlineNetbankingPay()" style="background:#0b63e5; font-size:14px; padding:12px; width:100%;">
+                  <span>Pay ₹{{AMOUNT}} via NetBanking</span> &rsaquo;
+                </button>
               </div>
 
               <!-- VIEW COD: CASH ON DELIVERY (ONLINE SELLING MODE) -->
@@ -3770,6 +3923,18 @@
                   <div class="ypg-success-amount" id="successAmountVal">₹{{AMOUNT}}</div>
                   <div style="font-size:12px; color:var(--ypg-text-muted); margin-bottom:14px;" id="successDescText">
                     Your payment was automatically verified by YouPI PG banking observers.
+                  </div>
+                  <!-- Digital Bill Receipt Dispatch Notification -->
+                  <div style="background:#ecfdf5; border:1px solid #a7f3d0; border-radius:10px; padding:12px; margin-bottom:14px; text-align:center;">
+                    <div style="font-size:12px; font-weight:700; color:#065f46; display:flex; align-items:center; justify-content:center; gap:6px;">
+                      <span>📲</span> Receipt Dispatched via SMS &amp; Email
+                    </div>
+                    <div style="font-size:11.5px; color:#047857; margin-top:2px;">
+                      A digital copy with bank reference number has been sent to your mobile.
+                    </div>
+                    <a href="/api/v1/payments/{{PAYMENT_ID}}/receipt" target="_blank" style="display:inline-flex; align-items:center; gap:6px; margin-top:8px; background:#059669; color:#ffffff; font-size:12px; font-weight:700; padding:6px 14px; border-radius:6px; text-decoration:none;">
+                      <span>📄 View Official Bill Receipt</span>
+                    </a>
                   </div>
                   <div id="successCodDevApiBox"
                     style="display:none; font-size:11.5px; background:#f1f5f9; padding:10px 14px; border-radius:8px; margin-bottom:14px; text-align:left; border:1px solid #e2e8f0;">
@@ -5019,6 +5184,10 @@
 
     function hideAllContent() {
       document.getElementById('viewUpiContent').hidden = true;
+      const vCardOnline = document.getElementById('viewOnlineCardContent');
+      if (vCardOnline) vCardOnline.hidden = true;
+      const vNbOnline = document.getElementById('viewOnlineNetbankingContent');
+      if (vNbOnline) vNbOnline.hidden = true;
       const vCod = document.getElementById('viewCodContent');
       if (vCod) vCod.hidden = true;
       const vCash = document.getElementById('viewCashContent');
@@ -5111,6 +5280,8 @@
       }
 
       const tabUpi = document.getElementById('tabMethodUpi');
+      const tabCardOnline = document.getElementById('tabMethodCardOnline');
+      const tabNetbanking = document.getElementById('tabMethodNetbanking');
       const tabCod = document.getElementById('tabMethodCod');
       const tabCash = document.getElementById('tabMethodCash');
       const tabCard = document.getElementById('tabMethodCard');
@@ -5118,6 +5289,8 @@
       if (tabUpi) tabUpi.style.display = 'inline-flex';
 
       const pcUpi = document.getElementById('pcMethodCardUpi');
+      const pcCardOnline = document.getElementById('pcMethodCardOnline');
+      const pcNetbanking = document.getElementById('pcMethodNetbanking');
       const pcCod = document.getElementById('pcMethodCardCod');
       const pcCash = document.getElementById('pcMethodCardCash');
       const pcCard = document.getElementById('pcMethodCardCard');
@@ -5125,25 +5298,26 @@
       if (pcUpi) pcUpi.style.display = 'block';
 
       if (sellingMode === 'ONLINE') {
-        // Online Selling Mode:
-        // COD works (configurable ON/OFF).
-        // Cash on counter and Card on counter do NOT exist (hidden).
+        if (tabCardOnline) tabCardOnline.style.display = enabledMethods.includes('CARD') ? 'inline-flex' : 'none';
+        if (tabNetbanking) tabNetbanking.style.display = enabledMethods.includes('NETBANKING') ? 'inline-flex' : 'none';
         if (tabCod) tabCod.style.display = enabledMethods.includes('COD') ? 'inline-flex' : 'none';
         if (tabCash) tabCash.style.display = 'none';
         if (tabCard) tabCard.style.display = 'none';
 
+        if (pcCardOnline) pcCardOnline.style.display = enabledMethods.includes('CARD') ? 'block' : 'none';
+        if (pcNetbanking) pcNetbanking.style.display = enabledMethods.includes('NETBANKING') ? 'block' : 'none';
         if (pcCod) pcCod.style.display = enabledMethods.includes('COD') ? 'block' : 'none';
         if (pcCash) pcCash.style.display = 'none';
         if (pcCard) pcCard.style.display = 'none';
       } else {
-        // Offline Selling Mode:
-        // Cash works (configurable ON/OFF).
-        // Card works (configurable ON/OFF).
-        // COD does NOT exist (hidden).
+        if (tabCardOnline) tabCardOnline.style.display = 'none';
+        if (tabNetbanking) tabNetbanking.style.display = 'none';
         if (tabCod) tabCod.style.display = 'none';
         if (tabCash) tabCash.style.display = enabledMethods.includes('CASH_COUNTER') ? 'inline-flex' : 'none';
         if (tabCard) tabCard.style.display = enabledMethods.includes('CARD_COUNTER') ? 'inline-flex' : 'none';
 
+        if (pcCardOnline) pcCardOnline.style.display = 'none';
+        if (pcNetbanking) pcNetbanking.style.display = 'none';
         if (pcCod) pcCod.style.display = 'none';
         if (pcCash) pcCash.style.display = enabledMethods.includes('CASH_COUNTER') ? 'block' : 'none';
         if (pcCard) pcCard.style.display = enabledMethods.includes('CARD_COUNTER') ? 'block' : 'none';
@@ -5158,6 +5332,8 @@
     function updateMethodTabsUI(method) {
       const tabs = [
         { id: 'tabMethodUpi', method: 'UPI' },
+        { id: 'tabMethodCardOnline', method: 'CARD' },
+        { id: 'tabMethodNetbanking', method: 'NETBANKING' },
         { id: 'tabMethodCod', method: 'COD' },
         { id: 'tabMethodCash', method: 'CASH_COUNTER' },
         { id: 'tabMethodCard', method: 'CARD_COUNTER' }
@@ -5174,6 +5350,8 @@
 
       const pcCards = [
         { id: 'pcMethodCardUpi', method: 'UPI' },
+        { id: 'pcMethodCardOnline', method: 'CARD' },
+        { id: 'pcMethodNetbanking', method: 'NETBANKING' },
         { id: 'pcMethodCardCod', method: 'COD' },
         { id: 'pcMethodCardCash', method: 'CASH_COUNTER' },
         { id: 'pcMethodCardCard', method: 'CARD_COUNTER' }
@@ -5207,6 +5385,14 @@
       if (method === 'UPI') {
         document.getElementById('viewUpiContent').hidden = false;
         document.getElementById('ypgStickyFooter').style.display = 'flex';
+      } else if (method === 'CARD') {
+        const vCardOnline = document.getElementById('viewOnlineCardContent');
+        if (vCardOnline) vCardOnline.hidden = false;
+        document.getElementById('ypgStickyFooter').style.display = 'none';
+      } else if (method === 'NETBANKING') {
+        const vNbOnline = document.getElementById('viewOnlineNetbankingContent');
+        if (vNbOnline) vNbOnline.hidden = false;
+        document.getElementById('ypgStickyFooter').style.display = 'none';
       } else if (method === 'COD') {
         const vCod = document.getElementById('viewCodContent');
         if (vCod) vCod.hidden = false;
@@ -5237,12 +5423,13 @@
             state.status = resData.status;
           }
 
-          if (method === 'COD') {
+          if (method === 'CARD' || method === 'NETBANKING' || method === 'COD') {
+            const timerId = method === 'CARD' ? 'cardTimerText' : (method === 'NETBANKING' ? 'nbTimerText' : 'codTimerText');
             runCountdown(resData.timeRemainingSeconds || 300, sec => {
-              const el = document.getElementById('codTimerText');
+              const el = document.getElementById(timerId);
               if (el) el.textContent = formatTime(sec);
             }, () => {
-              const el = document.getElementById('codTimerText');
+              const el = document.getElementById(timerId);
               if (el) el.textContent = 'Expired';
               fetch(`${API_BASE}/api/v1/checkout/${PAYMENT_ID}/expire`, { method: 'POST' }).catch(() => { });
               loadState();
@@ -5263,12 +5450,161 @@
               loadState();
             }
           } else {
-            // Offline Counter mode: no timer countdown
             if (countdownTimer) clearInterval(countdownTimer);
           }
         }
       } catch (e) {
         console.warn('selectPaymentMethod network error:', e);
+      }
+    }
+
+    function formatCardNumberInput(input) {
+      let v = input.value.replace(/\D/g, '').slice(0, 16);
+      let formatted = v.replace(/(\d{4})(?=\d)/g, '$1 ');
+      input.value = formatted;
+      const badge = document.getElementById('onlineCardBrandBadge');
+      if (badge) {
+        if (v.startsWith('4')) badge.textContent = 'VISA';
+        else if (v.startsWith('5')) badge.textContent = 'MASTERCARD';
+        else if (v.startsWith('6')) badge.textContent = 'RUPAY';
+        else badge.textContent = 'CARD';
+      }
+    }
+
+    function formatCardExpiryInput(input) {
+      let v = input.value.replace(/\D/g, '').slice(0, 4);
+      if (v.length > 2) {
+        input.value = v.slice(0, 2) + '/' + v.slice(2);
+      } else {
+        input.value = v;
+      }
+    }
+
+    let selectedNetBankCode = 'HDFC';
+    function selectNetBank(bankCode, btnEl) {
+      selectedNetBankCode = bankCode;
+      document.querySelectorAll('.nb-bank-tile').forEach(b => {
+        b.style.border = '1px solid #cbd5e1';
+        b.style.background = '#ffffff';
+        b.classList.remove('active');
+      });
+      if (btnEl) {
+        btnEl.style.border = '1.5px solid #0b63e5';
+        btnEl.style.background = '#eff6ff';
+        btnEl.classList.add('active');
+      }
+      const other = document.getElementById('otherBanksSelect');
+      if (other) other.value = '';
+    }
+
+    function selectOtherBank(val) {
+      if (val) {
+        selectedNetBankCode = val;
+        document.querySelectorAll('.nb-bank-tile').forEach(b => {
+          b.style.border = '1px solid #cbd5e1';
+          b.style.background = '#ffffff';
+          b.classList.remove('active');
+        });
+      }
+    }
+
+    async function handleOnlineCardPay() {
+      const cardNum = (document.getElementById('onlineCardNumber')?.value || '').replace(/\s+/g, '');
+      const cardExp = document.getElementById('onlineCardExpiry')?.value || '';
+      const cardCvv = document.getElementById('onlineCardCvv')?.value || '';
+      const cardHolder = document.getElementById('onlineCardHolder')?.value || '';
+
+      if (!cardNum || cardNum.length < 12) {
+        alert('Please enter a valid card number.');
+        return;
+      }
+      if (!cardExp || cardExp.length < 4) {
+        alert('Please enter a valid card expiry (MM/YY).');
+        return;
+      }
+      if (!cardCvv || cardCvv.length < 3) {
+        alert('Please enter your 3-digit CVV.');
+        return;
+      }
+
+      const btn = document.getElementById('btnPayCard');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span>Processing Card 3DS...</span>';
+      }
+
+      try {
+        const res = await fetch(`${API_BASE}/api/v1/checkout/${PAYMENT_ID}/card-pay`, {
+          method: 'POST',
+          headers: getApiHeaders({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify({ cardNumber: cardNum, cardExp, cardCvv, cardHolderName: cardHolder, deviceId: DeviceIdentity?.currentDeviceId })
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          hideAllContent();
+          document.getElementById('viewSuccessContent').hidden = false;
+          const amtEl = document.getElementById('successAmountVal');
+          if (amtEl) amtEl.textContent = '₹' + (data.amount || state?.amount || '{{AMOUNT}}');
+          const descEl = document.getElementById('successDescText');
+          if (descEl) descEl.textContent = `Card payment of ₹${data.amount || state?.amount} verified via 3D-Secure. UTR: ${data.utr}`;
+          if (data.returnUrl) {
+            const retBtn = document.getElementById('btnReturnStore');
+            if (retBtn) retBtn.href = data.returnUrl;
+          }
+        } else {
+          alert(data.error || 'Card payment declined. Please check details.');
+          if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<span>Pay ₹{{AMOUNT}} securely</span> &rsaquo;';
+          }
+        }
+      } catch (err) {
+        alert('Payment connection error: ' + err.message);
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<span>Pay ₹{{AMOUNT}} securely</span> &rsaquo;';
+        }
+      }
+    }
+
+    async function handleOnlineNetbankingPay() {
+      const btn = document.getElementById('btnPayNetbanking');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span>Connecting to Bank Gateway...</span>';
+      }
+
+      try {
+        const res = await fetch(`${API_BASE}/api/v1/checkout/${PAYMENT_ID}/netbanking-pay`, {
+          method: 'POST',
+          headers: getApiHeaders({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify({ bankCode: selectedNetBankCode, deviceId: DeviceIdentity?.currentDeviceId })
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          hideAllContent();
+          document.getElementById('viewSuccessContent').hidden = false;
+          const amtEl = document.getElementById('successAmountVal');
+          if (amtEl) amtEl.textContent = '₹' + (data.amount || state?.amount || '{{AMOUNT}}');
+          const descEl = document.getElementById('successDescText');
+          if (descEl) descEl.textContent = `NetBanking payment via ${data.bank} authorized and credited. UTR: ${data.utr}`;
+          if (data.returnUrl) {
+            const retBtn = document.getElementById('btnReturnStore');
+            if (retBtn) retBtn.href = data.returnUrl;
+          }
+        } else {
+          alert(data.error || 'NetBanking authentication failed.');
+          if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<span>Pay ₹{{AMOUNT}} via NetBanking</span> &rsaquo;';
+          }
+        }
+      } catch (err) {
+        alert('NetBanking gateway error: ' + err.message);
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<span>Pay ₹{{AMOUNT}} via NetBanking</span> &rsaquo;';
+        }
       }
     }
 

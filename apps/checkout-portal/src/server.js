@@ -132,9 +132,13 @@ export class CheckoutServer {
     const enabledMethods = state?.enabledMethods || state?.branding?.enabledPaymentMethods || ['UPI'];
     const showMethodBar = (enabledMethods && enabledMethods.length > 1) ? 'flex' : 'none';
     const tabCodStyle = (sellingMode === 'ONLINE' && enabledMethods.includes('COD')) ? 'display:inline-flex;' : 'display:none;';
+    const tabOnlineCardStyle = (sellingMode === 'ONLINE' && enabledMethods.includes('CARD')) ? 'display:inline-flex;' : 'display:none;';
+    const tabNetbankingStyle = (sellingMode === 'ONLINE' && enabledMethods.includes('NETBANKING')) ? 'display:inline-flex;' : 'display:none;';
     const tabCashStyle = (sellingMode === 'OFFLINE' && enabledMethods.includes('CASH_COUNTER')) ? 'display:inline-flex;' : 'display:none;';
     const tabCardStyle = (sellingMode === 'OFFLINE' && enabledMethods.includes('CARD_COUNTER')) ? 'display:inline-flex;' : 'display:none;';
     const pcCodStyle = (sellingMode === 'ONLINE' && enabledMethods.includes('COD')) ? 'display:block;' : 'display:none;';
+    const pcOnlineCardStyle = (sellingMode === 'ONLINE' && enabledMethods.includes('CARD')) ? 'display:block;' : 'display:none;';
+    const pcNetbankingStyle = (sellingMode === 'ONLINE' && enabledMethods.includes('NETBANKING')) ? 'display:block;' : 'display:none;';
     const pcCashStyle = (sellingMode === 'OFFLINE' && enabledMethods.includes('CASH_COUNTER')) ? 'display:block;' : 'display:none;';
     const pcCardStyle = (sellingMode === 'OFFLINE' && enabledMethods.includes('CARD_COUNTER')) ? 'display:block;' : 'display:none;';
 
@@ -163,9 +167,13 @@ export class CheckoutServer {
     html = html.replaceAll('{{DOWNTIME_MSG}}', escapeHtml(alertMsg));
     html = html.replaceAll('{{METHOD_SELECTOR_DISPLAY}}', escapeHtml(showMethodBar));
     html = html.replaceAll('{{TAB_COD_STYLE}}', escapeHtml(tabCodStyle));
+    html = html.replaceAll('{{TAB_ONLINE_CARD_STYLE}}', escapeHtml(tabOnlineCardStyle));
+    html = html.replaceAll('{{TAB_NETBANKING_STYLE}}', escapeHtml(tabNetbankingStyle));
     html = html.replaceAll('{{TAB_CASH_STYLE}}', escapeHtml(tabCashStyle));
     html = html.replaceAll('{{TAB_CARD_STYLE}}', escapeHtml(tabCardStyle));
     html = html.replaceAll('{{PC_COD_STYLE}}', escapeHtml(pcCodStyle));
+    html = html.replaceAll('{{PC_ONLINE_CARD_STYLE}}', escapeHtml(pcOnlineCardStyle));
+    html = html.replaceAll('{{PC_NETBANKING_STYLE}}', escapeHtml(pcNetbankingStyle));
     html = html.replaceAll('{{PC_CASH_STYLE}}', escapeHtml(pcCashStyle));
     html = html.replaceAll('{{PC_CARD_STYLE}}', escapeHtml(pcCardStyle));
     html = html.replaceAll('{{DOWNTIME_ALT_BTN_DISPLAY}}', escapeHtml(downtimeAltBtnDisplay));

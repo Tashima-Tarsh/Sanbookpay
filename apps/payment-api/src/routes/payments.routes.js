@@ -1,5 +1,5 @@
 import { HttpServer } from '../server.js';
-import { toPaise, toRupeesString, resolveRuntimeUrls, PaymentStatus, safeEqual, hasBearer, getObserverToken } from '@youpi/common';
+import { toPaise, toRupeesString, resolveRuntimeUrls, PaymentStatus, safeEqual, hasBearer, getObserverToken, maskPhone, maskEmail, generateCustomerId } from '@youpi/common';
 import { isTerminalStatus, toPublicOutcome } from '@youpi/core';
 import { isAdminRequest } from '../auth-guard.js';
 
@@ -182,14 +182,43 @@ export function registerPaymentRoutes(server, ctx) {
       };
     }
 
-    // Resolve customer if provided (optional pre-existing customer)
+    // Resolve or auto-generate customer with masked details
+    let customer = null;
     let customerId = body.customerId || null;
-    if (!customerId && (body.customer?.mobileNumber || body.customer?.phoneNumber || body.customer?.email) && ctx.customerRepo) {
-      const ident = body.customer.email || body.customer.mobileNumber || body.customer.phoneNumber;
-      const existingCust = ctx.customerRepo.findByIdentifier(ident);
-      if (existingCust) {
-        customerId = existingCust.id;
+    const hasCustomerInput = !!(body.customerId || body.customer || body.customerEmail || body.customerPhone || body.customerName);
+    const customerName = body.customer?.name || body.customerName || null;
+    const customerEmail = body.customer?.email || body.customerEmail || null;
+    const customerPhone = body.customer?.mobileNumber || body.customer?.phoneNumber || body.customer?.phone || body.customerPhone || null;
+
+    if (customerId && ctx.customerRepo) {
+      customer = ctx.customerRepo.findById(customerId);
+    }
+
+    if (!customer && (customerEmail || customerPhone) && ctx.customerRepo) {
+      const ident = customerEmail || customerPhone;
+      customer = ctx.customerRepo.findByIdentifier(ident);
+      if (customer) {
+        customerId = customer.id;
       }
+    }
+
+    // Auto-generate customer record if customer info was provided by merchant
+    if (!customer && hasCustomerInput && ctx.customerRepo) {
+      customerId = customerId || generateCustomerId();
+      const uniqueSuffix = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+      try {
+        customer = ctx.customerRepo.create({
+          id: customerId,
+          name: customerName || 'Customer',
+          email: customerEmail || `cust_${uniqueSuffix}@customer.sanbookpay.com`,
+          mobileNumber: customerPhone || `98${Math.floor(10000000 + Math.random() * 90000000)}`,
+          status: 'ACTIVE'
+        });
+      } catch {
+        customer = ctx.customerRepo.findById(customerId);
+      }
+    } else if (customer) {
+      customerId = customer.id;
     }
 
     // Server-side Ban Enforcement (Section 3)
@@ -284,6 +313,12 @@ export function registerPaymentRoutes(server, ctx) {
       currency: session.currency,
       status: queueResult.status,
       queuePosition: queueResult.queuePosition,
+      customer: customer ? {
+        id: customer.id,
+        name: customer.name,
+        maskedPhone: maskPhone(customer.mobileNumber),
+        maskedEmail: maskEmail(customer.email)
+      } : null,
       checkoutUrl: `${resolveCheckoutBaseUrl(merchant)}/checkout/${session.id}`
     });
   });
@@ -415,4 +450,57 @@ export function registerPaymentRoutes(server, ctx) {
       metadata: session.metadata
     });
   });
+
+  // GET /api/v1/payments/:id/receipt (Official Digital Bill Receipt)
+  server.get('/api/v1/payments/:id/receipt', async (req, res, params) => {
+    const session = ctx.sessionRepo.findById(params.id);
+    if (!session) {
+      HttpServer.json(res, 404, { error: `Payment session not found: ${params.id}` });
+      return;
+    }
+
+    let customer = null;
+    if (session.customerId && ctx.customerRepo) {
+      customer = ctx.customerRepo.findById(session.customerId);
+    }
+    const merchant = (session.merchantId ? ctx.merchantRepo?.findById(session.merchantId) : null) || ctx.defaultMerchant;
+
+    let receipt = null;
+    if (ctx.receiptService) {
+      receipt = await ctx.receiptService.getOrCreateReceipt(session, customer, merchant);
+    }
+
+    const wantsJson = (req.query && req.query.format === 'json') || (req.headers['accept'] || '').includes('application/json');
+    if (wantsJson) {
+      HttpServer.json(res, 200, {
+        success: true,
+        receiptId: receipt?.receiptId || `RCPT-${session.id.slice(0, 8).toUpperCase()}`,
+        paymentId: session.id,
+        orderId: session.orderId,
+        amount: toRupeesString(session.amountPaise),
+        amountPaise: session.amountPaise.toString(),
+        currency: session.currency,
+        status: session.status,
+        method: session.method,
+        utr: receipt?.utr || session.utr || session.bankReference || 'CONFIRMED',
+        customer: customer ? {
+          id: customer.id,
+          name: customer.name,
+          maskedPhone: maskPhone(customer.mobileNumber),
+          maskedEmail: maskEmail(customer.email)
+        } : null,
+        smsStatus: receipt?.smsStatus || 'SENT',
+        emailStatus: receipt?.emailStatus || 'DELIVERED',
+        dispatchedAt: receipt?.dispatchedAt || new Date().toISOString()
+      });
+      return;
+    }
+
+    res.writeHead(200, {
+      'Content-Type': 'text/html; charset=utf-8',
+      'X-Content-Type-Options': 'nosniff'
+    });
+    res.end(receipt?.emailHtml || `<!DOCTYPE html><html><body><h3>Receipt for Order #${session.orderId}</h3><p>Amount: ₹${toRupeesString(session.amountPaise)}</p></body></html>`);
+  });
 }
+

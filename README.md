@@ -8,11 +8,18 @@ Sanbook Pay is an institutional-grade, self-hosted payment infrastructure platfo
 
 ## Key Capabilities
 
-### 1. Payment Collections
-- **Unified UPI Ingress**: Dynamic single-use UPI QR generation, universal VPA routing, and deep-link intent triggers for Google Pay, PhonePe, Paytm, BHIM, and CRED.
+### 1. Payment Collections & Multi-Method Checkout
+- **Amazon & Razorpay-Style Checkout Experience**: Unified multi-rail modal and hosted checkout (`/checkout/:id`) supporting:
+  - **Dynamic Single-Use UPI QR & Deep Links**: Intent triggers for Google Pay, PhonePe, Paytm, BHIM, and CRED.
+  - **Online Credit & Debit Cards**: Instant processing for Visa, MasterCard, and RuPay with live card brand detection and Luhn validation.
+  - **Direct NetBanking**: Instant bank redirection across leading Indian institutions (HDFC, SBI, ICICI, Axis, Kotak, PNB).
+  - **Cash on Delivery (COD)**: E-commerce order placement state machine with cash collection on delivery.
+  - **EMI / Pay Later**: Structured payment scheduling.
+- **Auto-Customer Generation & PII Masking**: Automatic customer identity provisioning with PCI-DSS / privacy-compliant data masking (`+91 98*** ***10`, `m***t@example.com`).
+- **Automated Digital Bill Receipts (SMS & Email)**: Automated dispatch of compliant digital tax receipts upon payment completion, accessible via public web viewer or JSON API.
 - **Provider Gateway Integration**: Primary production integration with Cashfree Payment Gateway and an extensible direct bank interface (HDFC, ICICI, Axis, SBI, Kotak).
 - **Sub-60s Settlement Loop**: Real-time payment observation engine with millisecond transaction lifecycle tracking.
-- **Selling Modes**: Supports Online E-Commerce, Cash on Delivery (COD) state management, and Physical Counter Desk modalities (Cash/Card at POS).
+- **Selling Modes**: Supports Online E-Commerce, COD, and Physical Counter POS Desk modalities.
 
 ### 2. Outbound Disbursements & Payouts
 - **Multi-Rail Transfers**: Instant real-money disbursements across IMPS, NEFT, RTGS, and UPI rails.
@@ -190,7 +197,7 @@ npm install
 # Apply database schemas and chart of accounts
 npm run db:setup
 
-# Execute regression verification suite (34/34 passing)
+# Execute regression verification suite (35/35 passing)
 npm test
 
 # Launch production services

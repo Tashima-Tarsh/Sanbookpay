@@ -55,6 +55,7 @@ import { registerSettlementsRoutes } from './routes/settlements.routes.js';
 import { registerRefundsRoutes } from './routes/refunds.routes.js';
 import { registerOperationsRoutes } from './routes/operations.routes.js';
 import { getWhatsAppBerryService, WhatsAppBerryService } from './services/whatsapp-berry.service.js';
+import { ReceiptNotificationService } from './services/receipt-notification.service.js';
 
 export function createPaymentApp(customDb = null, options = {}) {
   const db = customDb || getDatabase();
@@ -77,6 +78,7 @@ export function createPaymentApp(customDb = null, options = {}) {
   const ticketRepo = new SupportTicketRepository(db);
   const auditRepo = new AuditLogRepository(db);
   const deviceRepo = new DeviceRepository(db);
+  const receiptService = new ReceiptNotificationService(db, auditRepo);
 
   const eventEmitter = new EventEmitter();
 
@@ -167,6 +169,13 @@ export function createPaymentApp(customDb = null, options = {}) {
         sources: data.sources || session.verificationSources
       });
       webhookEngine.dispatch('SUCCESS', session).catch(() => {});
+      try {
+        const customer = session.customerId ? customerRepo.findById(session.customerId) : null;
+        const merchant = (session.merchantId ? merchantRepo.findById(session.merchantId) : null) || defaultMerchant;
+        receiptService.sendPaymentReceipt(session, customer, merchant);
+      } catch (err) {
+        console.error('[ReceiptNotification] Failed to dispatch receipt:', err.message);
+      }
       handleSlotFreedAndPromote(session.receivingAccountId);
     }
   });
@@ -439,6 +448,7 @@ export function createPaymentApp(customDb = null, options = {}) {
     defaultMerchant,
     checkoutBaseUrl,
     whatsappBerryService,
+    receiptService,
     webhookEngine
   };
 

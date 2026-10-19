@@ -10,3 +10,4 @@ export * from './runtime-config.js';
 export * from './secrets.js';
 export * from './tunnel-command.js';
 export * from './branding.js';
+export * from './masking.js';
