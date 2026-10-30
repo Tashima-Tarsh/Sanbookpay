@@ -16,19 +16,55 @@
 import { HttpServer } from '../server.js';
 import { PaymentStatus } from '@youpi/common';
 import crypto from 'node:crypto';
+import http from 'node:http';
+import https from 'node:https';
 import { LedgerRepository, MerchantRepository } from '@youpi/db';
 
-/** Dynamo Pay-branded bank IFSC directory */
-const DYNAMO_IFSC_DB = {
-  'DYNA0000001': { bank: 'Dynamo Pay Bank', branch: 'Mumbai Main', city: 'Mumbai', state: 'Maharashtra', address: 'Dynamo Pay Bank Main Branch, Fort, Mumbai - 400001', contact: '022-22600001', upi: true, neft: true, rtgs: true, imps: true },
-  'DYNA0000002': { bank: 'Dynamo Pay Bank', branch: 'Delhi Main', city: 'New Delhi', state: 'Delhi', address: 'Dynamo Pay Bank Main Branch, Connaught Place, New Delhi - 110001', contact: '011-23300001', upi: true, neft: true, rtgs: true, imps: true },
-  'DYNA0000003': { bank: 'Dynamo Pay Bank', branch: 'Bangalore Main', city: 'Bangalore', state: 'Karnataka', address: 'Dynamo Pay Bank Main Branch, MG Road, Bangalore - 560001', contact: '080-25500001', upi: true, neft: true, rtgs: true, imps: true },
-  'DYNA0000004': { bank: 'Dynamo Pay Bank', branch: 'Chennai Main', city: 'Chennai', state: 'Tamil Nadu', address: 'Dynamo Pay Bank Main Branch, Chennai - 600001', contact: '044-24200001', upi: true, neft: true, rtgs: true, imps: true },
-  'DYNA0000005': { bank: 'Dynamo Pay Bank', branch: 'Hyderabad Main', city: 'Hyderabad', state: 'Telangana', address: 'Dynamo Pay Bank Main Branch, Hyderabad - 500001', contact: '040-26500001', upi: true, neft: true, rtgs: true, imps: true },
-  'DYNA0000006': { bank: 'Dynamo Pay Bank', branch: 'Pune Main', city: 'Pune', state: 'Maharashtra', address: 'Dynamo Pay Bank Main Branch, Pune - 411001', contact: '020-24200001', upi: true, neft: true, rtgs: true, imps: true }
-};
+/** Razorpay IFSC API endpoint - real bank IFSC data */
+const RAZORPAY_IFSC_API = 'https://ifsc.razorpay.com';
 
-/** Dynamo Pay webhook retry policy */
+/**
+ * Fetches real IFSC bank details from Razorpay's public IFSC API.
+ * @param {string} ifsc - IFSC code (e.g., SBIN0000001)
+ * @returns {Promise<{bank: string, branch: string, city: string, state: string, address: string, contact: string, upi: boolean, neft: boolean, rtgs: boolean, imps: boolean} | null>}
+ */
+async function fetchRazorpayIfsc(ifsc) {
+  try {
+    const res = await new Promise((resolve, reject) => {
+      const req = https.get(`${RAZORPAY_IFSC_API}/${ifsc}`, (res) => {
+        let data = '';
+        res.on('data', (chunk) => { data += chunk; });
+        res.on('end', () => resolve({ status: res.statusCode, body: data }));
+      });
+      req.on('error', reject);
+      req.setTimeout(10000, () => req.destroy(new Error('timeout')));
+    });
+
+    if (res.status === 404) {
+      return null;
+    }
+    if (res.status !== 200) {
+      throw new Error(`Razorpay IFSC API returned ${res.status}`);
+    }
+
+    const raw = JSON.parse(res.body);
+    return {
+      bank: raw.BANK || '',
+      branch: raw.Branch || '',
+      city: raw.Center || '',
+      state: raw.State || '',
+      address: raw.Address || '',
+      contact: raw.Contact || '',
+      upi: raw.UPI === true,
+      neft: raw.NEFT === true,
+      rtgs: raw.RTGS === true,
+      imps: raw.IMPS === true
+    };
+  } catch (err) {
+    console.error(`IFSC lookup failed for ${ifsc}:`, err.message);
+    return null;
+  }
+}
 const DYNAMO_WEBHOOK_RETRY_POLICY = {
   maxRetries: 5,
   initialBackoffMs: 5000,
@@ -309,13 +345,15 @@ export function registerDynamoPayRoutes(server, ctx) {
       return HttpServer.json(res, 400, { error: 'Missing IFSC code', code: 'MISSING_IFSC', platform: 'dynamo-pay' });
     }
 
-    const info = DYNAMO_IFSC_DB[ifsc];
+    const ifscRegex = /^[A-Z]{4}0[A-Z0-9]{6}$/;
+    if (!ifscRegex.test(ifsc)) {
+      return HttpServer.json(res, 400, { error: 'Invalid IFSC format', code: 'INVALID_IFSC_FORMAT', platform: 'dynamo-pay' });
+    }
+
+    // Look up real bank details from Razorpay IFSC API
+    const info = await fetchRazorpayIfsc(ifsc);
     if (!info) {
-      const ifscRegex = /^[A-Z]{4}0[A-Z0-9]{6}$/;
-      if (!ifscRegex.test(ifsc)) {
-        return HttpServer.json(res, 400, { error: 'Invalid IFSC format', code: 'INVALID_IFSC_FORMAT', platform: 'dynamo-pay' });
-      }
-      return HttpServer.json(res, 404, { error: 'IFSC not found in Dynamo Pay directory', code: 'IFSC_NOT_FOUND', ifsc, platform: 'dynamo-pay' });
+      return HttpServer.json(res, 404, { error: 'IFSC not found in bank directory', code: 'IFSC_NOT_FOUND', ifsc, platform: 'dynamo-pay' });
     }
 
     return HttpServer.json(res, 200, {
@@ -331,7 +369,8 @@ export function registerDynamoPayRoutes(server, ctx) {
       rtgs: info.rtgs,
       imps: info.imps,
       supportedModes: ['UPI', 'NEFT', 'RTGS', 'IMPS'].filter(m => info[m.toLowerCase()]),
-      platform: 'dynamo-pay'
+      platform: 'dynamo-pay',
+      source: 'razorpay-ifsc-api'
     });
   });
 
