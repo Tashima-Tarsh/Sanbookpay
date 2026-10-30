@@ -91,6 +91,19 @@ describe('Gmail Payment Observer Integration Tests', () => {
       assert.equal(json.status, 'UP');
       assert.equal(json.service, 'gmail-observer');
     });
+    test('starting the Gmail observer requires authorization',async()=>{
+      assert.equal((await fetch(gmailBaseUrl+'/start',{method:'POST'})).status,401);
+      const response=await fetch(gmailBaseUrl+'/start',{method:'POST',headers:{Authorization:`Bearer ${TEST_OBSERVER_TOKEN}`}});
+      assert.equal(response.status,200);assert.equal((await response.json()).started,true);
+      gmailInstance.poller.stop();
+    });
+    test('stopping the Gmail observer clears cached account access',async()=>{
+      gmailInstance.poller.stop();
+      gmailInstance.poller.credentials={clientId:'test-client',refreshToken:'test-refresh'};
+      gmailInstance.poller.cachedAccessToken='test-cached-token';gmailInstance.poller.tokenExpiresAt=Date.now()+60000;
+      const response=await fetch(gmailBaseUrl+'/stop',{method:'POST',headers:{Authorization:`Bearer ${TEST_OBSERVER_TOKEN}`}});
+      assert.equal(response.status,200);assert.equal(gmailInstance.poller.credentials,null);assert.equal(gmailInstance.poller.cachedAccessToken,null);assert.equal(gmailInstance.poller.isRunning,false);
+    });
 
     test('GET /oauth/url requires a token and returns a Google OAuth URL carrying a signed state', async () => {
       assert.equal((await get('/oauth/url')).status, 401);

@@ -75,4 +75,17 @@ describe('Merchant Admin Integration Tests', () => {
     const json = JSON.parse(res.text);
     assert.ok(Array.isArray(json));
   });
+  test('console sign-in issues an HttpOnly session and sign-out revokes it',async()=>{
+    const login=await fetch(baseUrl+'/api/console/session',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:getAdminToken()})});
+    assert.equal(login.status,200);
+    const cookie=login.headers.get('set-cookie');assert.match(cookie,/HttpOnly/);assert.match(cookie,/SameSite=Strict/);
+    const headers={Cookie:cookie.split(';')[0]};
+    assert.equal((await fetch(baseUrl+'/api/console/session',{headers})).status,200);
+    assert.equal((await fetch(baseUrl+'/api/console/session',{method:'DELETE',headers})).status,200);
+    assert.equal((await fetch(baseUrl+'/api/console/session',{headers})).status,401);
+  });
+  test('anonymous browser cannot use the privileged payment API relay',async()=>{
+    assert.equal((await fetch(baseUrl+'/api/console/v1/admin/merchant-settings')).status,401);
+    assert.equal((await fetch(baseUrl+'/api/v1/admin/merchant-settings')).status,401);
+  });
 });

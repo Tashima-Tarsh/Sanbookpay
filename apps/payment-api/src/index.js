@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { registerMerchantConsoleRoutes } from './routes/merchant-console.routes.js';
 import { EventEmitter } from 'node:events';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -232,6 +233,10 @@ export function createPaymentApp(customDb = null, options = {}) {
       handleSlotFreedAndPromote(session.receivingAccountId);
     }
   });
+  eventEmitter.on('PAYMENT.VERIFICATION_PENDING', data => {
+    server.broadcastSse(data.paymentId, 'status_change', { status: PaymentStatus.VERIFICATION_PENDING });
+    try{attributionEngine.reconcilePendingPayment(data.paymentId);}catch(error){console.error('[Pending bank reconciliation]',error.message);}
+  });
 
   eventEmitter.on('PAYMENT.EXPIRED', (data) => {
     const session = sessionRepo.findById(data.paymentId);
@@ -371,10 +376,12 @@ export function createPaymentApp(customDb = null, options = {}) {
       `, [nowIso]);
 
       for (const row of failedProc) {
-        sessionRepo.transitionToTerminal(row.id, PaymentStatus.FAILED);
-        server.broadcastSse(row.id, 'status_change', { status: PaymentStatus.FAILED });
+        timingEngine.handleProcessingTimerExpiration(row.id);
         handleSlotFreedAndPromote(row.receiving_account_id);
       }
+
+      const pendingBankMatches=db.query(`SELECT DISTINCT ps.id FROM payment_sessions ps JOIN payment_observations obs ON obs.receiving_account_id=ps.receiving_account_id AND obs.amount_paise=ps.amount_paise AND obs.bank_reference_number=json_extract(ps.metadata,'$.reportedUtr') WHERE ps.status='VERIFICATION_PENDING' AND obs.attributed_payment_id IS NULL AND obs.attribution_status IN ('UNATTRIBUTED','LATE_UNMATCHED') AND obs.source IN ('GMAIL','GOOGLE_MESSAGES','ANDROID_OBSERVER','SMS_GATEWAY')`);
+      for(const row of pendingBankMatches)attributionEngine.reconcilePendingPayment(row.id);
 
       // Scan for vacant receiving accounts that have waiting queued sessions
       const vacantAccounts = db.query(`
@@ -496,6 +503,7 @@ export function createPaymentApp(customDb = null, options = {}) {
   registerCheckoutRoutes(server, context);
   registerPollerRoutes(server, context);
   registerAdminRoutes(server, context);
+  registerMerchantConsoleRoutes(server, { ...context, eventEmitter });
   registerCustomerRoutes(server, context);
   registerDeviceRoutes(server, context);
   registerCollectionsRoutes(server, context);

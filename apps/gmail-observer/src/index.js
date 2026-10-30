@@ -17,6 +17,7 @@ export function startGmailObserver(port = null, options = {}) {
   return new Promise(resolve => {
     const instance = rawServer.listen(finalPort, bindHost, () => {
       console.log(`[Gmail Observer] Service listening on port ${finalPort}`);
+      if(options.autoStart === true)poller.start();
       resolve({
         poller,
         port: finalPort,
@@ -31,5 +32,5 @@ export function startGmailObserver(port = null, options = {}) {
 
 // Auto-run if executed directly as main script
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  startGmailObserver();
+  startGmailObserver(null,{autoStart:true});
 }

@@ -33,11 +33,13 @@ export const VALID_TRANSITIONS = Object.freeze({
     PaymentStatus.CANCELLED
   ],
   [PaymentStatus.PROCESSING]: [
+    PaymentStatus.VERIFICATION_PENDING,
     PaymentStatus.SUCCESS,
     PaymentStatus.FAILED,
     PaymentStatus.EXPIRED
   ],
   [PaymentStatus.SUCCESS]: [],
+  [PaymentStatus.VERIFICATION_PENDING]: [PaymentStatus.SUCCESS, PaymentStatus.FAILED],
   [PaymentStatus.FAILED]: [],
   [PaymentStatus.EXPIRED]: [],
   [PaymentStatus.CANCELLED]: []

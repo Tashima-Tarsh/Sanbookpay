@@ -2,6 +2,7 @@ import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import { startCheckoutServer } from '../index.js';
+import { CheckoutServer } from '../server.js';
 import { generateQrMatrix, generateQrSvg } from '../qr.js';
 
 describe('Checkout Portal Integration Tests', () => {
@@ -10,7 +11,11 @@ describe('Checkout Portal Integration Tests', () => {
 
   before(async () => {
     // Start on high test port (7199)
-    serverInstance = await startCheckoutServer(7199);
+    const portal = new CheckoutServer();
+    portal.fetchPaymentState = async id => id === 'missing' ? null : ({ paymentId:id, orderId:'ORDER-TEST', merchantName:'Test merchant', amount:'500.00', status:'ACTIVE', payeeVpa:'9082843142@slc', upiUri:'upi://pay?pa=9082843142%40slc&pn=Test&am=500.00&cu=INR', timeRemainingSeconds:300 });
+    const raw = portal.createServer();
+    await new Promise(r => raw.listen(7199,'127.0.0.1',r));
+    serverInstance = { port:7199, close:()=>new Promise(r=>raw.close(r)) };
     baseUrl = `http://localhost:${serverInstance.port}`;
   });
 
@@ -122,13 +127,11 @@ describe('Checkout Portal Integration Tests', () => {
       // Verify Dynamo Pay branding
       assert.ok(res.text.includes('Dynamo Pay'));
 
-      // Verify premium glassmorphism classes
+      // Verify the checkout exposes the payment QR and app payment controls.
       assert.ok(res.text.includes('dp-wrapper'));
-      assert.ok(res.text.includes('dp-header'));
-      assert.ok(res.text.includes('dp-amount-card'));
-      assert.ok(res.text.includes('dp-qr-card'));
-      assert.ok(res.text.includes('dp-qr-image'));
-      assert.ok(res.text.includes('dp-btn-primary'));
+      assert.ok(res.text.includes('id="amount"'));
+      assert.ok(res.text.includes('id="qrImage"'));
+      assert.ok(res.text.includes('data-app="gpay"'));
 
       // Verify UPI provider icons referenced
       assert.ok(res.text.includes('/icons/gpay.png'));
@@ -143,5 +146,10 @@ describe('Checkout Portal Integration Tests', () => {
       assert.equal(res.text.includes('WhatsApp Mobile Number'), false);
       assert.equal(res.text.includes('ypg-pc-sidebar'), false);
     });
+  });
+  test('missing sessions never generate a payable QR with invented details', async () => {
+    const res=await get('/checkout/missing/qr.svg');
+    assert.equal(res.status,409);
+    assert.ok(!res.text.includes('merchant@upi'));
   });
 });

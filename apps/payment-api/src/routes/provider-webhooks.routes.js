@@ -96,6 +96,7 @@ export function registerProviderWebhooksRoutes(server, ctx) {
       }
 
       // Update financial ledger
+      ctx.eventEmitter?.emit('PAYMENT.PROVIDER_SUCCESS', { paymentOrderId:order.id });
       try {
         ledgerRepo.recordDoubleEntry(
           merchantId,

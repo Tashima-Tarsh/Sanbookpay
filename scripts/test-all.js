@@ -7,19 +7,23 @@ const testFiles = [
   'packages/db/src/__tests__/db.test.js',
   'packages/core/src/__tests__/core.test.js',
   'packages/core/src/__tests__/queue-timing.test.js',
+  'packages/core/src/__tests__/verification-pending.test.js',
   'packages/core/src/__tests__/webhook-engine.test.js',
   'packages/merchant-sdk/src/__tests__/merchant-sdk.test.js',
   'packages/merchant-sdk/src/__tests__/sanbook-pay-sdk.test.js',
   'packages/merchant-sdk/src/__tests__/youpi-universal-integration.test.js',
   'apps/checkout-portal/src/__tests__/checkout-portal.test.js',
+  'apps/checkout-portal/src/__tests__/checkout-interactions.test.js',
   'apps/coin-wallet-store/src/__tests__/coin-wallet-store.test.js',
   'apps/merchant-admin/src/__tests__/merchant-admin.test.js',
+  'apps/merchant-admin/src/__tests__/console-navigation.test.js',
   'apps/payment-help/src/__tests__/payment-help.test.js',
   'apps/gmail-observer/src/__tests__/gmail-observer.test.js',
   'apps/sms-observer/src/__tests__/sms-observer.test.js',
   'apps/android-observer-app/__tests__/android-observer.test.js',
   'apps/control-center/src/__tests__/control-center.test.js',
   'apps/payment-api/src/__tests__/payment-api.test.js',
+  'apps/payment-api/src/__tests__/merchant-console.test.js',
   'apps/payment-api/src/__tests__/auth-guard.test.js',
   'apps/payment-api/src/__tests__/counter-payments.test.js',
   'apps/payment-api/src/__tests__/selling-modes-and-cod.test.js',
@@ -50,7 +54,7 @@ for (let i = 0; i < testFiles.length; i++) {
   const file = testFiles[i];
   process.stdout.write(`[${i + 1}/${testFiles.length}] Testing ${file}... `);
   const startFile = Date.now();
-  const result = spawnSync(process.execPath, ['--test', file], {
+  const result = spawnSync(process.execPath, ['--test', '--test-reporter=tap', file], {
     stdio: 'pipe',
     env: {
       ...process.env,
@@ -62,7 +66,7 @@ for (let i = 0; i < testFiles.length; i++) {
 
   const duration = ((Date.now() - startFile) / 1000).toFixed(2);
 
-  if (result.status === 0) {
+  if (result.status === 0 && !/^\s*not ok\b/m.test(result.stdout || '')) {
     passedCount++;
     console.log(`✅ PASS (${duration}s)`);
   } else {

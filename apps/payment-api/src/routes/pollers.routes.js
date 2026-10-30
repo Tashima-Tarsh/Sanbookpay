@@ -421,7 +421,14 @@ export function registerPollerRoutes(server, ctx) {
 
     // Canonical runtime URL derivation (Part C2)
     const runtime = resolveRuntimeUrls(merchant?.branding || {});
-    const baseUrl = runtime.apiUrl;
+    let baseUrl = runtime.apiUrl;
+    if(req.query.gatewayUrl){
+      try{
+        const requested=new URL(req.query.gatewayUrl);
+        if(requested.protocol!=='https:' || requested.username || requested.password || requested.pathname!=='/' || requested.search || requested.hash) throw new Error('Invalid URL');
+        baseUrl=requested.origin;
+      }catch{return HttpServer.json(res,400,{error:'Enter the public HTTPS gateway origin, without a path or credentials.'});}
+    }
     const token = enrollmentSecret;
     const sessionId = crypto.randomUUID();
     const expiresAt = Date.now() + (10 * 60 * 1000); // 10 minutes

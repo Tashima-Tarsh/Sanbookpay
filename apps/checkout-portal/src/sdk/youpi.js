@@ -213,7 +213,7 @@
         }
 
         instance.options.paymentId = data.paymentId;
-        instance.options.checkoutUrl = data.checkoutUrl;
+        instance.options.checkoutUrl = new URL(data.checkoutUrl, new URL(instance.options.portalUrl, window.location.href)).href;
         instance.open();
         return instance;
       } catch (err) {

@@ -436,7 +436,7 @@ export class CoinWalletStoreServer {
             // The post-payment return target must be derived from the store's own configured
             // base URL. Building it from Host / X-Forwarded-* lets an attacker choose where a
             // paying customer is redirected (phishing after a real payment).
-            const returnUrl = `${this.publicBaseUrl}/wallet?orderId=${encodeURIComponent(orderId)}`;
+            const returnUrl = `${process.env.DYNAMO_UNIFIED_GATEWAY === 'true' ? '' : this.publicBaseUrl}/wallet?orderId=${encodeURIComponent(orderId)}`;
 
             // Coin quantity is derived server-side from the amount paid. A client-supplied
             // `coins` value would let a buyer pay ₹1 and be credited an arbitrary balance.
@@ -458,7 +458,9 @@ export class CoinWalletStoreServer {
 
             // Normalize checkoutUrl for localhost development / testing to prevent tunnel offline issues
             let resolvedCheckoutUrl = payment.checkoutUrl;
-            if (this.publicBaseUrl.includes('localhost') || this.publicBaseUrl.includes('127.0.0.1')) {
+            if (process.env.DYNAMO_UNIFIED_GATEWAY === 'true') {
+              resolvedCheckoutUrl = `/checkout/${payment.paymentId}`;
+            } else if (this.publicBaseUrl.includes('localhost') || this.publicBaseUrl.includes('127.0.0.1')) {
               resolvedCheckoutUrl = `${this.publicBaseUrl}/checkout/${payment.paymentId}`;
             }
 

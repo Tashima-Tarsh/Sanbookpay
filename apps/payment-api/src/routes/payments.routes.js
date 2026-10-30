@@ -39,6 +39,7 @@ function isPaymentOwner(req, session, ctx) {
  */
 export function registerPaymentRoutes(server, ctx) {
   function resolveCheckoutBaseUrl(merchant) {
+    if (process.env.DYNAMO_UNIFIED_GATEWAY === 'true') return '';
     if (merchant?.branding) {
       try {
         const urls = resolveRuntimeUrls(merchant.branding);
@@ -109,15 +110,16 @@ export function registerPaymentRoutes(server, ctx) {
       const isStale = (existing.status === PaymentStatus.ACTIVE && existing.expiresAt && existing.expiresAt.getTime() <= now) ||
         (existing.status === PaymentStatus.PROCESSING && existing.processingExpiresAt && existing.processingExpiresAt.getTime() <= now);
       if (isStale) {
-        ctx.sessionRepo.transitionToTerminal(existing.id, PaymentStatus.EXPIRED);
+        if(existing.status === PaymentStatus.PROCESSING) ctx.timingEngine.handleProcessingTimerExpiration(existing.id);
+        else ctx.sessionRepo.transitionToTerminal(existing.id, PaymentStatus.EXPIRED);
         if (existing.receivingAccountId) {
           ctx.queueEngine.promoteNext(existing.receivingAccountId);
         }
-        existing.status = PaymentStatus.EXPIRED;
+        existing.status = existing.status === PaymentStatus.PROCESSING ? PaymentStatus.VERIFICATION_PENDING : PaymentStatus.EXPIRED;
       }
 
       // If existing is non-terminal (ACTIVE, PROCESSING, QUEUED, INITIATED):
-      if ([PaymentStatus.ACTIVE, PaymentStatus.PROCESSING, PaymentStatus.QUEUED, PaymentStatus.INITIATED].includes(existing.status)) {
+      if ([PaymentStatus.ACTIVE, PaymentStatus.PROCESSING, PaymentStatus.QUEUED, PaymentStatus.INITIATED, PaymentStatus.VERIFICATION_PENDING].includes(existing.status)) {
         // CASE 3: Active session + Different device -> DUPLICATE_SESSION_DETECTED
         if (deviceId && existing.deviceId && deviceId !== existing.deviceId) {
           HttpServer.json(res, 409, {

@@ -16,6 +16,7 @@
 import { HttpServer } from '../server.js';
 import { PaymentStatus } from '@youpi/common';
 import crypto from 'node:crypto';
+import { resolveSecret } from '@youpi/common';
 import http from 'node:http';
 import https from 'node:https';
 import { LedgerRepository, MerchantRepository } from '@youpi/db';
@@ -90,8 +91,8 @@ export function registerDynamoPayRoutes(server, ctx) {
     try {
       const all = ctx.merchantRepo.findAll();
       for (const m of all) {
-        // Deterministic clientSecret derived from merchant id (reproducible across restarts)
-        const clientSecret = crypto.createHash('sha256').update(`dynamo-${m.id}-secret`).digest('hex').substring(0, 32);
+        // A persisted server secret keeps credentials stable without making them guessable from the public merchant ID.
+        const clientSecret = crypto.createHmac('sha256',resolveSecret('dynamo_client_master_key')).update(m.id).digest('hex');
         dynamoMerchants.set(m.id, {
           clientId: `dp_client_${m.id}`,
           clientSecret,

@@ -146,7 +146,7 @@ describe('@youpi/core Queue & Timing Engine Tests', () => {
     assert.equal(updatedS2.queuePosition, 0);
   });
 
-  test('Timing Engine: Payment Done starts 30-sec processing window, fails if no observation', async () => {
+  test('Timing Engine: Payment Done starts processing timeout awaits verification without claiming failure', async () => {
     const s1 = sessionRepo.create({
       merchantId: defaultMerchant.id,
       receivingAccountId: testAccount.id,
@@ -164,9 +164,11 @@ describe('@youpi/core Queue & Timing Engine Tests', () => {
     // Wait 70ms for processing timer (configured as 50ms) to elapse
     await new Promise(resolve => setTimeout(resolve, 70));
 
-    // s1 must now be FAILED because no observer verified it
+    // Missing bank evidence cannot prove a failure.
     const updatedS1 = sessionRepo.findById(s1.id);
-    assert.equal(updatedS1.status, PaymentStatus.FAILED);
+    assert.equal(updatedS1.status, 'VERIFICATION_PENDING');
+    assert.equal(updatedS1.completedAt, null);
+    assert.equal(accountRepo.findById(testAccount.id).isSlotBusy, false);
   });
 
   test('Recovery Engine: crash recovery cleans up overdue sessions and promotes queued', () => {

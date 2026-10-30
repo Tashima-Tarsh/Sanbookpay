@@ -78,7 +78,7 @@ export class SplitSettlementRepository {
       // Default split: 10% platform fee, 18% GST on fee, 90% merchant
       const platformFeePercent = 100;
       const gstPercent = 18;
-      const platformFeePaise = Math.round(gross * platformFeePercent / 1000);
+      const platformFeePaise = Math.min(Math.round(gross * platformFeePercent / 1000), Math.floor(gross / (1 + gstPercent / 100)));
       const gstOnFeePaise = Math.round(platformFeePaise * gstPercent / 100);
       const merchantSharePaise = gross - platformFeePaise - gstOnFeePaise;
       return {
@@ -97,7 +97,8 @@ export class SplitSettlementRepository {
     const gstPercent = Number(rule.gst_percent);
     const merchantSharePercent = Number(rule.merchant_share_percent);
 
-    const platformFeePaise = Math.round(gross * platformFeePercent / 1000);
+    // Bound the rounded fee so fee + rounded tax + net always equals the collected amount.
+    const platformFeePaise = Math.min(Math.round(gross * platformFeePercent / 1000), Math.floor(gross / (1 + gstPercent / 100)));
     const gstOnFeePaise = Math.round(platformFeePaise * gstPercent / 100);
     const merchantSharePaise = gross - platformFeePaise - gstOnFeePaise;
 

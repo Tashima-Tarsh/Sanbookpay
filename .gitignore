@@ -49,3 +49,6 @@ Thumbs.db
 !packages/**
 !docs/**
 !assets/**
+
+# Local Cloudflare tunnel executable
+/cloudflared.exe

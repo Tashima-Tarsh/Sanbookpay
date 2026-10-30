@@ -45,7 +45,7 @@ export class GmailPoller {
    * }} options
    */
   constructor(options = {}) {
-    this.apiBaseUrl = options.apiBaseUrl || process.env.BASE_PAYMENT_API_URL || 'http://localhost:6100';
+    this.apiBaseUrl = options.apiBaseUrl || process.env.PAYMENT_API_INTERNAL_URL || `http://127.0.0.1:${process.env.PAYMENT_API_PORT || 6100}`;
     this.receivingAccountId = options.receivingAccountId || '00000000-0000-0000-0000-000000000002';
     this.pollIntervalMs = options.pollIntervalMs || Number(process.env.GMAIL_POLL_INTERVAL_MS || 5000);
     this.observerClient = new PaymentObserverClient({
@@ -61,9 +61,11 @@ export class GmailPoller {
     this.cachedAccessToken = null;
     this.tokenExpiresAt = 0;
     this.processedMessageIds = new Set();
+    this.credentialsGeneration=0;
   }
 
   setCredentials(creds) {
+    if(creds.clientId!==this.credentials?.clientId || creds.refreshToken!==this.credentials?.refreshToken){this.credentialsGeneration++;this.cachedAccessToken=null;this.tokenExpiresAt=0;}
     this.credentials = { ...(this.credentials || {}), ...creds };
   }
 
@@ -96,6 +98,7 @@ export class GmailPoller {
 
     const { clientId, clientSecret, refreshToken } = this.credentials || {};
     if (!clientId || !clientSecret || !refreshToken) return null;
+    const generation=this.credentialsGeneration;
 
     try {
       const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
@@ -115,6 +118,7 @@ export class GmailPoller {
       }
 
       const tokenData = await tokenRes.json();
+      if(generation!==this.credentialsGeneration)return null;
       this.cachedAccessToken = tokenData.access_token;
       this.tokenExpiresAt = Date.now() + ((tokenData.expires_in || 3500) - 120) * 1000;
       return this.cachedAccessToken;
@@ -200,6 +204,7 @@ export class GmailPoller {
   }
 
   stop() {
+    this.credentialsGeneration++;
     if (this.timer) {
       clearInterval(this.timer);
       this.timer = null;
@@ -209,11 +214,12 @@ export class GmailPoller {
   }
 
   async pollCycle() {
+    const generation=this.credentialsGeneration;
     this.lastPollAt = new Date();
 
     try {
       const accessToken = await this.getAccessToken();
-      if (!accessToken) return;
+      if (!accessToken || generation!==this.credentialsGeneration) return;
 
       const query = encodeURIComponent('subject:(credit OR credited OR received OR upi OR deposit OR alert)');
       const listRes = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=10&q=${query}`, {
@@ -229,9 +235,11 @@ export class GmailPoller {
       }
 
       const listData = await listRes.json();
+      if(generation!==this.credentialsGeneration)return;
       const messages = listData.messages || [];
 
       for (const m of messages) {
+        if(generation!==this.credentialsGeneration)return;
         if (this.processedMessageIds.has(m.id)) continue;
 
         try {
@@ -242,6 +250,7 @@ export class GmailPoller {
           if (!msgRes.ok) continue;
 
           const msgData = await msgRes.json();
+          if(generation!==this.credentialsGeneration)return;
           const headers = msgData.payload?.headers || [];
           const from = headers.find(h => h.name.toLowerCase() === 'from')?.value || '';
           const subject = headers.find(h => h.name.toLowerCase() === 'subject')?.value || '';

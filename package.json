@@ -9,13 +9,15 @@
     "apps/*"
   ],
   "scripts": {
-    "build": "tsc -b",
+    "build": "node scripts/check-runtime.js",
+    "build:typescript": "tsc -b",
     "clean": "node scripts/clean.js",
     "db:setup": "node scripts/init-db.cjs",
     "sync:package": "node scripts/sync-package.cjs",
     "start": "node scripts/start.js",
     "start:prod": "node scripts/start.js",
     "start:local": "node scripts/start-local.js",
+    "start:tunnel": "node scripts/start-quick-tunnel.js",
     "start:prod:api": "node apps/payment-api/src/index.js",
     "dev": "node scripts/dev.js",
     "test": "node scripts/test-all.js",

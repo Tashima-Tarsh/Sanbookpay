@@ -1,4 +1,5 @@
 import { PaymentStatus, ObservationAttributionStatus, TicketStatus, SenderType } from '@youpi/common';
+const BANK_SOURCES = ['GMAIL','GOOGLE_MESSAGES','ANDROID_OBSERVER','SMS_GATEWAY'];
 
 export class AttributionEngine {
   /**
@@ -36,6 +37,18 @@ export class AttributionEngine {
     this.pendingGraceTimers.clear();
   }
 
+  reconcilePendingPayment(sessionId) {
+    const session=this.sessionRepo.findById(sessionId);
+    if(![PaymentStatus.ACTIVE,PaymentStatus.PROCESSING,PaymentStatus.VERIFICATION_PENDING].includes(session?.status) || !session.metadata?.reportedUtr) return null;
+    const rows=this.sessionRepo.db.query(`SELECT * FROM payment_observations WHERE receiving_account_id=? AND amount_paise=? AND bank_reference_number=? AND attributed_payment_id IS NULL AND attribution_status IN ('UNATTRIBUTED','LATE_UNMATCHED') ORDER BY observed_at`,[session.receivingAccountId,Number(session.amountPaise),session.metadata.reportedUtr]);
+    for(const row of rows){
+      if(!BANK_SOURCES.includes(row.source)) continue;
+      const result=this.processObservation(this.obsRepo.mapRow(row));
+      if(result.attributed)return result;
+    }
+    return null;
+  }
+
   /**
    * Processes a normalized canonical observation through the attribution pipeline.
    * @param {ReturnType<typeof import('./normalizer.js').ObservationNormalizer.normalize>} normalizedObs
@@ -54,7 +67,9 @@ export class AttributionEngine {
   processObservation(normalizedObs) {
     // Tier 1: Check fingerprint for deduplication
     const existing = this.obsRepo.findByFingerprint(normalizedObs.fingerprintHash);
-    if (existing) {
+    const retrySavedBankRecord=existing && !existing.attributedPaymentId && ['UNATTRIBUTED','LATE_UNMATCHED'].includes(existing.attributionStatus) && BANK_SOURCES.includes(existing.source) && normalizedObs.bankReferenceNumber && this.sessionRepo.db.queryOne(`SELECT COUNT(*) AS n FROM payment_sessions WHERE status IN ('ACTIVE','PROCESSING','VERIFICATION_PENDING') AND receiving_account_id=? AND amount_paise=? AND json_extract(metadata,'$.reportedUtr')=?`,[normalizedObs.receivingAccountId,Number(normalizedObs.amountPaise),normalizedObs.bankReferenceNumber]).n===1;
+    if(retrySavedBankRecord)normalizedObs=existing;
+    if (existing && !retrySavedBankRecord) {
       // If observation came from the SAME source, drop as redundant duplicate
       if (existing.source === normalizedObs.source) {
         if (this.auditRepo) {
@@ -145,11 +160,30 @@ export class AttributionEngine {
     }
 
     // Persist new observation as UNATTRIBUTED first
-    const savedObs = this.obsRepo.create(normalizedObs);
+    const savedObs = retrySavedBankRecord ? existing : this.obsRepo.create(normalizedObs);
+    if(BANK_SOURCES.includes(normalizedObs.source)&&normalizedObs.bankReferenceNumber){
+      const manual=this.sessionRepo.db.query(`SELECT * FROM payment_sessions WHERE status='SUCCESS' AND verification_tag='MERCHANT_CONFIRMED' AND receiving_account_id=? AND amount_paise=? AND json_extract(metadata,'$.reportedUtr')=?`,[normalizedObs.receivingAccountId,Number(normalizedObs.amountPaise),normalizedObs.bankReferenceNumber]);
+      if(manual.length>1)return {attributed:false,duplicate:false,lateMatch:false,observationId:savedObs.id,outcomeStatus:ObservationAttributionStatus.UNATTRIBUTED};
+      if(manual.length===1&&normalizedObs.observedAt.getTime()>=new Date(manual[0].created_at).getTime()-300000){
+        const verified=this.sessionRepo.recordVerificationSource(manual[0].id,normalizedObs.source,savedObs.id,{finalizeSuccess:true});
+        this.obsRepo.markAttributed(savedObs.id,manual[0].id);
+        this.eventEmitter.emit('PAYMENT.VERIFICATION_UPGRADED',{paymentId:manual[0].id,verificationLevel:verified.level,verificationTag:verified.tag,sources:verified.sources});
+        return {attributed:true,duplicate:false,lateMatch:false,paymentSessionId:manual[0].id,observationId:savedObs.id,outcomeStatus:PaymentStatus.SUCCESS};
+      }
+    }
 
     // Tier 2: Check currently active session on receiving account
     let currentSession = null;
-    if (normalizedObs.rawPayload?.targetSessionId) {
+    const unresolved=this.sessionRepo.db.query(`SELECT * FROM payment_sessions WHERE receiving_account_id=? AND amount_paise=? AND status=?`,[normalizedObs.receivingAccountId,Number(normalizedObs.amountPaise),PaymentStatus.VERIFICATION_PENDING]);
+    // A delayed bank record can settle an unresolved payment only by its exact reported reference,
+    // receiving account and amount; amount-only matching could credit a newer customer's order.
+    if (normalizedObs.bankReferenceNumber) {
+      const pending = this.sessionRepo.db.query(`SELECT * FROM payment_sessions WHERE receiving_account_id=? AND amount_paise=? AND status IN ('ACTIVE','PROCESSING','VERIFICATION_PENDING') AND json_extract(metadata,'$.reportedUtr')=?`, [normalizedObs.receivingAccountId, Number(normalizedObs.amountPaise), normalizedObs.bankReferenceNumber]);
+      if(pending.length > 1) return { attributed:false, duplicate:false, lateMatch:false, observationId:savedObs.id, outcomeStatus:ObservationAttributionStatus.UNATTRIBUTED };
+      if(pending.length === 1) currentSession=this.sessionRepo.mapRow(pending[0]);
+    }
+    if(!currentSession && unresolved.length)return {attributed:false,duplicate:false,lateMatch:false,observationId:savedObs.id,outcomeStatus:ObservationAttributionStatus.UNATTRIBUTED};
+    if (!currentSession && normalizedObs.rawPayload?.targetSessionId) {
       currentSession = this.sessionRepo.findById(normalizedObs.rawPayload.targetSessionId);
     }
     if (!currentSession || (currentSession.amountPaise !== normalizedObs.amountPaise)) {
@@ -185,7 +219,7 @@ export class AttributionEngine {
 
     if (currentSession) {
       // Invariant Check 1: Must be in ACTIVE or PROCESSING status
-      const isEligibleStatus = [PaymentStatus.ACTIVE, PaymentStatus.PROCESSING].includes(currentSession.status);
+      const isEligibleStatus = [PaymentStatus.ACTIVE, PaymentStatus.PROCESSING].includes(currentSession.status) || (currentSession.status === PaymentStatus.VERIFICATION_PENDING && BANK_SOURCES.includes(normalizedObs.source) && Boolean(normalizedObs.bankReferenceNumber) && currentSession.metadata?.reportedUtr === normalizedObs.bankReferenceNumber);
 
       // Invariant Check 2: Exact Amount Match (in integer paise)
       const isAmountMatch = currentSession.amountPaise === normalizedObs.amountPaise;

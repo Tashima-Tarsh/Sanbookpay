@@ -357,12 +357,12 @@ export function registerCheckoutRoutes(server, ctx) {
       }
       server.broadcastSse(session.id, 'status_change', { status: PaymentStatus.EXPIRED });
     } else if (session.status === PaymentStatus.PROCESSING && session.processingExpiresAt && session.processingExpiresAt.getTime() <= now) {
-      ctx.sessionRepo.transitionToTerminal(session.id, PaymentStatus.FAILED);
-      session.status = PaymentStatus.FAILED;
+      ctx.timingEngine.handleProcessingTimerExpiration(session.id);
+      session.status = PaymentStatus.VERIFICATION_PENDING;
       if (session.receivingAccountId) {
         ctx.queueEngine.promoteNext(session.receivingAccountId);
       }
-      server.broadcastSse(session.id, 'status_change', { status: PaymentStatus.FAILED });
+      server.broadcastSse(session.id, 'status_change', { status: session.status });
     }
 
     // Terminal session handling: if session is terminal, return terminal state directly (CASE 4)
@@ -412,6 +412,8 @@ export function registerCheckoutRoutes(server, ctx) {
         method: session.method,
         timeRemainingSeconds: 0,
         isTerminal: true,
+        verificationTag: session.verificationTag,
+        receiptConfirmation: session.metadata?.merchantReceiptConfirmation && !session.verificationLevel ? { source:'MERCHANT', reference:session.metadata.reportedUtr || null, bankObserverVerified:false } : null,
         branding,
         // UPI payment details (where payment was sent)
         upiDetails,
@@ -858,6 +860,8 @@ export function registerCheckoutRoutes(server, ctx) {
       return;
     }
 
+    if(session.status===PaymentStatus.VERIFICATION_PENDING) return HttpServer.json(res,409,{error:'A payment is awaiting bank verification. Do not pay again.'});
+
     const deviceAccess = checkSessionDeviceAccess(session, req, null, ctx);
     if (!deviceAccess.allowed) {
       HttpServer.json(res, deviceAccess.statusCode || 409, deviceAccess.body);
@@ -980,7 +984,13 @@ export function registerCheckoutRoutes(server, ctx) {
       return;
     }
 
+    const claim = await HttpServer.parseBody(req);
+    if(claim.reportedUtr !== undefined){
+      if(!/^\d{12}$/.test(String(claim.reportedUtr))) return HttpServer.json(res,400,{error:'Enter the 12-digit UPI reference from your payment receipt.'});
+      ctx.db.execute('UPDATE payment_sessions SET metadata=?,updated_at=? WHERE id=?',[JSON.stringify({...session.metadata,reportedUtr:String(claim.reportedUtr),reportedUtrSource:'CUSTOMER_REPORTED'}),new Date().toISOString(),session.id]);
+    }
     const updated = ctx.timingEngine.handlePaymentDone(params.id);
+    ctx.attributionEngine?.reconcilePendingPayment(session.id);
 
     // Resolve payee VPA (where the payment will be sent) for instant gaming confirmation
     const snapshot = session.metadata?.receivingAccountSnapshot;
@@ -1023,136 +1033,19 @@ export function registerCheckoutRoutes(server, ctx) {
   // POST /api/v1/checkout/:id/verify-utr
   // Gaming-industry instant confirmation: customer submits UTR after paying via UPI app.
   // No waiting for SMS/Gmail observer — immediate SUCCESS + webhook callback.
-  server.post('/api/v1/checkout/:id/verify-utr', async (req, res, params) => {
-    const session = ctx.sessionRepo.findById(params.id);
-    if (!session) {
-      HttpServer.json(res, 404, { error: `Payment session not found: ${params.id}` });
-      return;
-    }
-
-    const deviceAccess = checkSessionDeviceAccess(session, req, null, ctx);
-    if (!deviceAccess.allowed) {
-      HttpServer.json(res, deviceAccess.statusCode || 409, deviceAccess.body);
-      return;
-    }
-
-    if ([PaymentStatus.SUCCESS, PaymentStatus.FAILED, PaymentStatus.EXPIRED, PaymentStatus.CANCELLED].includes(session.status)) {
-      HttpServer.json(res, 200, {
-        paymentId: session.id,
-        status: session.status,
-        message: `Already in terminal state: ${session.status}`
-      });
-      return;
-    }
-
-    let body;
-    try {
-      body = await HttpServer.parseRawBody(req);
-    } catch {
-      HttpServer.json(res, 400, { error: 'Invalid request body' });
-      return;
-    }
-
-    let parsed;
-    try {
-      parsed = JSON.parse(body);
-    } catch {
-      HttpServer.json(res, 400, { error: 'Invalid JSON body' });
-      return;
-    }
-
-    const utr = parsed?.utr || parsed?.upiTransactionId || parsed?.transactionId || null;
-    if (!utr || typeof utr !== 'string' || utr.trim().length < 6) {
-      HttpServer.json(res, 400, { error: 'UTR is required and must be at least 6 characters' });
-      return;
-    }
-
-    const trimmedUtr = utr.trim();
-
-    // Attribute observation manually (UTR provided by customer after UPI app payment)
-    const attributedObservation = {
-      id: `manual_utr_${Date.now()}`,
-      sessionId: session.id,
-      source: 'MANUAL_UTR',
-      senderVpa: parsed?.senderVpa || null,
-      senderName: parsed?.senderName || null,
-      bankReferenceNumber: trimmedUtr,
-      observedAt: new Date().toISOString(),
-      amountPaise: session.amountPaise,
-      currency: session.currency,
-      verified: true
-    };
-
-    // Store manual observation
-    try {
-      if (ctx.obsRepo) {
-        ctx.obsRepo.create(attributedObservation);
-      }
-    } catch {}
-
-    // Transition to SUCCESS immediately
-    const updated = ctx.sessionRepo.transitionToTerminal(session.id, PaymentStatus.SUCCESS, {
-      attributedObservationId: attributedObservation.id
-    });
-
-    // Broadcast SSE for instant UI update
-    server.broadcastSse(params.id, 'status_change', {
-      status: PaymentStatus.SUCCESS,
-      utr: trimmedUtr,
-      orderId: updated.orderId,
-      amountPaise: updated.amountPaise ? updated.amountPaise.toString() : '0'
-    });
-    server.broadcastSse('admin_counter_events', 'status_change', {
-      status: PaymentStatus.SUCCESS,
-      sessionId: updated.id,
-      orderId: updated.orderId,
-      amountPaise: updated.amountPaise ? updated.amountPaise.toString() : '0'
-    });
-
-    // Fire webhook to merchant immediately (fast callback)
-    try {
-      if (ctx.webhookEngine) {
-        // Store UTR in metadata so dispatch includes it in webhook payload
-        const meta = typeof updated.metadata === 'string' ? JSON.parse(updated.metadata) : (updated.metadata || {});
-        meta.utr = trimmedUtr;
-        meta.senderVpa = attributedObservation.senderVpa;
-        meta.senderName = attributedObservation.senderName;
-        ctx.db.execute(`
-          UPDATE payment_sessions
-          SET metadata = ?, updated_at = ?
-          WHERE id = ?
-        `, [JSON.stringify(meta), new Date().toISOString(), params.id]);
-
-        await ctx.webhookEngine.dispatch('SUCCESS', updated);
-      }
-    } catch {}
-
-    // Auto-create split settlement entry for gaming/marketplace fee split
-    try {
-      const splitRepo = new SplitSettlementRepository(ctx.db);
-      const split = splitRepo.calculateSplit(updated.amountPaise, session.merchantId);
-      splitRepo.createEntry({
-        merchantId: session.merchantId,
-        paymentSessionId: updated.id,
-        paymentOrderId: null,
-        grossAmountPaise: split.grossAmountPaise,
-        platformFeePaise: split.platformFeePaise,
-        gstOnFeePaise: split.gstOnFeePaise,
-        merchantSharePaise: split.merchantSharePaise,
-        status: 'PENDING'
-      });
-    } catch {}
-
-    HttpServer.json(res, 200, {
-      paymentId: updated.id,
-      orderId: updated.orderId,
-      amount: toRupeesString(updated.amountPaise),
-      amountPaise: updated.amountPaise ? updated.amountPaise.toString() : '0',
-      status: PaymentStatus.SUCCESS,
-      utr: trimmedUtr,
-      verifiedAt: updated.completedAt ? updated.completedAt.toISOString() : new Date().toISOString(),
-      message: 'Payment verified instantly via UTR. Funds received.'
-    });
+  server.post('/api/v1/checkout/:id/verify-utr', async (req,res,params)=>{
+    const session=ctx.sessionRepo.findById(params.id);
+    if(!session)return HttpServer.json(res,404,{error:'Payment session not found.'});
+    const access=checkSessionDeviceAccess(session,req,null,ctx);
+    if(!access.allowed)return HttpServer.json(res,access.statusCode||409,access.body);
+    if(![PaymentStatus.ACTIVE,PaymentStatus.PROCESSING,PaymentStatus.VERIFICATION_PENDING].includes(session.status))return HttpServer.json(res,409,{error:'This payment cannot accept a new reference.'});
+    const body=await HttpServer.parseBody(req),utr=String(body.utr||'').trim();
+    if(!/^\d{12}$/.test(utr))return HttpServer.json(res,400,{error:'Enter the 12-digit UPI reference from your payment receipt.'});
+    ctx.db.execute('UPDATE payment_sessions SET metadata=?,updated_at=? WHERE id=?',[JSON.stringify({...session.metadata,reportedUtr:utr,reportedUtrSource:'CUSTOMER_REPORTED'}),new Date().toISOString(),session.id]);
+    ctx.auditRepo?.log({merchantId:session.merchantId,entityType:'PAYMENT_SESSION',entityId:session.id,action:'CUSTOMER_REPORTED_UTR',actorType:'CUSTOMER',details:{reportedUtr:utr,bankVerified:false}});
+    ctx.attributionEngine?.reconcilePendingPayment(session.id);
+    const updated=ctx.sessionRepo.findById(session.id);
+    return HttpServer.json(res,200,{paymentId:updated.id,status:updated.status,reportedUtr:utr,verified:updated.status===PaymentStatus.SUCCESS,message:updated.status===PaymentStatus.SUCCESS?'Matched to a bank observation.':'Reference saved. Awaiting a matching bank observation.'});
   });
 
   // POST /api/v1/checkout/:id/cancel
@@ -1163,7 +1056,7 @@ export function registerCheckoutRoutes(server, ctx) {
       return;
     }
 
-    if ([PaymentStatus.SUCCESS, PaymentStatus.FAILED, PaymentStatus.EXPIRED, PaymentStatus.CANCELLED].includes(session.status)) {
+    if ([PaymentStatus.SUCCESS, PaymentStatus.FAILED, PaymentStatus.EXPIRED, PaymentStatus.CANCELLED, PaymentStatus.VERIFICATION_PENDING].includes(session.status)) {
       HttpServer.json(res, 200, {
         paymentId: session.id,
         status: session.status
@@ -1209,7 +1102,7 @@ export function registerCheckoutRoutes(server, ctx) {
       return;
     }
 
-    if ([PaymentStatus.SUCCESS, PaymentStatus.FAILED, PaymentStatus.EXPIRED, PaymentStatus.CANCELLED].includes(session.status)) {
+    if ([PaymentStatus.SUCCESS, PaymentStatus.FAILED, PaymentStatus.EXPIRED, PaymentStatus.CANCELLED, PaymentStatus.VERIFICATION_PENDING].includes(session.status)) {
       HttpServer.json(res, 400, { error: `Cannot switch payment method for terminal session in status '${session.status}'` });
       return;
     }
@@ -1434,7 +1327,7 @@ export function registerCheckoutRoutes(server, ctx) {
     }
 
     // PROCESSING = a UPI payment was already detected and is being verified; switching it to COD would drop that payment.
-    if ([PaymentStatus.SUCCESS, PaymentStatus.FAILED, PaymentStatus.EXPIRED, PaymentStatus.CANCELLED, PaymentStatus.PROCESSING].includes(session.status)) {
+    if ([PaymentStatus.SUCCESS, PaymentStatus.FAILED, PaymentStatus.EXPIRED, PaymentStatus.CANCELLED, PaymentStatus.PROCESSING, PaymentStatus.VERIFICATION_PENDING].includes(session.status)) {
       HttpServer.json(res, 400, { error: `Cannot place COD order for session in status '${session.status}'` });
       return;
     }
@@ -1567,7 +1460,7 @@ export function registerCheckoutRoutes(server, ctx) {
       return;
     }
 
-    if ([PaymentStatus.SUCCESS, PaymentStatus.FAILED, PaymentStatus.EXPIRED, PaymentStatus.CANCELLED].includes(session.status)) {
+    if ([PaymentStatus.SUCCESS, PaymentStatus.FAILED, PaymentStatus.EXPIRED, PaymentStatus.CANCELLED, PaymentStatus.VERIFICATION_PENDING].includes(session.status)) {
       HttpServer.json(res, 400, { error: `Cannot process card payment for session in status '${session.status}'` });
       return;
     }
@@ -1692,7 +1585,7 @@ export function registerCheckoutRoutes(server, ctx) {
       return;
     }
 
-    if ([PaymentStatus.SUCCESS, PaymentStatus.FAILED, PaymentStatus.EXPIRED, PaymentStatus.CANCELLED].includes(session.status)) {
+    if ([PaymentStatus.SUCCESS, PaymentStatus.FAILED, PaymentStatus.EXPIRED, PaymentStatus.CANCELLED, PaymentStatus.VERIFICATION_PENDING].includes(session.status)) {
       HttpServer.json(res, 400, { error: `Cannot process NetBanking payment for session in status '${session.status}'` });
       return;
     }

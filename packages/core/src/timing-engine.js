@@ -152,7 +152,7 @@ export class TimingEngine {
 
   /**
    * Executes when Timer 2 (30-second processing window) reaches 0 with no matching observation.
-   * Transitions to FAILED and promotes next queued customer.
+   * Releases the slot while payment confirmation remains unresolved.
    * @param {string} sessionId
    */
   handleProcessingTimerExpiration(sessionId) {
@@ -161,27 +161,27 @@ export class TimingEngine {
     const session = this.sessionRepo.findById(sessionId);
     if (!session) return;
 
-    // Invariant: Only fail if still in PROCESSING status (no observer matched it yet)
+    // Only unresolved processing sessions can time out.
     if (session.status !== PaymentStatus.PROCESSING) {
       return;
     }
 
-    // Transition to FAILED and release slot
-    this.sessionRepo.transitionToTerminal(sessionId, PaymentStatus.FAILED);
+    // Missing bank evidence is not a payment failure.
+    this.sessionRepo.transitionToVerificationPending(sessionId);
 
     if (this.auditRepo) {
       this.auditRepo.log({
         merchantId: session.merchantId,
         entityType: 'PAYMENT_SESSION',
         entityId: sessionId,
-        action: 'PAYMENT_FAILED_NO_OBSERVATION',
+        action: 'PAYMENT_VERIFICATION_PENDING',
         actorType: 'SYSTEM',
         details: { reason: '30-second verification window elapsed with no matching observation' }
       });
     }
 
-    this.eventEmitter.emit('SESSION.FAILED', { sessionId, receivingAccountId: session.receivingAccountId });
-    this.eventEmitter.emit('PAYMENT.FAILED', {
+    this.eventEmitter.emit('SESSION.VERIFICATION_PENDING', { sessionId, receivingAccountId: session.receivingAccountId });
+    this.eventEmitter.emit('PAYMENT.VERIFICATION_PENDING', {
       paymentId: sessionId,
       orderId: session.orderId,
       merchantId: session.merchantId,
@@ -205,7 +205,7 @@ export class TimingEngine {
     const session = this.sessionRepo.findById(sessionId);
     if (!session) return null;
 
-    if ([PaymentStatus.SUCCESS, PaymentStatus.FAILED, PaymentStatus.EXPIRED, PaymentStatus.CANCELLED].includes(session.status)) {
+    if ([PaymentStatus.SUCCESS, PaymentStatus.FAILED, PaymentStatus.EXPIRED, PaymentStatus.CANCELLED, PaymentStatus.VERIFICATION_PENDING].includes(session.status)) {
       return session; // already terminal
     }
 

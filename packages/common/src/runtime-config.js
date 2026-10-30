@@ -3,6 +3,8 @@
  * Single source of truth for runtime mode, derived hostnames, and service mappings.
  */
 
+import fs from 'node:fs';
+
 export const SERVICE_PORTS = Object.freeze({
   CHECKOUT: 7000,
   API: 6100,
@@ -237,7 +239,12 @@ export function resolvePairingUrl(options = {}) {
  * @param {object} [branding]
  */
 export function resolveGmailRedirectUri(branding = {}) {
-  if (process.env.GMAIL_REDIRECT_URI) return process.env.GMAIL_REDIRECT_URI;
+  const configuredRedirect=process.env.GMAIL_REDIRECT_URI;
+  const localOrQuickRedirect=!configuredRedirect || /^https?:\/\/(?:localhost|127\.0\.0\.1|[a-z0-9-]+\.trycloudflare\.com)(?::\d+)?\//.test(configuredRedirect);
+  if(process.env.DYNAMO_UNIFIED_GATEWAY==='true'&&localOrQuickRedirect){
+    try{const origin=fs.readFileSync(new URL('../../../data/.secrets/quick_tunnel_url',import.meta.url),'utf8').trim();if(/^https:\/\/[a-z0-9-]+\.trycloudflare\.com$/.test(origin))return origin+'/oauth/callback';}catch{}
+  }
+  if (configuredRedirect) return configuredRedirect;
   try {
     return `${resolveRuntimeUrls(branding || {}).gmailUrl}/oauth/callback`;
   } catch {

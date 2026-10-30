@@ -33,6 +33,7 @@ export class RecoveryEngine {
   recover() {
     let expiredCount = 0;
     let failedCount = 0;
+    let verificationPendingCount = 0;
     let rescheduledCount = 0;
     let promotedCount = 0;
 
@@ -46,8 +47,8 @@ export class RecoveryEngine {
     `, [PaymentStatus.PROCESSING, nowIso]);
 
     for (const row of overdueProcessing) {
-      this.sessionRepo.transitionToTerminal(row.id, PaymentStatus.FAILED);
-      failedCount++;
+      this.sessionRepo.transitionToVerificationPending(row.id);
+      verificationPendingCount++;
       if (this.auditRepo) {
         this.auditRepo.log({
           entityType: 'PAYMENT_SESSION',
@@ -117,6 +118,7 @@ export class RecoveryEngine {
     return {
       expiredCount,
       failedCount,
+      verificationPendingCount,
       rescheduledCount,
       promotedCount
     };

@@ -99,7 +99,7 @@ export class PaymentSessionRepository {
         const isStale = (activeRow.status === PaymentStatus.ACTIVE && activeRow.expires_at && new Date(activeRow.expires_at) <= now) ||
           (activeRow.status === PaymentStatus.PROCESSING && activeRow.processing_expires_at && new Date(activeRow.processing_expires_at) <= now);
         if (isStale) {
-          const terminalStatus = activeRow.status === PaymentStatus.PROCESSING ? PaymentStatus.FAILED : PaymentStatus.EXPIRED;
+          const terminalStatus = activeRow.status === PaymentStatus.PROCESSING ? PaymentStatus.VERIFICATION_PENDING : PaymentStatus.EXPIRED;
           if (!isValidTransition(activeRow.status, terminalStatus)) {
             throw new Error(`Illegal payment state transition: cannot move from '${activeRow.status}' to '${terminalStatus}'.`);
           }
@@ -107,7 +107,7 @@ export class PaymentSessionRepository {
             UPDATE payment_sessions
             SET status = ?, completed_at = ?, updated_at = ?
             WHERE id = ?
-          `, [terminalStatus, nowIso, nowIso, activeRow.id]);
+          `, [terminalStatus, terminalStatus === PaymentStatus.VERIFICATION_PENDING ? null : nowIso, nowIso, activeRow.id]);
           activeRow = null;
         }
       }
@@ -220,6 +220,16 @@ export class PaymentSessionRepository {
    * Atomically releases receiving account slot.
    */
   transitionToTerminal(sessionId, targetStatus, options = {}) {
+    if (!TERMINAL_STATES.includes(targetStatus)) throw new Error(`Not a terminal target status: ${targetStatus}`);
+    return this.transitionAndReleaseSlot(sessionId, targetStatus, options);
+  }
+
+  transitionToVerificationPending(sessionId) {
+    return this.transitionAndReleaseSlot(sessionId, PaymentStatus.VERIFICATION_PENDING);
+  }
+
+  transitionAndReleaseSlot(sessionId, targetStatus, options = {}) {
+    if (!TERMINAL_STATES.includes(targetStatus) && targetStatus !== PaymentStatus.VERIFICATION_PENDING) throw new Error(`Invalid slot-release target: ${targetStatus}`);
     return this.db.transaction(() => {
       const session = this.findById(sessionId);
       if (!session) throw new Error(`Session not found: ${sessionId}`);
@@ -238,9 +248,6 @@ export class PaymentSessionRepository {
 
       // The state machine is enforced here rather than merely documented: without this,
       // any caller could move a live session straight to SUCCESS and bypass verification.
-      if (!TERMINAL_STATES.includes(targetStatus)) {
-        throw new Error(`Not a terminal target status: ${targetStatus}`);
-      }
       if (!isValidTransition(session.status, targetStatus)) {
         throw new Error(`Illegal payment state transition: cannot move from '${session.status}' to '${targetStatus}'.`);
       }
@@ -266,7 +273,7 @@ export class PaymentSessionRepository {
         UPDATE payment_sessions
         SET status = ?, completed_at = ?, attributed_observation_id = ?, metadata = ?, updated_at = ?
         WHERE id = ?
-      `, [targetStatus, now, attributedObsId, JSON.stringify(metadata), now, sessionId]);
+      `, [targetStatus, targetStatus === PaymentStatus.VERIFICATION_PENDING ? null : now, attributedObsId, JSON.stringify(metadata), now, sessionId]);
 
       // Release slot on receiving account if this session owned it
       if (session.receivingAccountId) {
@@ -293,8 +300,8 @@ export class PaymentSessionRepository {
     const isStale = (row.status === PaymentStatus.ACTIVE && row.expires_at && new Date(row.expires_at) <= now) ||
       (row.status === PaymentStatus.PROCESSING && row.processing_expires_at && new Date(row.processing_expires_at) <= now);
     if (isStale) {
-      const terminalStatus = row.status === PaymentStatus.PROCESSING ? PaymentStatus.FAILED : PaymentStatus.EXPIRED;
-      this.transitionToTerminal(row.id, terminalStatus);
+      const terminalStatus = row.status === PaymentStatus.PROCESSING ? PaymentStatus.VERIFICATION_PENDING : PaymentStatus.EXPIRED;
+      this.transitionAndReleaseSlot(row.id, terminalStatus);
       return null;
     }
     return this.mapRow(row);
@@ -314,8 +321,8 @@ export class PaymentSessionRepository {
     const isStale = (row.status === PaymentStatus.ACTIVE && row.expires_at && new Date(row.expires_at) <= now) ||
       (row.status === PaymentStatus.PROCESSING && row.processing_expires_at && new Date(row.processing_expires_at) <= now);
     if (isStale) {
-      const terminalStatus = row.status === PaymentStatus.PROCESSING ? PaymentStatus.FAILED : PaymentStatus.EXPIRED;
-      this.transitionToTerminal(row.id, terminalStatus);
+      const terminalStatus = row.status === PaymentStatus.PROCESSING ? PaymentStatus.VERIFICATION_PENDING : PaymentStatus.EXPIRED;
+      this.transitionAndReleaseSlot(row.id, terminalStatus);
       return null;
     }
     return this.mapRow(row);
@@ -340,8 +347,8 @@ export class PaymentSessionRepository {
     const isStale = (row.status === PaymentStatus.ACTIVE && row.expires_at && new Date(row.expires_at) <= now) ||
       (row.status === PaymentStatus.PROCESSING && row.processing_expires_at && new Date(row.processing_expires_at) <= now);
     if (isStale) {
-      const terminalStatus = row.status === PaymentStatus.PROCESSING ? PaymentStatus.FAILED : PaymentStatus.EXPIRED;
-      this.transitionToTerminal(row.id, terminalStatus);
+      const terminalStatus = row.status === PaymentStatus.PROCESSING ? PaymentStatus.VERIFICATION_PENDING : PaymentStatus.EXPIRED;
+      this.transitionAndReleaseSlot(row.id, terminalStatus);
       return null;
     }
     return this.mapRow(row);
@@ -366,8 +373,8 @@ export class PaymentSessionRepository {
     const isStale = (row.status === PaymentStatus.ACTIVE && row.expires_at && new Date(row.expires_at) <= now) ||
       (row.status === PaymentStatus.PROCESSING && row.processing_expires_at && new Date(row.processing_expires_at) <= now);
     if (isStale) {
-      const terminalStatus = row.status === PaymentStatus.PROCESSING ? PaymentStatus.FAILED : PaymentStatus.EXPIRED;
-      this.transitionToTerminal(row.id, terminalStatus);
+      const terminalStatus = row.status === PaymentStatus.PROCESSING ? PaymentStatus.VERIFICATION_PENDING : PaymentStatus.EXPIRED;
+      this.transitionAndReleaseSlot(row.id, terminalStatus);
       return null;
     }
     return this.mapRow(row);
@@ -402,8 +409,8 @@ export class PaymentSessionRepository {
     const isStale = (row.status === PaymentStatus.ACTIVE && row.expires_at && new Date(row.expires_at) <= now) ||
       (row.status === PaymentStatus.PROCESSING && row.processing_expires_at && new Date(row.processing_expires_at) <= now);
     if (isStale) {
-      const terminalStatus = row.status === PaymentStatus.PROCESSING ? PaymentStatus.FAILED : PaymentStatus.EXPIRED;
-      this.transitionToTerminal(row.id, terminalStatus);
+      const terminalStatus = row.status === PaymentStatus.PROCESSING ? PaymentStatus.VERIFICATION_PENDING : PaymentStatus.EXPIRED;
+      this.transitionAndReleaseSlot(row.id, terminalStatus);
       return null;
     }
     return this.mapRow(row);

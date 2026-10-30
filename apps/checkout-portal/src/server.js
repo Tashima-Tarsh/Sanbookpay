@@ -274,7 +274,12 @@ export class CheckoutServer {
       if (qrMatch) {
         const paymentId = qrMatch[1];
         const state = await this.fetchPaymentState(paymentId);
-        const upiUri = state?.upiUri || `upi://pay?pa=${encodeURIComponent(state?.payeeVpa || 'merchant@upi')}&pn=${encodeURIComponent(state?.merchantName || 'Store')}&am=${encodeURIComponent(state?.amount || '100.00')}&tn=${encodeURIComponent(paymentId)}`;
+        const upiUri = state?.upiUri;
+        if (!upiUri || state.status !== 'ACTIVE') {
+          res.writeHead(409, { 'Content-Type':'application/json', 'Cache-Control':'no-store', ...BASE_SECURITY_HEADERS });
+          res.end(JSON.stringify({ error:'No active payment QR is available.' }));
+          return;
+        }
 
         const svg = generateQrSvg(upiUri, 220);
         res.writeHead(200, {

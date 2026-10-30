@@ -39,6 +39,8 @@ export class GmailObserverServer {
           status: 'UP',
           service: 'gmail-observer',
           isRunning: this.poller.isRunning,
+          observerStatus: this.poller.cachedAccessToken && this.poller.tokenExpiresAt>Date.now() ? 'CONNECTED' : this.poller.credentials?.refreshToken ? 'CONFIGURED' : 'UNCONFIGURED',
+          isLoggedIn: Boolean(this.poller.cachedAccessToken && this.poller.tokenExpiresAt>Date.now()),
           lastPollAt: this.poller.lastPollAt,
           observedCount: this.poller.observedCount
         }));
@@ -56,6 +58,7 @@ export class GmailObserverServer {
           return;
         }
         this.poller.stop();
+        this.poller.credentials=null;this.poller.cachedAccessToken=null;this.poller.tokenExpiresAt=0;
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ success: true, message: 'Gmail poller stopped' }));
         return;
@@ -97,6 +100,12 @@ export class GmailObserverServer {
         });
         res.end(JSON.stringify({ authUrl, redirectUri: finalRedirectUri }));
         return;
+      }
+
+      if(pathname==='/start' && method==='POST'){
+        if(!hasBearer(req,getObserverToken(),getAdminToken())){res.writeHead(401,{'Content-Type':'application/json'});res.end(JSON.stringify({error:'Unauthorized'}));return;}
+        await this.poller.fetchCredentialsFromPaymentApi();this.poller.start();
+        res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({started:true}));return;
       }
 
       // GET /oauth/callback (Google OAuth redirect authorization exchange)

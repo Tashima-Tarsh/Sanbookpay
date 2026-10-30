@@ -1,9 +1,10 @@
 import http from 'node:http';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { getDatabase, MerchantRepository, SupportTicketRepository } from '@youpi/db';
-import { getAdminToken, safeEqual } from '@youpi/common';
+import { getAdminToken, safeEqual, verifyPassword } from '@youpi/common';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -59,6 +60,8 @@ export class AdminServer {
     this.apiBaseUrl = options.apiBaseUrl || process.env.BASE_PAYMENT_API_URL || 'http://localhost:6100';
     this.merchantRepo = new MerchantRepository(this.db);
     this.ticketRepo = new SupportTicketRepository(this.db);
+    this.sessions = new Map();
+    this.loginAttempts = new Map();
     this.htmlTemplatePath = path.join(__dirname, 'views', 'admin-premium.html');
     this.template = fs.readFileSync(this.htmlTemplatePath, 'utf8');
   }
@@ -73,6 +76,8 @@ export class AdminServer {
     // This completely eliminates CORS errors, tunnel downtime 530s, and cross-origin failures.
     const clientApiBase = '';
     html = html.replaceAll('{{API_BASE_URL}}', clientApiBase);
+    let tunnelUrl='';try{const candidate=fs.readFileSync(path.resolve(__dirname,'../../../data/.secrets/quick_tunnel_url'),'utf8').trim();if(/^https:\/\/[a-z0-9-]+\.trycloudflare\.com$/.test(candidate))tunnelUrl=candidate;}catch{}
+    html=html.replaceAll('{{PUBLIC_GATEWAY_URL}}',tunnelUrl);
     return html;
   }
 
@@ -80,6 +85,38 @@ export class AdminServer {
     return http.createServer(async (req, res) => {
       const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
       const pathname = url.pathname;
+      const reply = (status, body, headers = {}) => { res.writeHead(status, { 'Content-Type':'application/json', 'Cache-Control':'no-store', ...BASE_SECURITY_HEADERS, ...headers }); res.end(JSON.stringify(body)); };
+      const cookie = /(?:^|;\s*)dynamo_session=([a-f0-9]+)/.exec(req.headers.cookie || '')?.[1];
+      const session = cookie && this.sessions.get(cookie);
+      const authenticated = hasAdminToken(req) || Boolean(session && session > Date.now());
+      if (cookie && session && session <= Date.now()) this.sessions.delete(cookie);
+      const origin = req.headers.origin;
+      if (req.method !== 'GET' && req.method !== 'OPTIONS' && origin) {
+        let originHost; try { originHost = new URL(origin).host; } catch { return reply(403,{error:'Invalid request origin.'}); }
+        if(originHost !== (req.headers['x-forwarded-host'] || req.headers.host)) return reply(403, { error:'Request origin does not match the console.' });
+      }
+      if (pathname === '/api/console/session') {
+        if (req.method === 'GET') return reply(authenticated ? 200 : 401, { authenticated });
+        if (req.method === 'DELETE') { if(cookie) this.sessions.delete(cookie); return reply(200, { ok:true }, { 'Set-Cookie':'dynamo_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0' }); }
+        if(req.method !== 'POST') return reply(405, { error:'Method not allowed' });
+        const ip = req.socket.remoteAddress;
+        const attempts = this.loginAttempts.get(ip) || { count:0, until:Date.now()+60000 };
+        if(attempts.until < Date.now()) { attempts.count=0; attempts.until=Date.now()+60000; }
+        if(++attempts.count>10) return reply(429, { error:'Too many attempts. Try again in a minute.' });
+        this.loginAttempts.set(ip, attempts);
+        let raw=''; for await(const chunk of req) { raw+=chunk; if(raw.length>4096) return reply(413,{error:'Request too large'}); }
+        let body; try { body=JSON.parse(raw); } catch { return reply(400,{error:'Invalid request'}); }
+        let login;
+        try { login=JSON.parse(fs.readFileSync(path.resolve(__dirname,'../../../data/.secrets/console-login.json'),'utf8')); } catch {}
+        const expectedEmail=process.env.ADMIN_LOGIN_EMAIL || login?.email;
+        const expectedHash=process.env.ADMIN_LOGIN_PASSWORD_HASH || login?.passwordHash;
+        const valid=expectedEmail && expectedHash && safeEqual(String(body.email || '').toLowerCase(),expectedEmail.toLowerCase()) && verifyPassword(String(body.password || ''),expectedHash);
+        if(!valid && !(body.token && safeEqual(String(body.token),getAdminToken()))) return reply(401,{error:'Incorrect email or password.'});
+        for(const [key,expires] of this.sessions) if(expires<Date.now()) this.sessions.delete(key);
+        const id=crypto.randomBytes(32).toString('hex'); this.sessions.set(id,Date.now()+8*3600000);
+        const secure=req.headers['x-forwarded-proto']==='https' ? '; Secure' : '';
+        return reply(200,{authenticated:true},{ 'Set-Cookie':`dynamo_session=${id}; HttpOnly; SameSite=Strict; Path=/; Max-Age=28800${secure}` });
+      }
 
       if (req.method === 'OPTIONS') {
         res.writeHead(204, {
@@ -92,6 +129,10 @@ export class AdminServer {
       }
 
       // Health
+      if(pathname==='/oauth/callback' && req.method==='GET'){
+        const upstream=http.request({hostname:'127.0.0.1',port:Number(process.env.GMAIL_OBSERVER_PORT||6003),path:req.url,method:'GET',headers:sanitizedForwardHeaders(req,'localhost:6003')},response=>{res.writeHead(response.statusCode,{...response.headers,'cache-control':'no-store'});response.pipe(res);});
+        upstream.on('error',()=>{if(!res.headersSent)reply(502,{error:'Gmail observer is unavailable. Please try again.'});});upstream.end();return;
+      }
       if (pathname === '/health') {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ status: 'UP', service: 'merchant-admin' }));
@@ -153,23 +194,26 @@ export class AdminServer {
 
       // Transparent API Proxy: /api/* -> Payment Core REST API
       if (pathname.startsWith('/api/')) {
+        if(!authenticated) return reply(401,{error:'Sign in to the merchant console.',code:'AUTH_REQUIRED'});
         const targetPort = Number(process.env.PAYMENT_API_PORT || 6100);
         const defaultMerchant = this.merchantRepo.getDefault ? this.merchantRepo.getDefault() : (this.merchantRepo.findById('00000000-0000-0000-0000-000000000001') || this.merchantRepo.findAll()[0]);
         const defaultMerchantId = defaultMerchant?.id || '00000000-0000-0000-0000-000000000001';
         const proxyReq = http.request({
           hostname: '127.0.0.1',
           port: targetPort,
-          path: req.url,
+          path: req.url.replace(/^\/api\/console\//, '/api/'),
           method: req.method,
           headers: {
-            ...req.headers,
+            ...sanitizedForwardHeaders(req, `localhost:${targetPort}`),
+            'authorization': `Bearer ${getAdminToken()}`,
+            'x-admin-token': getAdminToken(),
             'x-merchant-id': req.headers['x-merchant-id'] || defaultMerchantId,
             host: `localhost:${targetPort}`,
             'x-forwarded-host': req.headers.host || '',
             'x-forwarded-proto': req.headers['x-forwarded-proto'] || 'http'
           }
         }, (proxyRes) => {
-          res.writeHead(proxyRes.statusCode, proxyRes.headers);
+          res.writeHead(proxyRes.statusCode, { ...proxyRes.headers, 'cache-control':'no-store' });
           proxyRes.pipe(res);
         });
 

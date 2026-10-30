@@ -191,7 +191,7 @@ export function registerAdminRoutes(server, ctx) {
     let gmailStatus = { status: 'STANDBY', isLoggedIn: false, emailsObserved: 0 };
     try {
       const gmailPort = Number(process.env.GMAIL_OBSERVER_PORT || 6003);
-      const gmailRes = await fetch(`http://localhost:${gmailPort}/api/browser/status`, { signal: AbortSignal.timeout(1500) });
+      const gmailRes = await fetch(`http://127.0.0.1:${gmailPort}/health`, { signal: AbortSignal.timeout(1500) });
       if (gmailRes.ok) {
         gmailStatus = await gmailRes.json();
       }
@@ -199,7 +199,7 @@ export function registerAdminRoutes(server, ctx) {
 
     HttpServer.json(res, 200, {
       gmail: {
-        status: gmailStatus.status || (gmailStatus.isLoggedIn ? 'CONNECTED' : 'STANDBY'),
+        status: gmailStatus.observerStatus || (gmailStatus.isLoggedIn ? 'CONNECTED' : 'STANDBY'),
         isLoggedIn: Boolean(gmailStatus.isLoggedIn),
         emailsObserved: gmailStatus.emailsObserved || 0,
         lastCheckedAt: gmailStatus.lastCheckedAt || null
@@ -913,6 +913,8 @@ export function registerAdminRoutes(server, ctx) {
 
     const inputBranding = body.branding || {};
     const updates = {};
+    if (body.contactEmail !== undefined) updates.contactEmail = String(body.contactEmail).trim();
+    if (body.contactPhone !== undefined) updates.contactPhone = String(body.contactPhone).trim();
     if (body.businessName && body.businessName.trim()) updates.businessName = body.businessName.trim();
     else if (inputBranding.businessName && inputBranding.businessName.trim()) updates.businessName = inputBranding.businessName.trim();
     if (body.webhookUrl !== undefined) {
@@ -1537,8 +1539,9 @@ export function registerAdminRoutes(server, ctx) {
 
     // Stop poller in observer service
     try {
-      await fetch(`http://127.0.0.1:${process.env.GMAIL_OBSERVER_PORT || 6003}/stop`, { method: 'POST' }).catch(() => {});
-    } catch {}
+      const stopped=await fetch(`http://127.0.0.1:${process.env.GMAIL_OBSERVER_PORT || 6003}/stop`, { method:'POST',headers:{Authorization:req.headers.authorization||''},signal:AbortSignal.timeout(5000) });
+      if(!stopped.ok)return HttpServer.json(res,502,{error:'Credentials removed, but the Gmail observer did not stop. Try disconnecting again.'});
+    } catch { return HttpServer.json(res,502,{error:'Credentials removed. The Gmail observer service could not be reached to stop it.'}); }
 
     HttpServer.json(res, 200, {
       success: true,
@@ -1594,6 +1597,14 @@ export function registerAdminRoutes(server, ctx) {
       message: 'Gmail API credentials saved successfully.',
       status: updatedGmail.refreshToken || updatedGmail.apiKey ? 'CONFIGURED' : 'UNCONFIGURED'
     });
+  });
+
+  server.post('/api/v1/admin/gmail/start-observer',async(req,res)=>{
+    try{
+      const response=await fetch(`http://127.0.0.1:${Number(process.env.GMAIL_OBSERVER_PORT||6003)}/start`,{method:'POST',headers:{Authorization:req.headers.authorization||''},signal:AbortSignal.timeout(5000)});
+      if(!response.ok)return HttpServer.json(res,502,{error:'Gmail observer could not be started.'});
+      return HttpServer.json(res,200,{started:true});
+    }catch{return HttpServer.json(res,502,{error:'Gmail observer service is not running. Start the gateway services and try again.'});}
   });
 
   // POST /api/v1/admin/gmail/test
