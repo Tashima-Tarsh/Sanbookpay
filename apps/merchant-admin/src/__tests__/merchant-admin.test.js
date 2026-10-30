@@ -41,18 +41,29 @@ describe('Merchant Admin Integration Tests', () => {
     assert.equal(json.service, 'merchant-admin');
   });
 
-  test('GET / renders dashboard with queue monitor, observers, counter desk & pairing modal', async () => {
+  test('GET / renders premium Dynamo Pay merchant dashboard', async () => {
     const res = await get('/');
     assert.equal(res.status, 200);
     assert.ok(res.headers['content-type'].includes('text/html'));
 
-    assert.ok(res.text.includes('Real-Time Receiving Account Slot Ownership'));
-    assert.ok(res.text.includes('Active Slot (5-Minute Window)'));
-    assert.ok(res.text.includes('Processing Slot (30s Verification Window)'));
-    assert.ok(res.text.includes('Live Counter Payment Requests'));
-    assert.ok(res.text.includes('Payment Observers (SMS & Gmail)'));
-    assert.ok(res.text.includes('Android SMS Gateway'));
-    assert.ok(res.text.includes('Gmail Direct API'));
+    assert.ok(res.text.includes('<!DOCTYPE html>'));
+    assert.ok(res.text.includes('name="viewport"'));
+    assert.ok(res.text.includes('Dynamo Pay'));
+    assert.ok(res.text.includes('dp-sidebar'));
+    assert.ok(res.text.includes('dp-main'));
+    assert.ok(res.text.includes('dp-stats-grid'));
+    assert.ok(res.text.includes('dp-stat-card'));
+    assert.ok(res.text.includes('dp-table-wrap'));
+    assert.ok(res.text.includes('dp-table'));
+
+    // Verify premium glassmorphism dashboard elements
+    assert.ok(res.text.includes('Overview'));
+    assert.ok(res.text.includes('Transactions'));
+    assert.ok(res.text.includes('Merchants'));
+    assert.ok(res.text.includes('Settlements'));
+    assert.ok(res.text.includes('UPI Accounts'));
+    assert.ok(res.text.includes('API Keys'));
+    assert.ok(res.text.includes('Alerts'));
   });
 
   test('GET /api/admin/tickets requires the admin token', async () => {

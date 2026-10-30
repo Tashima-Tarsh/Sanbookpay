@@ -59,6 +59,7 @@ import { registerSettlementsRoutes } from './routes/settlements.routes.js';
 import { registerRefundsRoutes } from './routes/refunds.routes.js';
 import { registerSplitSettlementRoutes } from './routes/split-settlement.routes.js';
 import { registerOperationsRoutes } from './routes/operations.routes.js';
+import { registerDynamoPayRoutes } from './routes/dynamopay.routes.js';
 import { getWhatsAppBerryService, WhatsAppBerryService } from './services/whatsapp-berry.service.js';
 import { ReceiptNotificationService } from './services/receipt-notification.service.js';
 
@@ -471,6 +472,7 @@ export function createPaymentApp(customDb = null, options = {}) {
   registerRefundsRoutes(server, context);
   registerSplitSettlementRoutes(server, context);
   registerOperationsRoutes(server, context);
+  registerDynamoPayRoutes(server, context);
 
   function destroy() {
     clearInterval(queueSyncDaemon);

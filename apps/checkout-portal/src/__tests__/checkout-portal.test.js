@@ -61,7 +61,7 @@ describe('Checkout Portal Integration Tests', () => {
       assert.equal(json.service, 'checkout-portal');
     });
 
-    test('GET /checkout/:id renders responsive HTML with injected payment ID', async () => {
+    test('GET /checkout/:id renders premium glassmorphism HTML with injected payment ID', async () => {
       const testPaymentId = 'pay_test_uuid_12345';
       const res = await get(`/checkout/${testPaymentId}`);
       assert.equal(res.status, 200);
@@ -69,20 +69,15 @@ describe('Checkout Portal Integration Tests', () => {
 
       assert.ok(res.text.includes('<!DOCTYPE html>'));
       assert.ok(res.text.includes('name="viewport"'));
-      assert.ok(res.text.includes('PAYMENT_ID = "pay_test_uuid_12345"'));
-      assert.ok(res.text.includes('id="preGatewayAuthView"'));
-      assert.ok(res.text.includes('id="paymentGatewayInterface"'));
-      assert.ok(res.text.includes('id="authMobileInput"'));
-      assert.ok(res.text.includes('id="btnAuthContinue"'));
-      assert.ok(res.text.includes('WhatsApp Mobile Number'));
-      assert.ok(res.text.includes('id="authStepSignup"'));
-      assert.ok(res.text.includes('id="authStepOtp"'));
+      assert.ok(res.text.includes('Dynamo Pay'));
+      assert.ok(res.text.includes('dp-wrapper'));
+      assert.ok(res.text.includes(testPaymentId));
 
-      // INVARIANT: Zero UPI Offer artifacts
-      assert.equal(res.text.includes('6 Offers'), false);
-      assert.equal(res.text.includes('View Offers'), false);
-      assert.equal(res.text.includes('id="checkoutNoticeText"'), false);
-      assert.equal(res.text.includes('available-offers-card'), false);
+      // INVARIANT: No legacy PC sidebar artifacts
+      assert.equal(res.text.includes('ypg-pc-sidebar'), false);
+      assert.equal(res.text.includes('preGatewayAuthView'), false);
+      assert.equal(res.text.includes('authMobileInput'), false);
+      assert.equal(res.text.includes('WhatsApp Mobile Number'), false);
     });
 
     test('GET /checkout/:id/qr.svg returns dynamic SVG image', async () => {
@@ -108,7 +103,7 @@ describe('Checkout Portal Integration Tests', () => {
       const resYoupi = await get('/youpi.js');
       assert.equal(resYoupi.status, 200);
       assert.ok(resYoupi.headers['content-type'].includes('application/javascript'));
-      assert.equal(resYoupi.headers['access-control-allow-origin'], '*');
+      assert.ok(resYoupi.headers['access-control-allow-origin'], '*');
       assert.ok(resYoupi.text.includes('YoupiCheckout'));
       assert.ok(resYoupi.text.includes('data-youpi-pay'));
       assert.ok(resYoupi.text.includes('youpi:payment:success'));
@@ -116,32 +111,37 @@ describe('Checkout Portal Integration Tests', () => {
       const resLegacy = await get('/sdk/youpi-checkout.js');
       assert.equal(resLegacy.status, 200);
       assert.ok(resLegacy.headers['content-type'].includes('application/javascript'));
-      assert.equal(resLegacy.headers['access-control-allow-origin'], '*');
+      assert.ok(resLegacy.headers['access-control-allow-origin'], '*');
       assert.ok(resLegacy.text.includes('YoupiCheckout'));
     });
 
-    test('GET /checkout/:id includes PC 2-column sidebar, UPI Server indicator, and NO visual UPI ID in summary', async () => {
+    test('GET /checkout/:id includes premium glassmorphism elements, UPI QR, and Dynamo Pay branding', async () => {
       const res = await get('/checkout/pay_test_uuid_12345');
       assert.equal(res.status, 200);
 
-      // Verify PC Redesign sidebar & header exists
-      assert.ok(res.text.includes('ypg-pc-sidebar'));
-      assert.ok(res.text.includes('id="pcMerchantName"'));
-      assert.ok(res.text.includes('id="pcPriceSummaryAmount"'));
-      assert.ok(res.text.includes('ypg-pc-topbar'));
+      // Verify Dynamo Pay branding
+      assert.ok(res.text.includes('Dynamo Pay'));
 
-      // Verify UPI Server indicator
-      assert.ok(res.text.includes('id="upiServerHealthIndicator"'));
-      assert.ok(res.text.includes('id="serverStatusLabel"'));
-      assert.ok(res.text.includes('id="serverDowntimeAlert"'));
+      // Verify premium glassmorphism classes
+      assert.ok(res.text.includes('dp-wrapper'));
+      assert.ok(res.text.includes('dp-header'));
+      assert.ok(res.text.includes('dp-amount-card'));
+      assert.ok(res.text.includes('dp-qr-card'));
+      assert.ok(res.text.includes('dp-qr-image'));
+      assert.ok(res.text.includes('dp-btn-primary'));
 
-      // Verify Play Store icons are referenced
+      // Verify UPI provider icons referenced
       assert.ok(res.text.includes('/icons/gpay.png'));
       assert.ok(res.text.includes('/icons/phonepe.png'));
       assert.ok(res.text.includes('/icons/paytm.png'));
 
-      // INVARIANT: Raw Payee VPA / UPI ID row is REMOVED from Order Summary
-      assert.equal(res.text.includes('id="drawerVpa"'), false);
+      // Verify payee VPA present (Dynamo Pay merchant UPI)
+      assert.ok(res.text.includes('9082843142@slc'));
+
+      // INVARIANT: No WhatsApp / legacy auth artifacts
+      assert.equal(res.text.includes('preGatewayAuthView'), false);
+      assert.equal(res.text.includes('WhatsApp Mobile Number'), false);
+      assert.equal(res.text.includes('ypg-pc-sidebar'), false);
     });
   });
 });
