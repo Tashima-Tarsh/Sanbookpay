@@ -12,3 +12,7 @@ export * from './tunnel-command.js';
 export * from './branding.js';
 export * from './masking.js';
 export * from './logger.js';
+export * from './dynamo-queue.js';
+export * from './dynamo-webhooks.js';
+export * from './dynamo-gmail.js';
+export * from './dynamo-sms.js';

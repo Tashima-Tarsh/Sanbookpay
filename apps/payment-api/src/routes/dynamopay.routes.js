@@ -345,7 +345,7 @@ export function registerDynamoPayRoutes(server, ctx) {
       return HttpServer.json(res, 400, { error: 'Missing IFSC code', code: 'MISSING_IFSC', platform: 'dynamo-pay' });
     }
 
-    const ifscRegex = /^[A-Z]{4}0[A-Z0-9]{6}$/;
+    const ifscRegex = /^[A-Z]{4,5}0[A-Z0-9]{5,6}$/;
     if (!ifscRegex.test(ifsc)) {
       return HttpServer.json(res, 400, { error: 'Invalid IFSC format', code: 'INVALID_IFSC_FORMAT', platform: 'dynamo-pay' });
     }

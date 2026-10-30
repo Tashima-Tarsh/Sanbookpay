@@ -1,0 +1,54 @@
+# DYNAMO PAY — Caddy Reverse Proxy (HTTPS/TLS)
+# Production-grade reverse proxy with automatic HTTPS
+# Replace example.com with your actual domain
+
+{
+    email admin@dynamopay.local
+    acme_ca https://acme-v02.api.letsencrypt.org/directory
+    auto_https on
+    logs {
+        output file /var/log/caddy/access.log {
+            format json
+        }
+    }
+}
+
+# Payment Core API — HTTPS
+https://api.dynamopay.local {
+    reverse_proxy localhost:6100 {
+        header_up Host {upstream_hostport}
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+    }
+}
+
+# Checkout Portal — HTTPS
+https://checkout.dynamopay.local {
+    reverse_proxy localhost:7000 {
+        header_up Host {upstream_hostport}
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+    }
+}
+
+# Merchant Admin — HTTPS
+https://admin.dynamopay.local {
+    reverse_proxy localhost:6001 {
+        header_up Host {upstream_hostport}
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+    }
+}
+
+# Coin Wallet Store (Demo) — HTTPS
+https://store.dynamopay.local {
+    reverse_proxy localhost:5000 {
+        header_up Host {upstream_hostport}
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+    }
+}

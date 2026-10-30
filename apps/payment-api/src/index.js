@@ -3,6 +3,10 @@ import { EventEmitter } from 'node:events';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PaymentStatus } from '@youpi/common';
+import { DynamoPayQueue } from '@youpi/common';
+import { DynamoPayWebhooks } from '@youpi/common';
+import { DynamoPayGmailVerification } from '@youpi/common';
+import { DynamoPaySMSGateway } from '@youpi/common';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -126,6 +130,32 @@ export function createPaymentApp(customDb = null, options = {}) {
     merchantRepo,
     maxRetries: Number(process.env.WEBHOOK_MAX_RETRIES || 5)
   });
+
+  // Dynamo Pay production services
+  const dynamoQueue = new DynamoPayQueue();
+  const dynamoWebhooks = new DynamoPayWebhooks();
+  const dynamoGmail = new DynamoPayGmailVerification();
+  const dynamoSMS = new DynamoPaySMSGateway();
+
+  // Connect Dynamo Pay queue to Redis
+  dynamoQueue.connect().catch((err) => {
+    console.warn('[DynamoPay Queue] Redis connection failed:', err.message);
+    console.warn('[DynamoPay Queue] Running without Redis queue - using in-memory fallback');
+  });
+
+  // Connect Gmail verification if credentials available
+  if (process.env.GMAIL_CLIENT_ID && process.env.GMAIL_CLIENT_SECRET) {
+    console.log('[DynamoPay Gmail] OAuth2 credentials configured');
+  } else {
+    console.warn('[DynamoPay Gmail] No credentials - SMS/Gmail verification disabled');
+  }
+
+  // Connect SMS Gateway if URL available
+  if (process.env.SMS_GATEWAY_URL) {
+    console.log('[DynamoPay SMS] Gateway configured:', process.env.SMS_GATEWAY_URL);
+  } else {
+    console.warn('[DynamoPay SMS] No gateway URL - SMS verification disabled');
+  }
 
   const server = new HttpServer();
   server.use(authGuard);
@@ -455,7 +485,11 @@ export function createPaymentApp(customDb = null, options = {}) {
     checkoutBaseUrl,
     whatsappBerryService,
     receiptService,
-    webhookEngine
+    webhookEngine,
+    dynamoQueue,
+    dynamoWebhooks,
+    dynamoGmail,
+    dynamoSMS
   };
 
   registerPaymentRoutes(server, context);
@@ -485,6 +519,10 @@ export function createPaymentApp(customDb = null, options = {}) {
     if (typeof attributionEngine.destroy === 'function') {
       attributionEngine.destroy();
     }
+    // Dynamo Pay services shutdown
+    dynamoQueue.disconnect().catch(() => {});
+    dynamoSMS.stopPolling();
+    dynamoGmail.stopPolling();
   }
 
   return {
