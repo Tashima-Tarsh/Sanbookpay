@@ -1,0 +1,47 @@
+# Sanbook Pay Production Caddy Reverse Proxy & Automatic HTTPS
+{$DOMAIN:pay.yourdomain.com} {
+    encode gzip zstd
+
+    # Security headers
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "SAMEORIGIN"
+        Referrer-Policy "strict-origin-when-cross-origin"
+    }
+
+    # API Routes & Webhooks
+    handle /api/* {
+        reverse_proxy payment-api:6100 {
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+
+    # Admin Dashboard Routes
+    handle /admin/* {
+        reverse_proxy merchant-admin:6001 {
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+
+    handle /sanbook-pay-admin.* {
+        reverse_proxy merchant-admin:6001
+    }
+
+    # Checkout Portal & Public SDKs
+    handle {
+        reverse_proxy checkout-portal:7000 {
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+}
+

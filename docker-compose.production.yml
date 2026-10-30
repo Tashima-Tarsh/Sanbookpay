@@ -1,0 +1,148 @@
+services:
+  # ---------------------------------------------------------------------------
+  # Database: Canonical PostgreSQL Financial Ledger
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: sanbook-pay-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-sanbook_pay}
+      POSTGRES_USER: ${POSTGRES_USER:-sanbook_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sanbook_secure_vault_2026}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./packages/db/src/schema.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sanbook_admin} -d ${POSTGRES_DB:-sanbook_pay}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ---------------------------------------------------------------------------
+  # Cache & Event Broker: Redis
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: sanbook-pay-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass "${REDIS_PASSWORD:-sanbook_redis_pass_2026}"
+    volumes:
+      - redis-data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-sanbook_redis_pass_2026}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ---------------------------------------------------------------------------
+  # Sanbook Pay Core Engine & Financial APIs
+  # ---------------------------------------------------------------------------
+  payment-api:
+    build:
+      context: .
+      dockerfile: apps/payment-api/Dockerfile
+    container_name: sanbook-pay-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 6100
+      DATABASE_URL: postgresql://${POSTGRES_USER:-sanbook_admin}:${POSTGRES_PASSWORD:-sanbook_secure_vault_2026}@postgres:5432/${POSTGRES_DB:-sanbook_pay}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-sanbook_redis_pass_2026}@redis:6379/0
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef}
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN:-sanbook_internal_secret_token_2026}
+      BASE_PAYMENT_API_URL: http://payment-api:6100
+      CHECKOUT_PORTAL_URL: http://checkout-portal:7000
+    ports:
+      - "6100:6100"
+    healthcheck:
+      test: ["CMD-SHELL", "node -e 'fetch(\"http://127.0.0.1:6100/health\").then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))'"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  # ---------------------------------------------------------------------------
+  # Sanbook Pay Merchant Console
+  # ---------------------------------------------------------------------------
+  merchant-admin:
+    build:
+      context: .
+      dockerfile: apps/merchant-admin/Dockerfile
+    container_name: sanbook-pay-admin
+    restart: unless-stopped
+    depends_on:
+      payment-api:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 6001
+      BASE_PAYMENT_API_URL: http://payment-api:6100
+      ADMIN_API_TOKEN: ${ADMIN_API_TOKEN:-sanbook_admin_jwt_secret_2026}
+    ports:
+      - "6001:6001"
+    healthcheck:
+      test: ["CMD-SHELL", "node -e 'fetch(\"http://127.0.0.1:6001/health\").then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))'"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  # ---------------------------------------------------------------------------
+  # Sanbook Pay Checkout Portal
+  # ---------------------------------------------------------------------------
+  checkout-portal:
+    build:
+      context: .
+      dockerfile: apps/checkout-portal/Dockerfile
+    container_name: sanbook-pay-checkout
+    restart: unless-stopped
+    depends_on:
+      payment-api:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 7000
+      BASE_PAYMENT_API_URL: http://payment-api:6100
+    ports:
+      - "7000:7000"
+    healthcheck:
+      test: ["CMD-SHELL", "node -e 'fetch(\"http://127.0.0.1:7000/health\").then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))'"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  # ---------------------------------------------------------------------------
+  # TLS Termination & Ingress: Caddy Reverse Proxy
+  # ---------------------------------------------------------------------------
+  caddy:
+    image: caddy:2-alpine
+    container_name: sanbook-pay-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:-pay.yourdomain.com}
+    volumes:
+      - ./deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - payment-api
+      - merchant-admin
+      - checkout-portal
+
+volumes:
+  postgres-data:
+  redis-data:
+  caddy-data:
+  caddy-config:
+

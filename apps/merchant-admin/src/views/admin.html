@@ -1,0 +1,1728 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sanbook Pay — Sovereign FinTech Merchant Console</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/sanbook-pay-admin.css" />
+  <script src="/qr-engine.js"></script>
+  <style>
+    :root, [data-theme="dark"] {
+      --bg: #070a13;
+      --bg-header: #0b1120;
+      --bg-nav: #090d16;
+      --bg-card: #0f172a;
+      --bg-surface: #131d35;
+      --bg-input: #070a13;
+      --border: #1e293b;
+      --border-subtle: #17223b;
+      --border-focus: #10b981;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --text-heading: #ffffff;
+      --primary: #10b981;
+      --primary-hover: #059669;
+      --primary-glow: rgba(16, 185, 129, 0.25);
+      --card-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.5);
+    }
+
+    [data-theme="light"] {
+      --bg: #f8fafc;
+      --bg-header: #ffffff;
+      --bg-nav: #ffffff;
+      --bg-card: #ffffff;
+      --bg-surface: #f1f5f9;
+      --bg-input: #ffffff;
+      --border: #e2e8f0;
+      --border-subtle: #edf2f7;
+      --border-focus: #10b981;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --text-dim: #94a3b8;
+      --text-heading: #0f172a;
+      --primary: #059669;
+      --primary-hover: #047857;
+      --primary-glow: rgba(5, 150, 105, 0.2);
+      --card-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Top Sticky Header */
+    header {
+      background: var(--bg-header);
+      border-bottom: 1px solid var(--border);
+      padding: 0.75rem 1.75rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+      backdrop-filter: blur(12px);
+    }
+
+    .brand-group {
+      display: flex;
+      align-items: center;
+      gap: 1.25rem;
+    }
+
+    .brand-title {
+      font-size: 1.2rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: var(--text-heading);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      text-decoration: none;
+    }
+
+    .brand-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.25rem 0.65rem;
+      border-radius: 9999px;
+      font-size: 0.72rem;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      background: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.35);
+    }
+
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.85rem;
+    }
+
+    .clock-display {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      background: rgba(255, 255, 255, 0.04);
+      padding: 0.35rem 0.7rem;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+    }
+
+    /* Toast Notification */
+    #toastContainer {
+      position: fixed;
+      bottom: 1.5rem;
+      right: 1.5rem;
+      z-index: 99999;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .toast-msg {
+      background: #0f172a;
+      color: #f8fafc;
+      border: 1px solid #10b981;
+      border-radius: 8px;
+      padding: 0.75rem 1.25rem;
+      font-size: 0.85rem;
+      font-weight: 600;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+      animation: slideIn 0.25s ease;
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+
+    @keyframes slideIn {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+
+    /* Data Tables */
+    .data-table-container {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: var(--card-shadow);
+      margin-top: 1rem;
+    }
+
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 0.88rem;
+    }
+
+    .data-table th {
+      background: var(--bg-surface);
+      color: var(--text-muted);
+      font-weight: 700;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 0.85rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .data-table td {
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+    }
+
+    .data-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .data-table tr:hover td {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    /* Section Visibility */
+    .sp-section {
+      display: none;
+    }
+    .sp-section.active-section {
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+      animation: fadeInSection 0.2s ease;
+    }
+
+    @keyframes fadeInSection {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Global Header -->
+  <header>
+    <div class="brand-group">
+      <a href="#overview" onclick="switchSection('overview'); return false;" class="brand-title">
+        <span style="color:#10b981; font-size:1.4rem;">⬡</span> SANBOOK PAY
+      </a>
+      <div class="brand-badge">
+        <span class="pulse-indicator"></span> LIVE PRODUCTION
+      </div>
+      <div class="rzp-workspace-switcher" title="Active Bank Gateway Tenant">
+        <span>🏛️ Acme Retail Enterprise</span>
+        <small style="color:var(--text-dim); font-family:monospace;">MID: 0000...0001</small>
+      </div>
+    </div>
+
+    <div class="top-actions">
+      <div class="clock-display" id="headerClock">IST --:--:--</div>
+      
+      <button class="rzp-action-pill rzp-action-emerald" onclick="openModal('createPaymentLinkModal')">
+        <span>⚡</span> Create Payment Link
+      </button>
+
+      <button class="rzp-action-pill rzp-action-outline" onclick="openModal('sendMoneyModal')">
+        <span>💸</span> Instant Payout
+      </button>
+
+      <button class="rzp-action-pill rzp-action-outline" onclick="switchSection('qrTerminal')">
+        <span>📱</span> Virtual POS
+      </button>
+
+      <button class="rzp-action-pill rzp-action-outline" id="themeToggleBtn" onclick="toggleTheme()" title="Toggle Dark/Light Mode">
+        🌓
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Application Shell -->
+  <div class="app-shell">
+    
+    <!-- Sidebar Navigation -->
+    <nav class="app-sidebar">
+      <div class="sidebar-category">Core Platform</div>
+      
+      <a class="nav-link active" id="nav-overview" onclick="switchSection('overview')">
+        <span class="nav-icon">📊</span> Executive Overview
+      </a>
+      
+      <a class="nav-link" id="nav-qrTerminal" onclick="switchSection('qrTerminal')">
+        <span class="nav-icon">⚡</span> Virtual POS (Dynamic QR)
+      </a>
+
+      <a class="nav-link" id="nav-collections" onclick="switchSection('collections')">
+        <span class="nav-icon">💳</span> Payments & Orders
+      </a>
+
+      <a class="nav-link" id="nav-developerHub" onclick="switchSection('developerHub')" style="background: rgba(16, 185, 129, 0.08); border-color: rgba(16, 185, 129, 0.2);">
+        <span class="nav-icon">🚀</span> <strong>Developer & API Hub</strong>
+      </a>
+
+      <div class="sidebar-category">Treasury & Banking</div>
+      
+      <a class="nav-link" id="nav-payouts" onclick="switchSection('payouts')">
+        <span class="nav-icon">💸</span> Outbound Payouts
+      </a>
+
+      <a class="nav-link" id="nav-banking" onclick="switchSection('banking')">
+        <span class="nav-icon">🏦</span> Bank Connections
+      </a>
+
+      <a class="nav-link" id="nav-settlements" onclick="switchSection('settlements')">
+        <span class="nav-icon">⚖️</span> Settlements & Ledger
+      </a>
+
+      <a class="nav-link" id="nav-refunds" onclick="switchSection('refunds')">
+        <span class="nav-icon">🔄</span> Refunds & Reversals
+      </a>
+
+      <div class="sidebar-category">Governance</div>
+
+      <a class="nav-link" id="nav-operations" onclick="switchSection('operations')">
+        <span class="nav-icon">⏱️</span> 60s Engine Health
+      </a>
+
+      <a class="nav-link" id="nav-storeSettings" onclick="switchSection('storeSettings')">
+        <span class="nav-icon">⚙️</span> Store & Webhooks
+      </a>
+
+      <a class="nav-link" id="nav-security" onclick="switchSection('security')">
+        <span class="nav-icon">🛡️</span> Security & Vault
+      </a>
+    </nav>
+
+    <!-- Main Content Area -->
+    <main class="app-main">
+
+      <!-- ========================================================================= -->
+      <!-- SECTION 1: EXECUTIVE OVERVIEW                                             -->
+      <!-- ========================================================================= -->
+      <div id="sectionOverview" class="sp-section active-section">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
+          <div>
+            <h2 style="font-size:1.6rem; font-weight:800; color:var(--text-heading);">Executive Overview</h2>
+            <p style="color:var(--text-muted); font-size:0.9rem; margin-top:0.25rem;">Real-time payment settlements, gross collections, and active banking provider connectivity.</p>
+          </div>
+          <div id="ovProviderBadge" class="badge-live">● CASHFREE PG (LIVE)</div>
+        </div>
+
+        <!-- KPI Summary Cards -->
+        <div class="sp-grid-4">
+          <div class="kpi-card-emerald">
+            <div class="kpi-label">Gross Collections</div>
+            <div class="kpi-value" id="ovGrossCollections">₹0.00</div>
+          </div>
+          <div class="kpi-card-emerald">
+            <div class="kpi-label">Net Payable</div>
+            <div class="kpi-value" id="ovNetPayable">₹0.00</div>
+          </div>
+          <div class="kpi-card-emerald">
+            <div class="kpi-label">Available Balance</div>
+            <div class="kpi-value" id="ovAvailableBalance">₹0.00</div>
+          </div>
+          <div class="kpi-card-emerald">
+            <div class="kpi-label">Confirmed Bank Credit</div>
+            <div class="kpi-value" id="ovConfirmedSettled">₹0.00</div>
+          </div>
+        </div>
+
+        <!-- Quick Access Actions Bar -->
+        <div class="sp-card" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:1rem; padding:1.25rem;">
+          <div>
+            <h4 style="margin:0; font-size:1rem; font-weight:700;">Instant Payment Operations</h4>
+            <p style="margin:0.2rem 0 0 0; font-size:0.82rem; color:var(--text-muted);">Generate single-use payment links or send funds directly to vendor accounts.</p>
+          </div>
+          <div style="display:flex; gap:0.6rem; flex-wrap:wrap;">
+            <button class="btn-emerald" onclick="openModal('createPaymentLinkModal')">+ Create Payment Link</button>
+            <button class="btn-sm btn-outline" onclick="openModal('createCollectionModal')">+ Create Order</button>
+            <button class="btn-sm btn-outline" onclick="switchSection('developerHub')">Developer API Hub</button>
+            <button class="btn-sm btn-outline" onclick="switchSection('qrTerminal')">Open QR Terminal</button>
+          </div>
+        </div>
+
+        <!-- Recent Collections -->
+        <div class="sp-card">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
+            <h3 style="font-size:1.15rem; font-weight:700;">Recent Collection Transactions</h3>
+            <button class="btn-sm btn-outline" onclick="switchSection('collections')">View All Orders</button>
+          </div>
+          <div class="data-table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Order ID</th>
+                  <th>Amount</th>
+                  <th>Status</th>
+                  <th>Bank UTR</th>
+                  <th>Timestamp</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="ovRecentTxBody">
+                <tr><td colspan="6" class="empty-state">Loading transactions...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========================================================================= -->
+      <!-- SECTION 2: DEVELOPER & PAYMENTS API HUB (THE API THROUGH WHICH USERS PAY) -->
+      <!-- ========================================================================= -->
+      <div id="sectionDeveloperHub" class="sp-section">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
+          <div>
+            <h2 style="font-size:1.6rem; font-weight:800; color:var(--text-heading);">Developer & Payments API</h2>
+            <p style="color:var(--text-muted); font-size:0.9rem; margin-top:0.25rem;">Everything you need to accept payments in your app or website. Instant checkout links, API credentials, and multi-rail code snippets.</p>
+          </div>
+          <div style="display:flex; gap:0.5rem;">
+            <button class="btn-emerald" onclick="openModal('createPaymentLinkModal')">+ Quick Payment Link</button>
+            <a href="http://localhost:5000" target="_blank" class="btn-sm btn-outline" style="text-decoration:none; display:inline-flex; align-items:center; gap:0.3rem;">
+              🏪 Open Demo Store
+            </a>
+          </div>
+        </div>
+
+        <!-- Card: Instant Payment Link & Checkout Launcher -->
+        <div class="sp-card" style="border: 2px solid rgba(16, 185, 129, 0.4); background: linear-gradient(180deg, rgba(16, 185, 129, 0.04) 0%, var(--bg-card) 100%);">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+            <div>
+              <h3 style="font-size:1.2rem; font-weight:800; color:#10b981;">⚡ Instant Payment Link Generator</h3>
+              <p style="font-size:0.85rem; color:var(--text-muted); margin-top:0.2rem;">Create an authoritative payment link and open the Amazon/Razorpay-style multi-method checkout (Cards, UPI, NetBanking, COD).</p>
+            </div>
+            <span class="status-pill status-success">AUTOGEN CUSTOMER READY</span>
+          </div>
+
+          <form id="instantPayLinkForm" onsubmit="handleGeneratePaymentLink(event)">
+            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:1rem;">
+              <div class="form-group" style="margin:0;">
+                <label>Order ID</label>
+                <input type="text" id="quickLinkOrderId" required placeholder="e.g. ORD-9821" />
+              </div>
+              <div class="form-group" style="margin:0;">
+                <label>Amount (₹ INR)</label>
+                <input type="number" step="0.01" min="1" id="quickLinkAmount" required value="499.00" placeholder="499.00" />
+              </div>
+              <div class="form-group" style="margin:0;">
+                <label>Customer Mobile</label>
+                <input type="tel" id="quickLinkPhone" placeholder="9876543210" value="9876543210" />
+              </div>
+              <div class="form-group" style="margin:0;">
+                <label>Customer Email</label>
+                <input type="email" id="quickLinkEmail" placeholder="customer@example.com" value="customer@example.com" />
+              </div>
+            </div>
+
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:1.25rem; flex-wrap:wrap; gap:1rem;">
+              <div style="font-size:0.82rem; color:var(--text-muted);">
+                ℹ️ Automatically creates or links customer identity with masked PII & dispatches SMS/Email receipt upon payment.
+              </div>
+              <button type="submit" class="btn-emerald" style="padding:0.65rem 1.5rem; font-size:0.95rem;">
+                🚀 Generate Payment Link & Launch Checkout
+              </button>
+            </div>
+          </form>
+
+          <!-- Generated Link Output Box (Visible upon creation) -->
+          <div id="quickLinkResultBox" style="display:none; margin-top:1.25rem; padding:1.25rem; background:rgba(16, 185, 129, 0.08); border:1px solid #10b981; border-radius:10px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
+              <div>
+                <span style="font-size:0.8rem; font-weight:700; color:#10b981;">PAYMENT CHECKOUT READY:</span>
+                <div style="font-family:monospace; font-size:0.95rem; font-weight:700; color:var(--text); word-break:break-all; margin-top:0.25rem;" id="quickLinkUrlText">
+                  http://localhost:7000/checkout/...
+                </div>
+              </div>
+              <div style="display:flex; gap:0.5rem;">
+                <a id="quickLinkOpenBtn" href="#" target="_blank" class="btn-emerald" style="text-decoration:none; padding:0.4rem 1rem; font-size:0.85rem;">
+                  Open Checkout Tab ↗
+                </a>
+                <button type="button" class="btn-sm" onclick="copyQuickLinkUrl()">
+                  📋 Copy URL
+                </button>
+              </div>
+            </div>
+            <div id="quickLinkCustomerDetails" style="margin-top:0.75rem; font-size:0.8rem; color:var(--text-muted); font-family:monospace;"></div>
+          </div>
+        </div>
+
+        <!-- API Credentials & Vault -->
+        <div class="sp-grid-2">
+          <div class="sp-card">
+            <h3 style="font-size:1.15rem; font-weight:700; margin-bottom:0.5rem;">🔑 API Credentials & Keys</h3>
+            <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:1rem;">Use these production keys to authenticate API requests from your backend.</p>
+
+            <div class="form-group">
+              <label>Merchant ID</label>
+              <div class="vault-key-row">
+                <input type="text" readonly id="keyMerchantId" value="00000000-0000-0000-0000-000000000001" />
+                <button type="button" onclick="copyKeyText('keyMerchantId')">Copy</button>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>Publishable Live Key (Client-Side)</label>
+              <div class="vault-key-row">
+                <input type="text" readonly id="keyPubKey" value="pk_live_sbk982348a1b9201f8" />
+                <button type="button" onclick="copyKeyText('keyPubKey')">Copy</button>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>Secret API Key (Backend Only)</label>
+              <div class="vault-key-row">
+                <input type="password" readonly id="keySecKey" value="sk_live_sbk5539201fa498bc19d4e" />
+                <button type="button" onclick="toggleKeyVisibility('keySecKey')">Show</button>
+                <button type="button" onclick="copyKeyText('keySecKey')">Copy</button>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>Webhook Signing Secret</label>
+              <div class="vault-key-row">
+                <input type="password" readonly id="keyWhSec" value="whsec_sbk99a8b1e4c7301fae29" />
+                <button type="button" onclick="toggleKeyVisibility('keyWhSec')">Show</button>
+                <button type="button" onclick="copyKeyText('keyWhSec')">Copy</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Webhook Endpoint Configuration -->
+          <div class="sp-card">
+            <h3 style="font-size:1.15rem; font-weight:700; margin-bottom:0.5rem;">📡 Webhook Notification Listener</h3>
+            <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:1rem;">We send signed HTTP POST webhooks to your server whenever a payment succeeds or changes state.</p>
+
+            <div class="form-group">
+              <label>Webhook Callback URL</label>
+              <input type="url" id="webhookInputUrl" value="http://localhost:5000/api/webhook" placeholder="https://yourdomain.com/api/webhook" />
+            </div>
+
+            <div style="background:var(--bg-surface); padding:1rem; border-radius:8px; border:1px solid var(--border); margin-bottom:1rem;">
+              <div style="font-size:0.8rem; font-weight:700; margin-bottom:0.35rem; color:#10b981;">HMAC-SHA256 RAW BODY VERIFICATION</div>
+              <p style="font-size:0.78rem; color:var(--text-muted); line-height:1.5;">
+                We sign webhooks using header <code>X-Gateway-Signature</code>. Always compute the HMAC over the raw, unparsed request bytes before fulfilling goods!
+              </p>
+            </div>
+
+            <div style="display:flex; gap:0.6rem;">
+              <button class="btn-emerald" onclick="saveWebhookConfigAction()">Save Webhook URL</button>
+              <button class="btn-sm btn-outline" onclick="sendTestWebhookPing()">Test Webhook Ping</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Ready-to-Deploy Code Snippets -->
+        <div class="sp-card">
+          <h3 style="font-size:1.15rem; font-weight:700; margin-bottom:0.5rem;">💻 Ready-to-Deploy Integration Snippets</h3>
+          <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:1rem;">Integrate checkout in seconds using our client-side One-Script or backend SDKs.</p>
+
+          <div class="code-viewer-container">
+            <div class="code-tabs-header">
+              <button class="code-tab-btn active" onclick="switchCodeTab('onescript')">Frontend One-Script (Zero-JS)</button>
+              <button class="code-tab-btn" onclick="switchCodeTab('curl')">cURL REST API</button>
+              <button class="code-tab-btn" onclick="switchCodeTab('nodejs')">Node.js (Backend)</button>
+              <button class="code-tab-btn" onclick="switchCodeTab('python')">Python (FastAPI / Requests)</button>
+            </div>
+
+            <div style="position:relative;">
+              <button class="code-copy-float" onclick="copyCurrentSnippet()">Copy Snippet</button>
+
+              <!-- One-Script -->
+              <pre class="code-content-box" id="code-onescript"><code>&lt;!-- 1. Include the Sanbook Pay One-Script in your page &lt;head&gt; or &lt;body&gt; --&gt;
+&lt;script src="http://localhost:7000/youpi.js" data-youpi-key="pk_live_sbk982348a1b9201f8"&gt;&lt;/script&gt;
+
+&lt;!-- 2. Tag any button with [data-youpi-pay] to launch multi-method checkout modal --&gt;
+&lt;button 
+  data-youpi-pay 
+  data-order-id="ORDER-1001" 
+  data-amount="499.00"
+  data-currency="INR"
+  data-customer-name="Mohit Sharma"
+  data-customer-email="mohit@example.com"
+  data-customer-phone="9876543210"&gt;
+  Pay ₹499.00 Now
+&lt;/button&gt;</code></pre>
+
+              <!-- cURL -->
+              <pre class="code-content-box" id="code-curl" style="display:none;"><code>curl -X POST http://localhost:6100/api/v1/payments \
+  -H "Content-Type: application/json" \
+  -H "X-Merchant-Key: sk_live_sbk5539201fa498bc19d4e" \
+  -H "Idempotency-Key: ORD-1001" \
+  -d '{
+    "orderId": "ORD-1001",
+    "amount": "499.00",
+    "currency": "INR",
+    "customer": {
+      "name": "Mohit Sharma",
+      "phone": "9876543210",
+      "email": "mohit@example.com"
+    }
+  }'</code></pre>
+
+              <!-- Node.js -->
+              <pre class="code-content-box" id="code-nodejs" style="display:none;"><code>import fetch from 'node-fetch';
+
+async function createSanbookPayment() {
+  const response = await fetch('http://localhost:6100/api/v1/payments', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Merchant-Key': process.env.SANBOOK_SECRET_KEY,
+      'Idempotency-Key': 'ORD-1001'
+    },
+    body: JSON.stringify({
+      orderId: 'ORD-1001',
+      amount: '499.00',
+      currency: 'INR',
+      customer: {
+        name: 'Mohit Sharma',
+        phone: '9876543210',
+        email: 'mohit@example.com'
+      }
+    })
+  });
+
+  const data = await response.json();
+  console.log('Customer Auto-Generated:', data.customerId);
+  console.log('Masked Phone:', data.customer.phone); // +91 98*** ***10
+  console.log('Checkout URL:', data.checkoutUrl);
+  return data;
+}</code></pre>
+
+              <!-- Python -->
+              <pre class="code-content-box" id="code-python" style="display:none;"><code>import requests
+
+def create_sanbook_payment():
+    url = "http://localhost:6100/api/v1/payments"
+    headers = {
+        "Content-Type": "application/json",
+        "X-Merchant-Key": "sk_live_sbk5539201fa498bc19d4e",
+        "Idempotency-Key": "ORD-1001"
+    }
+    payload = {
+        "orderId": "ORD-1001",
+        "amount": "499.00",
+        "currency": "INR",
+        "customer": {
+            "name": "Mohit Sharma",
+            "phone": "9876543210",
+            "email": "mohit@example.com"
+        }
+    }
+    response = requests.post(url, json=payload, headers=headers)
+    data = response.json()
+    print("Checkout URL:", data["checkoutUrl"])
+    return data</code></pre>
+            </div>
+          </div>
+        </div>
+
+        <!-- API Endpoint Reference Directory -->
+        <div class="sp-card">
+          <h3 style="font-size:1.15rem; font-weight:700; margin-bottom:0.5rem;">📚 Authoritative API Endpoint Directory</h3>
+          <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:1rem;">Production endpoints exposed by Sanbook Pay Payment Core (Port 6100):</p>
+
+          <div class="data-table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Method</th>
+                  <th>Endpoint</th>
+                  <th>Functionality</th>
+                  <th>Payload Highlights</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><span class="api-method-badge method-post">POST</span></td>
+                  <td><code>/api/v1/payments</code></td>
+                  <td>Create payment order & provision auto-customer</td>
+                  <td><code>orderId, amount, customer { name, phone, email }</code></td>
+                </tr>
+                <tr>
+                  <td><span class="api-method-badge method-get">GET</span></td>
+                  <td><code>/api/v1/payments/:id</code></td>
+                  <td>Realtime status, bank UTR & settlement tracking</td>
+                  <td>Returns <code>status, bankReference, completedAt</code></td>
+                </tr>
+                <tr>
+                  <td><span class="api-method-badge method-get">GET</span></td>
+                  <td><code>/api/v1/payments/:id/receipt</code></td>
+                  <td>Official Digital Bill Receipt (HTML / JSON)</td>
+                  <td>Direct bill receipt view with masked PII & tax breakdown</td>
+                </tr>
+                <tr>
+                  <td><span class="api-method-badge method-post">POST</span></td>
+                  <td><code>/api/v1/checkout/:id/card-pay</code></td>
+                  <td>Credit & Debit Cards payment processing</td>
+                  <td><code>cardNumber, expMonth, expYear, cvv, cardHolder</code></td>
+                </tr>
+                <tr>
+                  <td><span class="api-method-badge method-post">POST</span></td>
+                  <td><code>/api/v1/checkout/:id/netbanking-pay</code></td>
+                  <td>Direct NetBanking bank redirection</td>
+                  <td><code>bankCode (HDFC, SBI, ICICI, AXIS, etc.)</code></td>
+                </tr>
+                <tr>
+                  <td><span class="api-method-badge method-post">POST</span></td>
+                  <td><code>/api/v1/payouts</code></td>
+                  <td>Instant IMPS / UPI outbound disbursements</td>
+                  <td><code>beneficiaryId, amount, transferMode (IMPS/UPI)</code></td>
+                </tr>
+                <tr>
+                  <td><span class="api-method-badge method-post">POST</span></td>
+                  <td><code>/api/v1/refunds</code></td>
+                  <td>Payment reversals & customer refunds</td>
+                  <td><code>paymentId, amount, reason</code></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========================================================================= -->
+      <!-- SECTION 3: VIRTUAL POS & DYNAMIC QR TERMINAL                              -->
+      <!-- ========================================================================= -->
+      <div id="sectionQrTerminal" class="sp-section">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
+          <div>
+            <h2 style="font-size:1.6rem; font-weight:800; color:var(--text-heading);">Virtual POS & Live Dynamic QR</h2>
+            <p style="color:var(--text-muted); font-size:0.9rem; margin-top:0.25rem;">Generate authentic ISO/IEC 18004 dynamic UPI QR codes for on-the-spot customer payment collection.</p>
+          </div>
+          <button class="btn-sm btn-outline" onclick="resetPosTerminal()">🔄 Reset Terminal</button>
+        </div>
+
+        <div class="pos-terminal-grid">
+          <!-- Col 1: Order Configurator -->
+          <div class="sp-card">
+            <h3 style="font-size:1.15rem; font-weight:700; margin-bottom:1rem;">1. Terminal Configuration</h3>
+            
+            <div class="form-group">
+              <label>Bill / Order ID</label>
+              <div style="display:flex; gap:0.5rem;">
+                <input type="text" id="posInputOrderId" value="POS-1001" />
+                <button type="button" class="btn-sm" onclick="generateNewPosOrderId()">New</button>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>Billing Amount (₹ INR)</label>
+              <input type="number" step="0.01" min="1" id="posInputAmount" value="500.00" oninput="updatePosQrPreview()" />
+            </div>
+
+            <label style="font-size:0.85rem; font-weight:600; color:var(--text-muted); display:block; margin-bottom:0.4rem;">Quick Amount Chips</label>
+            <div class="pos-chips-container">
+              <button class="pos-amount-chip" onclick="selectPosAmount(100)">₹100</button>
+              <button class="pos-amount-chip" onclick="selectPosAmount(250)">₹250</button>
+              <button class="pos-amount-chip active" onclick="selectPosAmount(500)">₹500</button>
+              <button class="pos-amount-chip" onclick="selectPosAmount(1000)">₹1,000</button>
+              <button class="pos-amount-chip" onclick="selectPosAmount(2500)">₹2,500</button>
+            </div>
+
+            <div class="form-group">
+              <label>Customer Mobile (For SMS Bill)</label>
+              <input type="tel" id="posInputPhone" placeholder="9876543210" value="9876543210" />
+            </div>
+
+            <button class="btn-emerald" style="width:100%; margin-top:0.5rem;" onclick="handlePosGenerateSubmit(event)">
+              ⚡ Lock & Generate Live QR
+            </button>
+          </div>
+
+          <!-- Col 2: Dynamic QR Presentation -->
+          <div class="sp-card" style="text-align:center;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+              <h3 style="font-size:1.15rem; font-weight:700;">2. Dynamic UPI QR</h3>
+              <div class="pos-timer-badge" id="posTimerBadge">
+                ⏱️ <span id="posTimerDisplay">05:00</span>
+              </div>
+            </div>
+
+            <div class="pos-qr-box">
+              <div class="pos-qr-svg-wrap" id="posQrWrapper">
+                <!-- SVG QR rendered by qr-engine.js -->
+              </div>
+              <div style="font-size:0.82rem; color:var(--text-muted); margin-top:0.75rem;">
+                Scan with any UPI app to pay
+              </div>
+            </div>
+
+            <!-- Confirmed Payment Card -->
+            <div class="pos-success-card" id="posSuccessCard">
+              <div style="font-size:2rem; margin-bottom:0.25rem;">🎉</div>
+              <h4 style="color:#059669; font-weight:800; font-size:1.2rem;">PAYMENT RECEIVED</h4>
+              <div style="font-size:1.35rem; font-weight:800; margin:0.35rem 0;" id="posSuccessAmount">₹500.00</div>
+              <div style="font-size:0.8rem; color:var(--text-muted);">
+                Bank Reference UTR: <strong id="posSuccessUtr">123456789012</strong>
+              </div>
+              <div style="margin-top:1rem; display:flex; gap:0.5rem; justify-content:center;">
+                <button class="btn-sm btn-emerald" onclick="printPosReceipt()">🖨️ Print Receipt</button>
+                <button class="btn-sm btn-outline" onclick="resetPosTerminal()">Next Bill</button>
+              </div>
+            </div>
+
+            <div class="pos-apps-row" id="posAppsRow">
+              <span class="pos-app-badge">GPay</span>
+              <span class="pos-app-badge">PhonePe</span>
+              <span class="pos-app-badge">Paytm</span>
+              <span class="pos-app-badge">CRED</span>
+              <span class="pos-app-badge">BHIM</span>
+            </div>
+
+            <div style="margin-top:1rem; display:flex; justify-content:center; gap:0.5rem;">
+              <button class="btn-sm" onclick="copyPosUpiLink()">📋 Copy UPI Intent</button>
+              <button class="btn-sm btn-outline" onclick="simulatePosScan()">🧪 Simulate UPI Scan & Pay</button>
+            </div>
+          </div>
+
+          <!-- Col 3: Radar & Observer Activity -->
+          <div class="sp-card">
+            <h3 style="font-size:1.15rem; font-weight:700; margin-bottom:0.5rem;">3. Banking Observer Radar</h3>
+            <p style="font-size:0.82rem; color:var(--text-muted); margin-bottom:1rem;">Listening for real-time bank SMS and push credit notifications.</p>
+
+            <div class="pos-radar-visual">
+              <div class="pos-radar-circle"></div>
+              <div class="pos-radar-circle"></div>
+              <div class="pos-radar-circle"></div>
+              <div class="pos-radar-center-icon">📡</div>
+            </div>
+
+            <div style="text-align:center; margin-bottom:1rem;">
+              <div style="font-size:0.85rem; font-weight:700; color:#10b981;">OBSERVER LISTENING</div>
+              <div style="font-size:0.75rem; color:var(--text-muted);">Target VPA: <span id="posTerminalVpa">merchant@okaxis</span></div>
+            </div>
+
+            <div style="font-size:0.78rem; font-weight:700; color:var(--text-muted); margin-bottom:0.35rem;">Live Terminal Log:</div>
+            <div class="diagnostics-panel" id="posTerminalLogs" style="height:120px;">
+              [SYSTEM] Virtual POS Initialized.<br>
+              [OBSERVER] Watching banking credit notifications...
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========================================================================= -->
+      <!-- SECTION 4: PAYMENTS & COLLECTIONS                                         -->
+      <!-- ========================================================================= -->
+      <div id="sectionCollections" class="sp-section">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
+          <div>
+            <h2 style="font-size:1.6rem; font-weight:800; color:var(--text-heading);">Payments & Collections</h2>
+            <p style="color:var(--text-muted); font-size:0.9rem; margin-top:0.25rem;">Complete audit log of all inbound payments, auto-generated customer identities, and bank UTRs.</p>
+          </div>
+          <div style="display:flex; gap:0.6rem;">
+            <button class="btn-emerald" onclick="openModal('createCollectionModal')">+ Create Order</button>
+            <button class="btn-sm btn-outline" onclick="loadCollectionsData()">🔄 Refresh</button>
+          </div>
+        </div>
+
+        <div class="sp-card" style="padding:1rem;">
+          <div style="display:flex; gap:1rem; flex-wrap:wrap;">
+            <input type="text" placeholder="Search by Order ID, UTR, or Payment ID..." style="flex:1; min-width:240px; padding:0.65rem 0.85rem; border-radius:8px; border:1px solid var(--border); background:var(--bg-input); color:var(--text);" oninput="filterCollectionsTable(this.value)" />
+            <select style="width:160px; padding:0.65rem; border-radius:8px; border:1px solid var(--border); background:var(--bg-input); color:var(--text);">
+              <option value="">All Statuses</option>
+              <option value="SUCCESS">SUCCESS</option>
+              <option value="PENDING">PENDING</option>
+              <option value="FAILED">FAILED</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="data-table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Order / Payment ID</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th>Method</th>
+                <th>Bank Reference (UTR)</th>
+                <th>Timestamp</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="collectionsTableBody">
+              <tr><td colspan="7" class="empty-state">Loading collections...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ========================================================================= -->
+      <!-- SECTION 5: OUTBOUND PAYOUTS & DISBURSEMENTS                               -->
+      <!-- ========================================================================= -->
+      <div id="sectionPayouts" class="sp-section">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
+          <div>
+            <h2 style="font-size:1.6rem; font-weight:800; color:var(--text-heading);">Outbound Disbursements & Payouts</h2>
+            <p style="color:var(--text-muted); font-size:0.9rem; margin-top:0.25rem;">Real-time automated disbursements across IMPS, NEFT, RTGS, and UPI rails with 2-step authorization.</p>
+          </div>
+          <div style="display:flex; gap:0.6rem;">
+            <button class="btn-emerald" onclick="openModal('sendMoneyModal')">+ Send Payout</button>
+            <button class="btn-sm btn-outline" onclick="openModal('addBeneficiaryModal')">+ Add Beneficiary</button>
+          </div>
+        </div>
+
+        <!-- Beneficiaries Directory -->
+        <div class="sp-card">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+            <h3 style="font-size:1.15rem; font-weight:700;">Verified Beneficiary Registry</h3>
+            <span class="status-pill status-verified">PENNY-DROP ENGINE ACTIVE</span>
+          </div>
+          <div class="data-table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Beneficiary Name</th>
+                  <th>Destination Account / UPI</th>
+                  <th>Status</th>
+                  <th>Bank Registered Name</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="payoutsBenesTableBody">
+                <tr><td colspan="5" class="empty-state">No beneficiaries registered.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Payout Transactions List -->
+        <div class="sp-card">
+          <h3 style="font-size:1.15rem; font-weight:700; margin-bottom:1rem;">Disbursement Transactions</h3>
+          <div class="data-table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Payout ID</th>
+                  <th>Amount</th>
+                  <th>Rail</th>
+                  <th>Status</th>
+                  <th>Bank Reference</th>
+                  <th>Created At</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="payoutsListTableBody">
+                <tr><td colspan="7" class="empty-state">No payout transfers found.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========================================================================= -->
+      <!-- SECTION 6: BANK & PROVIDER CONNECTIONS                                    -->
+      <!-- ========================================================================= -->
+      <div id="sectionBanking" class="sp-section">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
+          <div>
+            <h2 style="font-size:1.6rem; font-weight:800; color:var(--text-heading);">Bank Connections Hub</h2>
+            <p style="color:var(--text-muted); font-size:0.9rem; margin-top:0.25rem;">Configure genuine payment providers, direct bank integrations, and account cancellation requests.</p>
+          </div>
+          <button class="btn-emerald" onclick="openModal('bankConnectionModal')">+ Configure Provider</button>
+        </div>
+
+        <!-- Provider Status Cards Grid -->
+        <div class="sp-grid-2">
+          <!-- Primary Gateway: Cashfree -->
+          <div class="bank-conn-card bank-conn-receive">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+              <div>
+                <h3 style="font-size:1.2rem; font-weight:800;">Cashfree Payment Gateway</h3>
+                <span style="font-size:0.8rem; color:var(--text-muted);">Collections & Dynamic UPI QR</span>
+              </div>
+              <span class="badge-live" id="bankConnStatusBadge">● LIVE CONNECTED</span>
+            </div>
+
+            <div class="bank-meta-row">
+              <span class="bank-meta-label">App ID</span>
+              <span class="bank-meta-val" id="dispConnAppId">CF_PROD_APP_9921</span>
+            </div>
+            <div class="bank-meta-row">
+              <span class="bank-meta-label">Environment</span>
+              <span class="bank-meta-val" id="dispConnEnv">PRODUCTION</span>
+            </div>
+            <div class="bank-meta-row">
+              <span class="bank-meta-label">Latency / Response</span>
+              <span class="bank-meta-val" style="color:#10b981;">48ms (Optimal)</span>
+            </div>
+
+            <div style="display:flex; gap:0.5rem; margin-top:0.5rem;">
+              <button class="btn-sm btn-outline" onclick="testConnectionAction()">Test Ping</button>
+              <button class="btn-sm btn-outline" onclick="checkCapabilitiesAction()">Capabilities</button>
+              <button class="btn-sm btn-emerald" onclick="activateCollectionsAction()">Activate</button>
+            </div>
+          </div>
+
+          <!-- Direct Bank APIs (HDFC, ICICI, SBI, Axis) -->
+          <div class="bank-conn-card bank-conn-send">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+              <div>
+                <h3 style="font-size:1.2rem; font-weight:800;">Direct Corporate Banking APIs</h3>
+                <span style="font-size:0.8rem; color:var(--text-muted);">Direct Host-to-Host (H2H) IMPS/NEFT</span>
+              </div>
+              <span class="status-pill status-verified">STANDBY READY</span>
+            </div>
+
+            <div class="bank-meta-row">
+              <span class="bank-meta-label">Supported Banks</span>
+              <span class="bank-meta-val">HDFC, ICICI, Axis, SBI, Kotak</span>
+            </div>
+            <div class="bank-meta-row">
+              <span class="bank-meta-label">Disbursement Protocol</span>
+              <span class="bank-meta-val">AES-256-GCM Host-to-Host</span>
+            </div>
+            <div class="bank-meta-row">
+              <span class="bank-meta-label">Penny-Drop Validation</span>
+              <span class="bank-meta-val" style="color:#38bdf8;">ACTIVE</span>
+            </div>
+
+            <div style="display:flex; gap:0.5rem; margin-top:0.5rem;">
+              <button class="btn-sm btn-outline" onclick="openModal('addBeneficiaryModal')">Test Penny-Drop</button>
+              <button class="btn-sm btn-outline" onclick="activatePayoutsAction()">Activate Rails</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bank Cancellation Request Card -->
+        <div class="sp-card bank-conn-cancel" style="border: 1px solid rgba(220, 38, 38, 0.3);">
+          <h3 style="font-size:1.15rem; font-weight:800; color:#ef4444; margin-bottom:0.5rem;">⚠️ Bank Connection Cancellation / Disconnect Request</h3>
+          <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:1rem;">
+            Gracefully disengage an active receiving account slot or provider connection. All in-flight settlements will be completed before terminal disconnect.
+          </p>
+
+          <form onsubmit="handleQuickBankCancellationSubmit(event)" style="display:flex; gap:0.75rem; flex-wrap:wrap; align-items:flex-end;">
+            <div class="form-group" style="margin:0; min-width:240px;">
+              <label>Select Connection to Decommission</label>
+              <select id="cancelConnSelect">
+                <option value="CASHFREE">Cashfree Primary Gateway</option>
+                <option value="DIRECT_BANK">Corporate H2H Bank Rail</option>
+              </select>
+            </div>
+            <div class="form-group" style="margin:0; flex:1; min-width:240px;">
+              <label>Audit Justification / Note</label>
+              <input type="text" id="cancelConnReason" placeholder="e.g. Scheduled maintenance migration" required />
+            </div>
+            <button type="submit" class="btn-sm" style="background:#dc2626; color:#ffffff; border:none; padding:0.65rem 1.25rem;">
+              Submit Cancellation Request
+            </button>
+          </form>
+        </div>
+
+        <!-- Real-Time Receiving Account Slot Ownership & Observers -->
+        <div class="sp-card">
+          <h3 style="font-size:1.15rem; font-weight:800; margin-bottom:0.5rem;">Real-Time Receiving Account Slot Ownership</h3>
+          <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:1rem;">
+            Concurrency slot manager ensuring zero payment collision across concurrent UPI payment sessions.
+          </p>
+
+          <div class="sp-grid-2">
+            <div style="background:var(--bg-surface); padding:1.25rem; border-radius:10px; border:1px solid var(--border);">
+              <div style="font-weight:700; font-size:0.9rem; margin-bottom:0.5rem; color:#10b981;">Active Slot (5-Minute Window)</div>
+              <p style="font-size:0.8rem; color:var(--text-muted); line-height:1.5;">
+                Dynamic UPI QR payment sessions hold an exclusive receiving account slot for up to 300 seconds while customer scans and pays.
+              </p>
+              <div style="margin-top:0.75rem; font-family:monospace; font-size:0.82rem; color:var(--text);">
+                Status: <span class="status-pill status-success">OPTIMAL</span> | Available Slots: <strong>50/50</strong>
+              </div>
+            </div>
+
+            <div style="background:var(--bg-surface); padding:1.25rem; border-radius:10px; border:1px solid var(--border);">
+              <div style="font-weight:700; font-size:0.9rem; margin-bottom:0.5rem; color:#38bdf8;">Processing Slot (30s Verification Window)</div>
+              <p style="font-size:0.8rem; color:var(--text-muted); line-height:1.5;">
+                Transitions to a high-priority 30s observation verification window when banking observer flags an incoming credit notification.
+              </p>
+              <div style="margin-top:0.75rem; font-family:monospace; font-size:0.82rem; color:var(--text);">
+                Status: <span class="status-pill status-verified">ACTIVE</span> | Active Processing: <strong>0</strong>
+              </div>
+            </div>
+          </div>
+
+          <div style="margin-top:1.5rem;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
+              <h4 style="font-size:1rem; font-weight:700;">Live Counter Payment Requests</h4>
+              <span class="status-pill status-live">COUNTER POS READY</span>
+            </div>
+            <p style="font-size:0.82rem; color:var(--text-muted);">
+              Instant POS terminal requests for physical retail counters with instant receipt printing.
+            </p>
+          </div>
+
+          <div style="margin-top:1.5rem; border-top:1px solid var(--border); padding-top:1.25rem;">
+            <h4 style="font-size:1rem; font-weight:700; margin-bottom:0.75rem;">Payment Observers (SMS & Gmail)</h4>
+            <div class="sp-grid-2">
+              <div style="background:var(--bg-surface); padding:1rem; border-radius:8px; border:1px solid var(--border);">
+                <div style="font-weight:700; font-size:0.85rem; color:#10b981; margin-bottom:0.25rem;">Android SMS Gateway</div>
+                <p style="font-size:0.78rem; color:var(--text-muted);">Self-hosted Android companion observer listening to real-time bank SMS alerts.</p>
+                <div style="margin-top:0.5rem;"><span class="badge-live">● CONNECTED (Port 6002)</span></div>
+              </div>
+
+              <div style="background:var(--bg-surface); padding:1rem; border-radius:8px; border:1px solid var(--border);">
+                <div style="font-weight:700; font-size:0.85rem; color:#38bdf8; margin-bottom:0.25rem;">Gmail Direct API</div>
+                <p style="font-size:0.78rem; color:var(--text-muted);">Google Cloud Pub/Sub and direct Gmail push observation daemon.</p>
+                <div style="margin-top:0.5rem;"><span class="badge-live">● CONNECTED (Port 6003)</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========================================================================= -->
+      <!-- SECTION 7: SETTLEMENTS & FINANCIAL LEDGER                                 -->
+      <!-- ========================================================================= -->
+      <div id="sectionSettlements" class="sp-section">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
+          <div>
+            <h2 style="font-size:1.6rem; font-weight:800; color:var(--text-heading);">Settlements & Financial Ledger</h2>
+            <p style="color:var(--text-muted); font-size:0.9rem; margin-top:0.25rem;">Triple-entry accounting invariants, integer paise ledger, and automated bank reconciliation.</p>
+          </div>
+          <div style="display:flex; gap:0.6rem;">
+            <button class="btn-emerald" onclick="triggerInstantSettlementAction()">⚡ Instant Settlement</button>
+            <button class="btn-sm btn-outline" onclick="triggerReconciliationAction()">Run 3-Way Reconcile</button>
+          </div>
+        </div>
+
+        <div class="sp-grid-4">
+          <div class="kpi-card-emerald">
+            <div class="kpi-label">Ledger Total Debits</div>
+            <div class="kpi-value" id="settleDebits">₹0.00</div>
+          </div>
+          <div class="kpi-card-emerald">
+            <div class="kpi-label">Ledger Total Credits</div>
+            <div class="kpi-value" id="settleCredits">₹0.00</div>
+          </div>
+          <div class="kpi-card-emerald">
+            <div class="kpi-label">Ledger Balance Variance</div>
+            <div class="kpi-value" id="settleVariance" style="color:#10b981;">₹0.00</div>
+          </div>
+          <div class="kpi-card-emerald">
+            <div class="kpi-label">Next Scheduled Settlement</div>
+            <div class="kpi-value" style="font-size:1.2rem; margin-top:0.7rem;" id="settleNextTime">T+0 (Today)</div>
+          </div>
+        </div>
+
+        <div class="sp-card">
+          <h3 style="font-size:1.15rem; font-weight:700; margin-bottom:1rem;">Settlement Batches & Bank Credit Records</h3>
+          <div class="data-table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Batch ID</th>
+                  <th>Gross Amount</th>
+                  <th>Net Credit</th>
+                  <th>Settlement Status</th>
+                  <th>Bank UTR</th>
+                  <th>Reconciled At</th>
+                </tr>
+              </thead>
+              <tbody id="settlementsTableBody">
+                <tr><td colspan="6" class="empty-state">Loading settlement records...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========================================================================= -->
+      <!-- SECTION 8: REFUNDS & DISPUTES                                             -->
+      <!-- ========================================================================= -->
+      <div id="sectionRefunds" class="sp-section">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
+          <div>
+            <h2 style="font-size:1.6rem; font-weight:800; color:var(--text-heading);">Refunds & Payment Reversals</h2>
+            <p style="color:var(--text-muted); font-size:0.9rem; margin-top:0.25rem;">Initiate instant refunds back to source bank accounts or UPI VPAs.</p>
+          </div>
+        </div>
+
+        <div class="sp-card">
+          <h3 style="font-size:1.15rem; font-weight:700; margin-bottom:1rem;">Initiate Refund</h3>
+          <form onsubmit="handleInitiateRefundSubmit(event)" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:1rem; align-items:flex-end;">
+            <div class="form-group" style="margin:0;">
+              <label>Payment / Order ID</label>
+              <input type="text" id="refundInputPaymentId" required placeholder="c7942127-... or ORDER-1001" />
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label>Refund Amount (₹ INR)</label>
+              <input type="number" step="0.01" min="1" id="refundInputAmount" required placeholder="Full or partial amount" />
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label>Reason / Audit Note</label>
+              <input type="text" id="refundInputReason" placeholder="Customer return, duplicate charge, etc." required />
+            </div>
+            <button type="submit" class="btn-emerald" style="padding:0.65rem 1rem;">Process Refund</button>
+          </form>
+        </div>
+
+        <div class="sp-card">
+          <h3 style="font-size:1.15rem; font-weight:700; margin-bottom:1rem;">Refund History</h3>
+          <div class="data-table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Refund ID</th>
+                  <th>Payment ID</th>
+                  <th>Amount</th>
+                  <th>Status</th>
+                  <th>ARN / Reversal Reference</th>
+                  <th>Created At</th>
+                </tr>
+              </thead>
+              <tbody id="refundsTableBody">
+                <tr><td colspan="6" class="empty-state">No refunds processed.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========================================================================= -->
+      <!-- SECTION 9: 60-SECOND OPERATIONS & ALERTS                                  -->
+      <!-- ========================================================================= -->
+      <div id="sectionOperations" class="sp-section">
+        <h2 style="font-size:1.6rem; font-weight:800; color:var(--text-heading);">60-Second Engine Health & Telemetry</h2>
+        <p style="color:var(--text-muted); font-size:0.9rem; margin-top:0.25rem;">Real-time performance tracking against the 60-second payment confirmation and settlement invariant.</p>
+
+        <div class="sp-grid-4">
+          <div class="kpi-card-emerald">
+            <div class="kpi-label">Average Confirmation Latency</div>
+            <div class="kpi-value" id="opAvgLatency" style="color:#10b981;">1.24s</div>
+          </div>
+          <div class="kpi-card-emerald">
+            <div class="kpi-label">Under 60s Compliance</div>
+            <div class="kpi-value" id="opCompliance" style="color:#10b981;">100.0%</div>
+          </div>
+          <div class="kpi-card-emerald">
+            <div class="kpi-label">Active Observer Daemons</div>
+            <div class="kpi-value" id="opActiveObservers">2/2 UP</div>
+          </div>
+          <div class="kpi-card-emerald">
+            <div class="kpi-label">Failed State Queue</div>
+            <div class="kpi-value" id="opQueueFailures" style="color:#10b981;">0</div>
+          </div>
+        </div>
+
+        <div class="sp-card">
+          <h3 style="font-size:1.15rem; font-weight:700; margin-bottom:1rem;">Real-Time Financial & Observer Alerts</h3>
+          <div id="alertsContainer">
+            <div class="alert-item alert-info">
+              <div>
+                <strong>[HEALTH] Sub-60s Verification Engine running nominally.</strong><br>
+                <small style="color:var(--text-muted);">All banking observation signals verified within SLA.</small>
+              </div>
+              <span class="status-pill status-success">HEALTHY</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========================================================================= -->
+      <!-- SECTION 10: STORE & WEBHOOK SETTINGS                                      -->
+      <!-- ========================================================================= -->
+      <div id="sectionStoreSettings" class="sp-section">
+        <h2 style="font-size:1.6rem; font-weight:800; color:var(--text-heading);">Store & Webhook Configuration</h2>
+        <p style="color:var(--text-muted); font-size:0.9rem; margin-top:0.25rem;">Configure your checkout portal branding, webhook destinations, and store URLs.</p>
+
+        <div class="sp-card">
+          <form onsubmit="handleSaveStoreSettings(event)">
+            <div class="sp-grid-2">
+              <div class="form-group">
+                <label>Merchant Brand Name</label>
+                <input type="text" id="storeBrandName" value="Sanbook Pay Merchant" />
+              </div>
+              <div class="form-group">
+                <label>Support Email</label>
+                <input type="email" id="storeSupportEmail" value="support@sanbookpay.internal" />
+              </div>
+              <div class="form-group">
+                <label>Checkout Portal Host</label>
+                <input type="url" id="storeCheckoutHost" value="http://localhost:7000" />
+              </div>
+              <div class="form-group">
+                <label>Webhook Destination URL</label>
+                <input type="url" id="storeWebhookUrl" value="http://localhost:5000/api/webhook" />
+              </div>
+            </div>
+            <button type="submit" class="btn-emerald" style="margin-top:1rem;">Save Store Configuration</button>
+          </form>
+        </div>
+      </div>
+
+      <!-- ========================================================================= -->
+      <!-- SECTION 11: SECURITY & VAULT AUDIT                                        -->
+      <!-- ========================================================================= -->
+      <div id="sectionSecurity" class="sp-section">
+        <h2 style="font-size:1.6rem; font-weight:800; color:var(--text-heading);">Security & Encryption Vault</h2>
+        <p style="color:var(--text-muted); font-size:0.9rem; margin-top:0.25rem;">Bank-grade AES-256-GCM credential vault, constant-time HMAC verification, and immutable audit trails.</p>
+
+        <div class="sp-grid-2">
+          <div class="sp-card">
+            <h3 style="font-size:1.15rem; font-weight:700; margin-bottom:1rem;">Security Invariants Status</h3>
+            <div class="bank-meta-row">
+              <span class="bank-meta-label">Credential Vault Encryption</span>
+              <span class="bank-meta-val" style="color:#10b981;">AES-256-GCM (Hardware Enclave)</span>
+            </div>
+            <div class="bank-meta-row">
+              <span class="bank-meta-label">Webhook Verification</span>
+              <span class="bank-meta-val" style="color:#10b981;">Constant-Time HMAC-SHA256 (Raw Body)</span>
+            </div>
+            <div class="bank-meta-row">
+              <span class="bank-meta-label">Public Force-Success Endpoint</span>
+              <span class="bank-meta-val" style="color:#ef4444;">PROHIBITED (Zero Simulation)</span>
+            </div>
+            <div class="bank-meta-row">
+              <span class="bank-meta-label">PII Customer Masking</span>
+              <span class="bank-meta-val" style="color:#10b981;">ENFORCED (+91 98*** ***10)</span>
+            </div>
+          </div>
+
+          <div class="sp-card">
+            <h3 style="font-size:1.15rem; font-weight:700; margin-bottom:1rem;">Download Companion Companion</h3>
+            <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:1rem;">
+              Download the official Android Banking SMS Observer companion app for self-hosted zero-fee UPI collection observation.
+            </p>
+            <a href="/youpi-sms-gateway.apk" class="btn-emerald" style="text-decoration:none; display:inline-block;">
+              📱 Download Android Observer APK
+            </a>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL: QUICK PAYMENT LINK CREATOR                                         -->
+  <!-- ========================================================================= -->
+  <div class="sp-modal-overlay" id="createPaymentLinkModal">
+    <div class="sp-modal-card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.25rem;">
+        <h3 style="font-size:1.25rem; font-weight:800; color:var(--text-heading);">⚡ Generate Instant Payment Link</h3>
+        <button type="button" class="btn-sm" onclick="closeModal('createPaymentLinkModal')">✕</button>
+      </div>
+
+      <form onsubmit="handleModalPaymentLinkSubmit(event)">
+        <div class="form-group">
+          <label>Order ID / Reference</label>
+          <input type="text" id="modalLinkOrderId" required placeholder="ORD-XXXX" />
+        </div>
+        <div class="form-group">
+          <label>Amount (₹ INR)</label>
+          <input type="number" step="0.01" min="1" id="modalLinkAmount" value="499.00" required />
+        </div>
+        <div class="form-group">
+          <label>Customer Mobile (Auto-Provisioned Identity)</label>
+          <input type="tel" id="modalLinkPhone" placeholder="9876543210" value="9876543210" />
+        </div>
+        <div class="form-group">
+          <label>Customer Email (For Tax Receipt)</label>
+          <input type="email" id="modalLinkEmail" placeholder="customer@example.com" value="customer@example.com" />
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:0.6rem; margin-top:1.5rem;">
+          <button type="button" class="btn-sm btn-outline" onclick="closeModal('createPaymentLinkModal')">Cancel</button>
+          <button type="submit" class="btn-emerald">Generate & Open Checkout</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL: CREATE COLLECTION ORDER                                            -->
+  <!-- ========================================================================= -->
+  <div class="sp-modal-overlay" id="createCollectionModal">
+    <div class="sp-modal-card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.25rem;">
+        <h3 style="font-size:1.25rem; font-weight:800; color:var(--text-heading);">Create Payment Collection Order</h3>
+        <button type="button" class="btn-sm" onclick="closeModal('createCollectionModal')">✕</button>
+      </div>
+
+      <form onsubmit="handleCreateCollectionSubmit(event)">
+        <div class="form-group">
+          <label>Order ID</label>
+          <input type="text" id="collInputOrderId" required placeholder="ORD-2026-001" />
+        </div>
+        <div class="form-group">
+          <label>Amount (₹ INR)</label>
+          <input type="number" step="0.01" min="1" id="collInputAmount" required placeholder="499.00" />
+        </div>
+        <div class="form-group">
+          <label>Customer Name</label>
+          <input type="text" id="collInputCustName" placeholder="Customer Name" />
+        </div>
+        <div class="form-group">
+          <label>Customer Mobile</label>
+          <input type="tel" id="collInputCustPhone" placeholder="9876543210" />
+        </div>
+        <div class="form-group">
+          <label>Customer Email</label>
+          <input type="email" id="collInputCustEmail" placeholder="customer@example.com" />
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:0.6rem; margin-top:1.5rem;">
+          <button type="button" class="btn-sm btn-outline" onclick="closeModal('createCollectionModal')">Cancel</button>
+          <button type="submit" class="btn-emerald">Create Order</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL: SEND MONEY (INSTANT PAYOUT)                                        -->
+  <!-- ========================================================================= -->
+  <div class="sp-modal-overlay" id="sendMoneyModal">
+    <div class="sp-modal-card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.25rem;">
+        <h3 style="font-size:1.25rem; font-weight:800; color:var(--text-heading);">💸 Send Money (Outbound Transfer)</h3>
+        <button type="button" class="btn-sm" onclick="closeModal('sendMoneyModal')">✕</button>
+      </div>
+
+      <form onsubmit="handleSendMoneySubmit(event)">
+        <div class="form-group">
+          <label>Select Verified Beneficiary</label>
+          <select id="payoutSelectBene" required>
+            <option value="">Loading beneficiaries...</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Amount (₹ INR)</label>
+          <input type="number" step="0.01" min="1" id="payoutInputAmount" required placeholder="100.00" />
+        </div>
+        <div class="form-group">
+          <label>Transfer Rail</label>
+          <select id="payoutSelectMode">
+            <option value="IMPS">IMPS (Instant 24x7)</option>
+            <option value="UPI">UPI (Instant VPA Transfer)</option>
+            <option value="NEFT">NEFT (Standard Batch)</option>
+            <option value="RTGS">RTGS (High Value &gt; 2 Lakhs)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Transfer Purpose / Audit Note</label>
+          <input type="text" id="payoutInputPurpose" placeholder="Vendor Settlement, Salary, etc." required />
+        </div>
+
+        <div style="background:var(--bg-surface); padding:0.75rem; border-radius:8px; font-size:0.8rem; color:var(--text-muted); margin-bottom:1rem;">
+          🔒 Requires two-step authorization. Transfer is sent directly through connected corporate banking rails.
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:0.6rem;">
+          <button type="button" class="btn-sm btn-outline" onclick="closeModal('sendMoneyModal')">Cancel</button>
+          <button type="submit" class="btn-emerald">Authorize & Send Payout</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL: ADD BENEFICIARY                                                    -->
+  <!-- ========================================================================= -->
+  <div class="sp-modal-overlay" id="addBeneficiaryModal">
+    <div class="sp-modal-card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.25rem;">
+        <h3 style="font-size:1.25rem; font-weight:800; color:var(--text-heading);">Register Beneficiary Account</h3>
+        <button type="button" class="btn-sm" onclick="closeModal('addBeneficiaryModal')">✕</button>
+      </div>
+
+      <form onsubmit="handleAddBeneficiarySubmit(event)">
+        <div class="form-group">
+          <label>Beneficiary Name</label>
+          <input type="text" id="beneInputName" required placeholder="Legal Beneficiary / Company Name" />
+        </div>
+        <div class="form-group">
+          <label>Destination Rail Type</label>
+          <select id="beneSelectType" onchange="toggleBeneFields()">
+            <option value="BANK_ACCOUNT">Bank Account (IFSC + Account Number)</option>
+            <option value="UPI_ID">UPI Virtual Payment Address (VPA)</option>
+          </select>
+        </div>
+
+        <div id="beneBankFields">
+          <div class="form-group">
+            <label>Bank Account Number</label>
+            <input type="text" id="beneInputAccount" placeholder="12-18 digit account number" />
+          </div>
+          <div class="form-group">
+            <label>IFSC Code</label>
+            <input type="text" id="beneInputIfsc" placeholder="e.g. HDFC0001234" style="text-transform:uppercase;" />
+          </div>
+        </div>
+
+        <div id="beneUpiFields" style="display:none;">
+          <div class="form-group">
+            <label>UPI ID (VPA)</label>
+            <input type="text" id="beneInputUpi" placeholder="e.g. vendor@okhdfcbank" />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Beneficiary Phone (For SMS notice)</label>
+          <input type="tel" id="beneInputPhone" placeholder="9876543210" />
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:0.6rem; margin-top:1.5rem;">
+          <button type="button" class="btn-sm btn-outline" onclick="closeModal('addBeneficiaryModal')">Cancel</button>
+          <button type="submit" class="btn-emerald">Verify & Register Account</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL: TRANSACTION DETAILS                                                -->
+  <!-- ========================================================================= -->
+  <div class="sp-modal-overlay" id="collectionDetailsModal">
+    <div class="sp-modal-card" style="max-width:700px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.25rem;">
+        <h3 style="font-size:1.25rem; font-weight:800; color:var(--text-heading);">Transaction Audit Record</h3>
+        <button type="button" class="btn-sm" onclick="closeModal('collectionDetailsModal')">✕</button>
+      </div>
+
+      <div id="collectionDetailsBody">
+        Loading audit facts...
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toastContainer"></div>
+
+  <!-- Include Core Admin Controller JS -->
+  <script src="/sanbook-pay-admin.js"></script>
+
+  <!-- Dashboard View Router and UI Interactivity -->
+  <script>
+    // Live Clock
+    function updateClock() {
+      const now = new Date();
+      const clockEl = document.getElementById('headerClock');
+      if (clockEl) {
+        clockEl.textContent = 'IST ' + now.toLocaleTimeString('en-US', { hour12: false, timeZone: 'Asia/Kolkata' });
+      }
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // Toast message utility
+    function showToast(msg, isSuccess = true) {
+      const container = document.getElementById('toastContainer');
+      if (!container) return;
+      const el = document.createElement('div');
+      el.className = 'toast-msg';
+      el.innerHTML = `${isSuccess ? '✅' : '⚠️'} ${escapeHtml(msg)}`;
+      container.appendChild(el);
+      setTimeout(() => {
+        el.style.opacity = '0';
+        el.style.transition = 'opacity 0.3s ease';
+        setTimeout(() => el.remove(), 300);
+      }, 3500);
+    }
+
+    // Switch active section in the single-page layout
+    function switchSection(sectionId) {
+      document.querySelectorAll('.sp-section').forEach(sec => {
+        sec.classList.remove('active-section');
+      });
+
+      const targetSec = document.getElementById('section' + sectionId.charAt(0).toUpperCase() + sectionId.slice(1));
+      if (targetSec) {
+        targetSec.classList.add('active-section');
+      }
+
+      document.querySelectorAll('.nav-link').forEach(link => {
+        link.classList.remove('active');
+      });
+      const activeLink = document.getElementById('nav-' + sectionId);
+      if (activeLink) activeLink.classList.add('active');
+
+      // Update URL hash without scroll jump
+      if (window.history && window.history.replaceState) {
+        window.history.replaceState(null, '', '#' + sectionId);
+      }
+
+      // Notify controller engine
+      if (typeof window.onSanbookPaySectionSwitch === 'function') {
+        window.onSanbookPaySectionSwitch(sectionId);
+      }
+    }
+
+    // Theme Toggle
+    function toggleTheme() {
+      const html = document.documentElement;
+      const current = html.getAttribute('data-theme') || 'dark';
+      const next = current === 'dark' ? 'light' : 'dark';
+      html.setAttribute('data-theme', next);
+      localStorage.setItem('sanbook_theme', next);
+    }
+
+    // Restore saved theme
+    (function() {
+      const saved = localStorage.getItem('sanbook_theme');
+      if (saved) document.documentElement.setAttribute('data-theme', saved);
+    })();
+
+    // Code snippet tab switcher
+    function switchCodeTab(tabId) {
+      document.querySelectorAll('.code-tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.code-content-box').forEach(box => box.style.display = 'none');
+
+      const activeBtn = Array.from(document.querySelectorAll('.code-tab-btn')).find(b => b.textContent.toLowerCase().includes(tabId));
+      if (activeBtn) activeBtn.classList.add('active');
+
+      const targetBox = document.getElementById('code-' + tabId);
+      if (targetBox) targetBox.style.display = 'block';
+    }
+
+    function copyCurrentSnippet() {
+      const activeBox = Array.from(document.querySelectorAll('.code-content-box')).find(b => b.style.display !== 'none');
+      if (activeBox) {
+        navigator.clipboard.writeText(activeBox.textContent.trim());
+        showToast('Code snippet copied to clipboard!');
+      }
+    }
+
+    function copyKeyText(id) {
+      const el = document.getElementById(id);
+      if (el) {
+        navigator.clipboard.writeText(el.value);
+        showToast('Copied to clipboard!');
+      }
+    }
+
+    function toggleKeyVisibility(id) {
+      const el = document.getElementById(id);
+      if (el) {
+        el.type = el.type === 'password' ? 'text' : 'password';
+      }
+    }
+
+    // Quick payment link generation
+    async function handleGeneratePaymentLink(e) {
+      if (e) e.preventDefault();
+      const orderId = document.getElementById('quickLinkOrderId').value.trim() || ('ORD-' + Date.now());
+      const amount = document.getElementById('quickLinkAmount').value;
+      const phone = document.getElementById('quickLinkPhone').value.trim();
+      const email = document.getElementById('quickLinkEmail').value.trim();
+
+      try {
+        const res = await fetch('/api/v1/payments', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            orderId,
+            amount,
+            customer: { phone, email, name: 'Sanbook Customer' }
+          })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          alert('Error creating payment: ' + (data.error || 'Failed'));
+          return;
+        }
+
+        const resultBox = document.getElementById('quickLinkResultBox');
+        const urlText = document.getElementById('quickLinkUrlText');
+        const openBtn = document.getElementById('quickLinkOpenBtn');
+        const custDetails = document.getElementById('quickLinkCustomerDetails');
+
+        if (resultBox && urlText && openBtn) {
+          resultBox.style.display = 'block';
+          urlText.textContent = data.checkoutUrl;
+          openBtn.href = data.checkoutUrl;
+
+          if (custDetails) {
+            custDetails.innerHTML = `👤 Auto-Customer ID: <strong>${escapeHtml(data.customerId || 'cust_' + Date.now())}</strong> | Masked Phone: <strong>${escapeHtml(data.customer?.phone || '+91 98*** ***10')}</strong> | Masked Email: <strong>${escapeHtml(data.customer?.email || 'c***@example.com')}</strong>`;
+          }
+
+          showToast('Payment link generated! Click Open Checkout.');
+        }
+      } catch (err) {
+        alert('Network error: ' + err.message);
+      }
+    }
+
+    function copyQuickLinkUrl() {
+      const urlText = document.getElementById('quickLinkUrlText');
+      if (urlText) {
+        navigator.clipboard.writeText(urlText.textContent.trim());
+        showToast('Payment link URL copied!');
+      }
+    }
+
+    async function handleModalPaymentLinkSubmit(e) {
+      if (e) e.preventDefault();
+      const orderId = document.getElementById('modalLinkOrderId').value.trim();
+      const amount = document.getElementById('modalLinkAmount').value;
+      const phone = document.getElementById('modalLinkPhone').value.trim();
+      const email = document.getElementById('modalLinkEmail').value.trim();
+
+      try {
+        const res = await fetch('/api/v1/payments', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            orderId,
+            amount,
+            customer: { phone, email }
+          })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          alert('Error: ' + (data.error || 'Failed'));
+          return;
+        }
+        closeModal('createPaymentLinkModal');
+        window.open(data.checkoutUrl, '_blank');
+        showToast('Payment launched in checkout tab!');
+      } catch (err) {
+        alert('Network error: ' + err.message);
+      }
+    }
+
+    function filterCollectionsTable(query) {
+      const q = (query || '').toLowerCase().trim();
+      const rows = document.querySelectorAll('#collectionsTableBody tr');
+      rows.forEach(r => {
+        const text = r.textContent.toLowerCase();
+        r.style.display = text.includes(q) ? '' : 'none';
+      });
+    }
+
+    // Initial Routing based on URL hash
+    window.addEventListener('DOMContentLoaded', () => {
+      const hash = window.location.hash.replace('#', '') || 'overview';
+      switchSection(hash);
+
+      const orderInput = document.getElementById('quickLinkOrderId');
+      if (orderInput && !orderInput.value) {
+        orderInput.value = 'ORD-' + Math.floor(100000 + Math.random() * 900000);
+      }
+
+      const modalOrderInput = document.getElementById('modalLinkOrderId');
+      if (modalOrderInput && !modalOrderInput.value) {
+        modalOrderInput.value = 'ORD-' + Math.floor(100000 + Math.random() * 900000);
+      }
+    });
+  </script>
+</body>
+</html>
