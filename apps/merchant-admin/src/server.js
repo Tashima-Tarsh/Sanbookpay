@@ -59,7 +59,7 @@ export class AdminServer {
     this.apiBaseUrl = options.apiBaseUrl || process.env.BASE_PAYMENT_API_URL || 'http://localhost:6100';
     this.merchantRepo = new MerchantRepository(this.db);
     this.ticketRepo = new SupportTicketRepository(this.db);
-    this.htmlTemplatePath = path.join(__dirname, 'views', 'admin.html');
+    this.htmlTemplatePath = path.join(__dirname, 'views', 'admin-premium.html');
     this.template = fs.readFileSync(this.htmlTemplatePath, 'utf8');
   }
 

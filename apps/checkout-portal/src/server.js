@@ -79,7 +79,7 @@ export class CheckoutServer {
     } catch {}
 
     this.apiBaseUrl = options.apiBaseUrl || process.env.BASE_PAYMENT_API_URL || 'http://localhost:6100';
-    this.htmlTemplatePath = path.join(__dirname, 'views', 'checkout.html');
+    this.htmlTemplatePath = path.join(__dirname, 'views', 'checkout-premium.html');
     this.sdkScriptPath = path.join(__dirname, 'sdk', 'youpi-checkout.js');
     this.template = fs.readFileSync(this.htmlTemplatePath, 'utf8');
   }
