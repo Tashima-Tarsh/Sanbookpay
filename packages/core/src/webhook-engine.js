@@ -37,6 +37,8 @@ export class WebhookEngine {
 
     const publicOutcome = isTerminalStatus(event) ? toPublicOutcome(event) : event;
 
+    const bank=session.attributedObservationId?this.db.queryOne('SELECT bank_reference_number,sender_vpa FROM payment_observations WHERE id=?',[session.attributedObservationId]):null;
+    const snapshot=session.metadata?.receivingAccountSnapshot||{};
     const payloadObj = {
       event: publicOutcome,
       paymentId: session.id,
@@ -45,6 +47,15 @@ export class WebhookEngine {
       amountPaise: Number(session.amountPaise),
       currency: session.currency || 'INR',
       method: session.method || 'UPI',
+      transaction:session.id,
+      uniquetransactionid:session.orderId,
+      status:publicOutcome==='SUCCESS'?'SUCCESS':'FAILED',
+      bankReferenceNumber:bank?.bank_reference_number||null,
+      utr:bank?.bank_reference_number||null,
+      senderVpa:bank?.sender_vpa||null,
+      payeeVpa:snapshot.upiId||null,
+      beneficiary:{name:snapshot.payeeName||null,upiId:snapshot.upiId||null},
+      confirmationSource:session.verificationTag==='MERCHANT_CONFIRMED'?'MERCHANT':session.verificationLevel?'BANK_OBSERVER':null,
       completedAt: session.completedAt ? session.completedAt.toISOString() : new Date().toISOString(),
       metadata: session.metadata || {}
     };

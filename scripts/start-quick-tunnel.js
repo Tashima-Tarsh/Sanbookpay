@@ -10,6 +10,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 import { runMigrations } from '../packages/db/src/migrate.js';
+import { getInternalServiceToken } from '@youpi/common';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -87,7 +88,7 @@ const proxyRequest = (targetPort, req, res) => {
     port: targetPort,
     path: req.url,
     method: req.method,
-    headers: { ...req.headers, host: `127.0.0.1:${targetPort}`, 'x-forwarded-host': req.headers.host || '', 'x-forwarded-proto': req.headers['x-forwarded-proto'] || 'http' }
+    headers: { ...req.headers, 'x-gateway-token':getInternalServiceToken(), host: `127.0.0.1:${targetPort}`, 'x-forwarded-host': req.headers.host || '', 'x-forwarded-proto': req.headers['x-forwarded-proto'] || 'http' }
   };
 
   const proxyReq = http.request(options, (proxyRes) => {
@@ -120,7 +121,7 @@ const gatewayServer = http.createServer((req, res) => {
   }
 
   // Route to Payment Core REST API
-  if (p.startsWith('/api/v1/') || p.startsWith('/v1/dynamo/') || p === '/health') {
+  if (p.startsWith('/api/v1/') || p.startsWith('/v1/dynamo/') || p.startsWith('/v1.0/') || p === '/health') {
     return proxyRequest(6100, req, res);
   }
 

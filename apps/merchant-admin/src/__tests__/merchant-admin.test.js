@@ -59,11 +59,11 @@ describe('Merchant Admin Integration Tests', () => {
     // Verify premium glassmorphism dashboard elements
     assert.ok(res.text.includes('Overview'));
     assert.ok(res.text.includes('Transactions'));
-    assert.ok(res.text.includes('Merchants'));
+    assert.ok(res.text.includes('Business profile'));
     assert.ok(res.text.includes('Settlements'));
     assert.ok(res.text.includes('UPI Accounts'));
-    assert.ok(res.text.includes('API Keys'));
-    assert.ok(res.text.includes('Alerts'));
+    assert.ok(res.text.includes('Developer tools'));
+    assert.ok(res.text.includes('Connections & alerts'));
   });
 
   test('GET /api/admin/tickets requires the admin token', async () => {
@@ -87,5 +87,11 @@ describe('Merchant Admin Integration Tests', () => {
   test('anonymous browser cannot use the privileged payment API relay',async()=>{
     assert.equal((await fetch(baseUrl+'/api/console/v1/admin/merchant-settings')).status,401);
     assert.equal((await fetch(baseUrl+'/api/v1/admin/merchant-settings')).status,401);
+  });
+  test('customer API guide and downloadable specification are publicly available',async()=>{
+    const guide=await get('/developers');assert.equal(guide.status,200);assert.ok(guide.text.includes('Dynamo Pay API'));
+    const spec=await get('/developers/openapi.json');assert.equal(spec.status,200);assert.ok(JSON.parse(spec.text).paths['/v1.0/collect/upi']);
+    const manual=await get('/dynamo-pay-manual.pdf');assert.equal(manual.status,200);assert.equal(manual.headers['content-type'],'application/pdf');assert.ok(manual.text.startsWith('%PDF-'));
+    assert.ok(!guide.text.toLowerCase().includes('sky8'));
   });
 });

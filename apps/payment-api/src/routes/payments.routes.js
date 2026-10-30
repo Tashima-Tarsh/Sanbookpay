@@ -1,3 +1,4 @@
+import { validateUpiChannel } from '../upi-channel.js';
 import { HttpServer } from '../server.js';
 import { toPaise, toRupeesString, resolveRuntimeUrls, PaymentStatus, safeEqual, hasBearer, getObserverToken, maskPhone, maskEmail, generateCustomerId } from '@youpi/common';
 import { isTerminalStatus, toPublicOutcome } from '@youpi/core';
@@ -176,6 +177,8 @@ export function registerPaymentRoutes(server, ctx) {
         HttpServer.json(res, 500, { error: 'No active UPI receiving account configured for merchant.' });
         return;
       }
+      const channelError=validateUpiChannel(merchant,amountPaise,receivingAccount.upiId);
+      if(channelError)return HttpServer.json(res,400,channelError);
       receivingAccountId = receivingAccount.id;
       receivingAccountSnapshot = {
         id: receivingAccount.id,

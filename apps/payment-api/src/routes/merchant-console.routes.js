@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { upiChannelSettings } from '../upi-channel.js';
 import { HttpServer } from '../server.js';
 import { isValidVpa, resolveSecret } from '@youpi/common';
 import { SplitSettlementRepository } from '@youpi/db';
@@ -20,6 +21,13 @@ export function registerMerchantConsoleRoutes(server, ctx) {
   db.execute(`CREATE TABLE IF NOT EXISTS console_split_transfers (payment_id TEXT NOT NULL REFERENCES console_split_allocations(payment_id), recipient_vpa TEXT NOT NULL, bank_reference TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY(payment_id,recipient_vpa))`);
   const merchant = req => (req.headers['x-merchant-id'] ? merchantRepo.findById(req.headers['x-merchant-id']) : null) || merchantRepo.getDefault();
   const root = '/api/v1/admin/console';
+  server.get(root+'/upi-channel',(req,res)=>HttpServer.json(res,200,upiChannelSettings(merchant(req))));
+  server.post(root+'/upi-channel',async(req,res)=>{
+    const body=await HttpServer.parseBody(req),m=merchant(req);
+    if(typeof body.enabled!=='boolean'||!Number.isSafeInteger(body.minAmountPaise)||!Number.isSafeInteger(body.maxAmountPaise)||body.minAmountPaise<1||body.maxAmountPaise<body.minAmountPaise||!Array.isArray(body.allowedVpas)||body.allowedVpas.length>100||body.allowedVpas.some(v=>typeof v!=='string'||!isValidVpa(v)))return HttpServer.json(res,400,{error:'Provide valid amount limits, channel state, and UPI IDs.'});
+    const upiChannel={enabled:body.enabled,minAmountPaise:body.minAmountPaise,maxAmountPaise:body.maxAmountPaise,allowedVpas:[...new Set(body.allowedVpas.map(v=>v.trim().toLowerCase()))]};
+    merchantRepo.update(m.id,{branding:{...m.branding,upiChannel}});HttpServer.json(res,200,upiChannel);
+  });
   const config = m => m.branding?.splitConfig || { platformFeeBps: 0, gstPercent: 18, recipients: [] };
   const fail = (res, message) => HttpServer.json(res, 400, { error: message });
   function payments(mid) {

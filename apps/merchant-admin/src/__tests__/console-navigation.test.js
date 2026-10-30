@@ -13,8 +13,8 @@ test('every sidebar destination shows one matching content view and API settings
   const nav=names.map(name=>Object.assign(element('nav-'+name),{dataset:{page:name}}));
   const views=names.map(name=>element('page-'+name));
   const data={
-    'v1/admin/console/summary':{total:0,paid:0,failed:0,pending:0,cod:0,collectedPaise:0},
-    'v1/admin/console/payments':{payments:[]},'v1/admin/console/refunds':{refunds:[]},'v1/refunds':{refunds:[]},
+    'v1/admin/console/summary':{total:1,paid:1,failed:0,pending:0,cod:0,collectedPaise:400},
+    'v1/admin/console/payments':{payments:[{id:'receipt-4',orderId:'ORDER-REAL',amountPaise:400,status:'SUCCESS',method:'UPI',source:'SESSION',createdAt:new Date().toISOString()}]},'v1/admin/console/refunds':{refunds:[{id:'refund-4',payment_id:'receipt-4',amount_paise:400,status:'PENDING_MANUAL',reason:'Return'}]},'v1/refunds':{refunds:[]},
     'v1/admin/console/splits':{platformFeeBps:500,gstPercent:18,recipients:[]},'v1/admin/console/allocations':{allocations:[]},
     'v1/admin/console/credentials':{merchantId:'merchant-1',clientId:'client-1',clientSecret:'protected-secret',webhookSecret:'protected-webhook'},
     'v1/admin/merchant-settings':{businessName:'Dynamo merchant'},'v1/admin/upi-accounts':{accounts:[]},
@@ -26,6 +26,10 @@ test('every sidebar destination shows one matching content view and API settings
   const flush=async()=>{for(let i=0;i<5;i++)await new Promise(r=>setImmediate(r));};
   vm.runInNewContext(fs.readFileSync(new URL('../../public/dynamo-console.js',import.meta.url),'utf8'),context);
   await flush();
+  assert.equal(element('statTotal').textContent,'1');
+  assert.ok(element('collectionChart').innerHTML.includes('has-value'));
+  assert.equal(element('dashboardAttention').hidden,false);
+  assert.ok(element('dashboardAttention').innerHTML.includes('A refund needs your attention'));
   for(const item of nav){await listeners.click({target:item});await flush();
     assert.equal(element('page-'+item.dataset.page).hidden,false,item.dataset.page);
     assert.equal(views.filter(v=>!v.hidden).length,1,item.dataset.page);

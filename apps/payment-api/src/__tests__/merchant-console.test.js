@@ -84,3 +84,9 @@ test('zero-paise recipient shares do not require an impossible bank transfer',as
   assert.equal((await call(`/allocations/${p.id}/transfer`,{vpa:'alice@upi',bankReference:'BANK-11111'})).status,200);
   assert.equal((await(await call('/allocations')).json()).allocations.find(r=>r.payment_id===p.id).status,'MANUALLY_CONFIRMED');
 });
+test('UPI channel settings validate and persist enable, limits and allowlist',async()=>{
+  assert.equal((await call('/upi-channel',{enabled:true,minAmountPaise:20000,maxAmountPaise:10000,allowedVpas:[]})).status,400);
+  assert.equal((await call('/upi-channel',{enabled:true,minAmountPaise:20000,maxAmountPaise:2000000,allowedVpas:['bad']})).status,400);
+  const settings={enabled:false,minAmountPaise:20000,maxAmountPaise:2000000,allowedVpas:['business@upi']};
+  assert.equal((await call('/upi-channel',settings)).status,200);assert.deepEqual(await(await call('/upi-channel')).json(),settings);
+});

@@ -46,6 +46,17 @@ describe('Auth guard: admin, observer and force-success endpoints', () => {
     assert.equal(confirm.status, 401);
   });
 
+  test('legacy financial routes require administrator authentication', async () => {
+    for (const path of ['/api/v1/collections', '/api/v1/payouts', '/api/v1/settlements', '/api/v1/ledger/accounts', '/api/v1/reconciliation/runs', '/api/v1/split-settlements/rules']) {
+      assert.equal((await call(path)).status, 401, path);
+      assert.equal((await call(path, { token: TEST_OBSERVER_TOKEN })).status, 401, path);
+      assert.notEqual((await call(path, { token: TEST_ADMIN_TOKEN })).status, 401, path);
+    }
+    for (const path of ['/api/v1/reconciliation/run', '/api/v1/split-settlements/configure', '/api/v1/split-settlements/settle']) {
+      assert.equal((await call(path, { method: 'POST', body: {} })).status, 401, path);
+    }
+  });
+
   test('tunnel/start refuses a command that contains no tunnel token (nothing is executed)', async () => {
     const res = await call('/api/v1/admin/tunnel/start', {
       method: 'POST',

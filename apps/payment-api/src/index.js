@@ -517,6 +517,7 @@ export function createPaymentApp(customDb = null, options = {}) {
   registerDynamoPayRoutes(server, context);
 
   function destroy() {
+    clearInterval(webhookRetryTimer);
     clearInterval(queueSyncDaemon);
     clearInterval(aggressivePollerDaemon);
     for (const timer of activeSweepTimers) {
@@ -532,6 +533,13 @@ export function createPaymentApp(customDb = null, options = {}) {
     dynamoSMS.stopPolling();
     dynamoGmail.stopPolling();
   }
+
+  let webhookRetryRunning=false;
+  const webhookRetryTimer=setInterval(async()=>{
+    if(webhookRetryRunning)return;webhookRetryRunning=true;
+    try{await webhookEngine.retryPending();}catch(error){console.error('[Webhook retry]',error.message);}finally{webhookRetryRunning=false;}
+  },5000);
+  webhookRetryTimer.unref?.();
 
   return {
     server,

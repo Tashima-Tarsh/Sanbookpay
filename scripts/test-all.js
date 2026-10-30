@@ -1,4 +1,5 @@
 import { spawnSync } from 'node:child_process';
+import fs from 'node:fs';
 
 const testFiles = [
   'packages/common/src/__tests__/common.test.js',
@@ -9,6 +10,7 @@ const testFiles = [
   'packages/core/src/__tests__/queue-timing.test.js',
   'packages/core/src/__tests__/verification-pending.test.js',
   'packages/core/src/__tests__/webhook-engine.test.js',
+  'packages/core/src/__tests__/webhook-failure-matrix.test.js',
   'packages/merchant-sdk/src/__tests__/merchant-sdk.test.js',
   'packages/merchant-sdk/src/__tests__/sanbook-pay-sdk.test.js',
   'packages/merchant-sdk/src/__tests__/youpi-universal-integration.test.js',
@@ -24,7 +26,9 @@ const testFiles = [
   'apps/control-center/src/__tests__/control-center.test.js',
   'apps/payment-api/src/__tests__/payment-api.test.js',
   'apps/payment-api/src/__tests__/merchant-console.test.js',
+  'apps/payment-api/src/__tests__/dynamo-public-api.test.js',
   'apps/payment-api/src/__tests__/auth-guard.test.js',
+  'apps/payment-api/src/__tests__/rate-limit.test.js',
   'apps/payment-api/src/__tests__/counter-payments.test.js',
   'apps/payment-api/src/__tests__/selling-modes-and-cod.test.js',
   'apps/payment-api/src/__tests__/developer-payment-simulator.test.js',
@@ -49,6 +53,7 @@ console.log('============================================================\n');
 
 let passedCount = 0;
 const startTotal = Date.now();
+const suiteResults=[];
 
 for (let i = 0; i < testFiles.length; i++) {
   const file = testFiles[i];
@@ -65,6 +70,10 @@ for (let i = 0; i < testFiles.length; i++) {
   });
 
   const duration = ((Date.now() - startFile) / 1000).toFixed(2);
+  const passed=result.status===0&&!/^\s*not ok\b/m.test(result.stdout||'');
+  suiteResults.push({file,passed,durationSeconds:Number(duration),tests:Number(result.stdout?.match(/^# tests (\d+)/m)?.[1]||0),testFailures:Number(result.stdout?.match(/^# fail (\d+)/m)?.[1]||0)});
+  fs.mkdirSync('output/testing',{recursive:true});
+  fs.writeFileSync('output/testing/regression-results.json',JSON.stringify({testedAt:new Date().toISOString(),suiteCount:testFiles.length,completed:suiteResults.length,passedSuites:suiteResults.filter(r=>r.passed).length,totalTests:suiteResults.reduce((n,r)=>n+r.tests,0),durationSeconds:Number(((Date.now()-startTotal)/1000).toFixed(2)),suites:suiteResults},null,2));
 
   if (result.status === 0 && !/^\s*not ok\b/m.test(result.stdout || '')) {
     passedCount++;

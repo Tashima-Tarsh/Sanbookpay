@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { getDatabase, MerchantRepository, SupportTicketRepository } from '@youpi/db';
-import { getAdminToken, safeEqual, verifyPassword } from '@youpi/common';
+import { getAdminToken, safeEqual, verifyPassword, getInternalServiceToken } from '@youpi/common';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -35,6 +35,7 @@ function sanitizedForwardHeaders(req, targetHost) {
       delete headers[name];
     }
   }
+  headers['x-gateway-token']=getInternalServiceToken();
   return headers;
 }
 
@@ -193,6 +194,10 @@ export class AdminServer {
       }
 
       // Transparent API Proxy: /api/* -> Payment Core REST API
+      if(pathname.startsWith('/v1.0/')){
+        const upstream=http.request({hostname:'127.0.0.1',port:Number(process.env.PAYMENT_API_PORT||6100),path:req.url,method:req.method,headers:sanitizedForwardHeaders(req,'localhost:6100')},response=>{res.writeHead(response.statusCode,{...response.headers,'cache-control':'no-store'});response.pipe(res);});
+        upstream.on('error',()=>{if(!res.headersSent)reply(502,{error:'Payment API unavailable.'});});req.pipe(upstream);return;
+      }
       if (pathname.startsWith('/api/')) {
         if(!authenticated) return reply(401,{error:'Sign in to the merchant console.',code:'AUTH_REQUIRED'});
         const targetPort = Number(process.env.PAYMENT_API_PORT || 6100);
@@ -257,6 +262,12 @@ export class AdminServer {
       }
 
       // Static assets from public/
+      const customerDocs={ '/developers':'dynamo-api.html','/developers/openapi.json':'dynamo-openapi.json','/developers/guide.md':'dynamo-api-guide.md' };
+      if(req.method==='GET'&&customerDocs[pathname]){
+        const file=path.join(__dirname,'../public',customerDocs[pathname]);
+        res.writeHead(200,{'Content-Type':pathname.endsWith('.json')?'application/json':pathname.endsWith('.md')?'text/markdown; charset=utf-8':'text/html; charset=utf-8','Cache-Control':'no-cache',...BASE_SECURITY_HEADERS});
+        fs.createReadStream(file).pipe(res);return;
+      }
       const cleanPath = pathname.replace(/^\/+/, '');
       const publicFilePath = path.join(__dirname, '../public', cleanPath);
       if (cleanPath && fs.existsSync(publicFilePath) && fs.statSync(publicFilePath).isFile()) {
@@ -267,6 +278,7 @@ export class AdminServer {
           '.svg': 'image/svg+xml',
           '.png': 'image/png',
           '.json': 'application/json',
+          '.pdf': 'application/pdf',
           '.apk': 'application/vnd.android.package-archive'
         };
         const contentType = mimeTypes[ext] || 'application/octet-stream';

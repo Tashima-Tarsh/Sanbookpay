@@ -7,7 +7,7 @@
   const badge=s=>`<span class="status ${esc(String(s).toLowerCase())}">${esc((s==='VERIFICATION_PENDING'?'Awaiting bank verification':String(s).replaceAll('_',' ').toLowerCase()))}</span>`;
   const failureStatuses=['FAILED','EXPIRED','CANCELLED','SUSPICIOUS'];
   let payments=[],allocations=[],settings={},timer,toastTimer,activePage='overview';
-  const pages={overview:['Payment overview','A clear view of your collections and payment activity.'],transactions:['Transactions','Search, inspect and export your payment history.'],failures:['Failed payments','Find unsuccessful attempts and understand their status.'],refunds:['Refunds','Manage full and partial refund requests and transfer records.'],splits:['Split payments','Configure your platform fee and distribute merchant proceeds.'],settlements:['Settlements','Track settlement batches and confirmed bank credits.'],upi:['UPI accounts','Manage where your customer payments are received.'],merchants:['Merchants & branding','Keep your business identity and customer support details up to date.'],api:['API keys & webhooks','Connect your website and receive signed payment events.'],alerts:['Alerts & observers','Monitor bank observation channels and operational alerts.']};
+  const pages={overview:['Your business at a glance','Payments, collections and the details that need your attention.'],transactions:['Transactions','Search, inspect and export your payment history.'],failures:['Failed payments','Find unsuccessful attempts and understand their status.'],refunds:['Refunds','Manage full and partial refund requests and transfer records.'],splits:['Split payments','Configure your platform fee and distribute merchant proceeds.'],settlements:['Settlements','Track settlement batches and confirmed bank credits.'],upi:['UPI accounts','Manage where your customer payments are received.'],merchants:['Business profile','Keep your business identity and customer support details up to date.'],api:['Developer tools','Connect your website and receive signed payment events.'],alerts:['Connections & alerts','Monitor bank observation channels and operational alerts.']};
   function toast(message,error=false){ $('toast').textContent=message;$('toast').className='toast'+(error?' error':'');$('toast').hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').hidden=true,5000); }
   async function api(path,body,method){
     const res=await fetch('/api/console/'+path,{method:method||(body?'POST':'GET'),headers:body?{'Content-Type':'application/json'}:{},body:body?JSON.stringify(body):undefined});
@@ -35,18 +35,27 @@
     $('refundPayment').value=selected;
   }
   async function overview(){
-    const [s,p]=await Promise.all([consoleApi('summary'),consoleApi('payments')]);payments=p.payments;renderPayments();
+    const [s,p,r]=await Promise.all([consoleApi('summary'),consoleApi('payments'),consoleApi('refunds')]);payments=p.payments;renderPayments();
+    const awaiting=(r.refunds||[]).filter(refund=>refund.status==='PENDING_MANUAL').length;
+    $('dashboardAttention').hidden=!awaiting;
+    $('dashboardAttention').innerHTML=awaiting?`<div><strong>${awaiting===1?'A refund needs your attention':awaiting+' refunds need your attention'}</strong><span>Check the request and record the bank transfer when it is complete.</span></div><button class="btn small" data-goto="refunds">Review ${awaiting===1?'refund':'refunds'} ?</button>`:'';
     $('statVolume').textContent=money(s.collectedPaise);$('statTotal').textContent=s.total.toLocaleString('en-IN');$('statPending').textContent=s.pending;
     const resolved=payments.filter(p=>p.method!=='COD'&&['SUCCESS',...failureStatuses].includes(p.status));
     $('statSuccess').textContent=resolved.length?`${(100*s.paid/resolved.length).toFixed(1)}%`:'—';
     $('activityCount').textContent=`${s.total} transactions`;
-    $('activityBreakdown').innerHTML=`<div class="bar"><span style="width:${s.total?100*s.paid/s.total:0}%"></span></div>`+[['Successful prepaid',s.paid],['Awaiting payment',s.pending],['Unsuccessful attempts',s.failed],['Cash on delivery orders',s.cod]].map(([l,n])=>`<div class="summary-line"><span>${l}</span><strong>${n}</strong></div>`).join('');
+    $('activityBreakdown').innerHTML=[['Received',s.paid],['In progress',s.pending],['Unsuccessful',s.failed]].map(([label,count])=>`<div><span>${label}</span><strong>${count}</strong></div>`).join('');
+    const dayKey=value=>new Date(value).toLocaleDateString('en-CA',{timeZone:'Asia/Kolkata'});
+    const days=Array.from({length:7},(_,i)=>{const d=new Date(Date.now()-(6-i)*86400000);return {key:dayKey(d),label:d.toLocaleDateString('en-IN',{timeZone:'Asia/Kolkata',weekday:'short'}),amount:0};});
+    payments.filter(p=>p.status==='SUCCESS'&&p.method!=='COD').forEach(p=>{const day=days.find(d=>d.key===dayKey(p.createdAt));if(day)day.amount+=p.amountPaise;});
+    const peak=Math.max(...days.map(d=>d.amount),100);
+    $('collectionChart').innerHTML='<div class="collection-bars">'+days.map(d=>`<div class="collection-day"><span class="collection-value">${d.amount?money(d.amount):'?'}</span><div class="collection-track"><div class="collection-fill${d.amount?' has-value':''}" style="height:${d.amount?Math.max(5,d.amount/peak*100):2}%"></div></div><span class="collection-label">${d.label}</span></div>`).join('')+'</div>';
+    $('dashboardDate').textContent=new Date().toLocaleDateString('en-IN',{timeZone:'Asia/Kolkata',weekday:'long',day:'numeric',month:'long',year:'numeric'});
     $('updated').textContent='Updated '+new Date().toLocaleTimeString('en-IN',{timeZone:'Asia/Kolkata',hour:'2-digit',minute:'2-digit'});
   }
   async function settlements(){
     const [s,list]=await Promise.all([api('v1/settlements/overview'),api('v1/settlements')]);
-    $('settlementSummary').innerHTML=[['Confirmed bank credit',s.confirmedBankCredit],['Pending settlement',s.settlementPending],['Processing fees',s.processingFees]].map(([l,n])=>`<div class="summary-line"><span>${l}</span><strong>${money(Number(n)*100)}</strong></div>`).join('')+'<button class="btn small section-space" data-goto="settlements">View settlements →</button>';
-    $('settlementStats').innerHTML=[['Gross ledger collections',s.grossCollections],['Net payable',s.netPayable],['Confirmed bank credit',s.confirmedBankCredit],['Pending settlement',s.settlementPending]].map(([l,n])=>`<div class="dp-stat-card"><span>${l}</span><strong>${money(Number(n)*100)}</strong></div>`).join('');
+    $('settlementSummary').innerHTML=[['Bank-confirmed settlements',s.confirmedBankCredit],['Awaiting settlement',s.settlementPending],['Processing fees',s.processingFees]].map(([l,n])=>`<div class="summary-line"><span>${l}</span><strong>${money(Number(n)*100)}</strong></div>`).join('')+'<p class="help">Direct UPI receipts reach your bank. This section shows confirmed settlement records.</p><button class="btn small section-space" data-goto="settlements">View settlements →</button>';
+    $('settlementStats').innerHTML=[['Gross ledger collections',s.grossCollections],['Net payable',s.netPayable],['Bank-confirmed settlements',s.confirmedBankCredit],['Awaiting settlement',s.settlementPending]].map(([l,n])=>`<div class="dp-stat-card"><span>${l}</span><strong>${money(Number(n)*100)}</strong></div>`).join('');
     table('settlementTable',['Batch','Gross','Fees','Net','Status','Bank UTR','Created'],list.settlements.map(r=>`<tr><td>${esc(r.settlementId)}</td><td>${money(Number(r.grossAmount)*100)}</td><td>${money(Number(r.feeAmount)*100)}</td><td>${money(Number(r.netAmount)*100)}</td><td>${badge(r.status)}</td><td>${esc(r.bankUtr||'—')}</td><td>${esc(date(r.createdAt))}</td></tr>`),'No settlement batches recorded. Bank confirmation will appear when received.');
   }
   async function loadSettings(){
@@ -83,7 +92,8 @@
     table('allocationTable',['Payment','Gross','Platform fee','GST','Recipients / net amounts','Status','Action'],allocations.map(r=>`<tr><td>${esc(payments.find(p=>p.id===r.payment_id)?.orderId||r.payment_id)}</td><td>${money(r.gross_paise)}</td><td>${money(r.fee_paise)}</td><td>${money(r.gst_paise)}</td><td>${r.recipients.map(p=>`${esc(p.name)} · ${money(p.amountPaise)}<small>${esc(p.vpa)}${r.transfers.find(t=>t.recipient_vpa===p.vpa)?' · Ref: '+esc(r.transfers.find(t=>t.recipient_vpa===p.vpa).bank_reference):''}</small>`).join('<br>')}</td><td>${badge(r.status)}</td><td>${r.status==='AWAITING_TRANSFER'?`<button class="btn small" data-transfer="${esc(r.payment_id)}">Record transfer</button>`:'—'}</td></tr>`),'No allocations yet. Saved recipient rules apply to new verified UPI payments.');
   }
   async function upi(){
-    const d=await api('v1/admin/upi-accounts');
+    const [d,c]=await Promise.all([api('v1/admin/upi-accounts'),consoleApi('upi-channel')]);
+    $('upiChannelEnabled').checked=c.enabled;$('upiChannelMin').value=c.minAmountPaise/100;$('upiChannelMax').value=c.maxAmountPaise/100;$('upiChannelVpas').value=(c.allowedVpas||[]).join('\n');
     table('upiTable',['UPI ID','Payee','Status','Payment slot','Action'],d.accounts.map(a=>`<tr><td><strong>${esc(a.upiId)}</strong></td><td>${esc(a.payeeName)}</td><td>${badge(a.isActive?'ACTIVE':'INACTIVE')}</td><td>${a.isSlotBusy?'In use':'Available'}</td><td>${!a.isActive?`<button class="btn small" data-activate-upi="${esc(a.id)}">Activate</button>`:'Current receiving account'}</td></tr>`),'No receiving accounts. Add a valid merchant UPI ID below.');
   }
   async function alerts(){
@@ -130,6 +140,7 @@
   submit('splitForm',async()=>{await consoleApi('splits',{platformFeeBps:Math.round(Number($('platformFee').value)*100),gstPercent:Number($('gstPercent').value),recipients:recipientInputs()});$('splitSaved').textContent='Saved for new verified payments.';toast('Both split settings saved.');});
   submit('merchantForm',async()=>{await api('v1/admin/merchant-settings',{businessName:$('businessName').value,contactEmail:$('contactEmail').value,contactPhone:$('contactPhone').value,branding:{appName:'Dynamo Pay'},supportEmails:[$('contactEmail').value].filter(Boolean),supportMobiles:[$('contactPhone').value].filter(Boolean)});await loadSettings();toast('Merchant details saved.');});
   submit('webhookForm',async()=>{await api('v1/admin/merchant-settings',{webhookUrl:$('webhookUrl').value});toast('Webhook endpoint saved.');await credentials();});
+  submit('upiChannelForm',async()=>{await consoleApi('upi-channel',{enabled:$('upiChannelEnabled').checked,minAmountPaise:Math.round(Number($('upiChannelMin').value)*100),maxAmountPaise:Math.round(Number($('upiChannelMax').value)*100),allowedVpas:$('upiChannelVpas').value.split(/[,\n]+/).map(v=>v.trim()).filter(Boolean)});toast('UPI channel settings saved.');});
   submit('upiForm',async()=>{await api('v1/admin/upi-accounts',{upiId:$('upiId').value,payeeName:$('payeeName').value});$('upiForm').reset();toast('UPI account added.');await upi();});
   submit('gmailForm',async()=>{
     const body={clientId:$('gmailClientId').value.trim()};

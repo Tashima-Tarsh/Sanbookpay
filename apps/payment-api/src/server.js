@@ -1,6 +1,14 @@
 import http from 'node:http';
 import { URL } from 'node:url';
-import { createLogger, LEVELS } from '@youpi/common';
+import { createLogger, LEVELS, getInternalServiceToken, safeEqual } from '@youpi/common';
+import { isIP } from 'node:net';
+
+export function resolveClientIp(req){
+  const remote=(req.socket?.remoteAddress||'unknown').replace(/^::ffff:/,'');
+  const trusted=['127.0.0.1','::1'].includes(remote)&&safeEqual(String(req.headers['x-gateway-token']||''),getInternalServiceToken());
+  const forwarded=req.headers['cf-connecting-ip'];
+  return trusted&&typeof forwarded==='string'&&isIP(forwarded)?forwarded:remote;
+}
 
 const log = createLogger('http-server');
 
@@ -274,7 +282,7 @@ export class HttpServer {
       const method = req.method.toUpperCase();
 
       // Extract client IP for rate limiting
-      const clientIp = req.socket?.remoteAddress || req.headers['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown';
+      const clientIp = resolveClientIp(req);
 
       // Structured request log
       const startTime = Date.now();

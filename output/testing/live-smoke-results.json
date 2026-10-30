@@ -1,0 +1,53 @@
+{
+  "testedAt": "2026-10-30T23:52:43.174Z",
+  "origin": "https://destinations-miracle-furnished-serve.trycloudflare.com",
+  "checks": [
+    {
+      "path": "/health",
+      "status": 200
+    },
+    {
+      "path": "/admin",
+      "status": 200
+    },
+    {
+      "path": "/developers",
+      "status": 200
+    },
+    {
+      "path": "/dynamo-pay-testing.pdf",
+      "status": 200
+    },
+    {
+      "path": "/dynamo-pay-manual.pdf",
+      "status": 200
+    },
+    {
+      "path": "/dynamo-route-test-results.csv",
+      "status": 200
+    },
+    {
+      "path": "/health",
+      "public": true,
+      "status": 200
+    },
+    {
+      "path": "/developers",
+      "public": true,
+      "status": 200
+    },
+    {
+      "path": "/dynamo-pay-testing.pdf",
+      "public": true,
+      "status": 200
+    }
+  ],
+  "login": "PASS",
+  "financialAuth": "PASS",
+  "retainedPayment": {
+    "order": "ORDER-1793399120228",
+    "status": "SUCCESS",
+    "amountINR": 4
+  },
+  "paymentCount": 1
+}

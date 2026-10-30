@@ -13,10 +13,13 @@
  * All endpoints are Dynamo Pay branded — no third-party naming.
  */
 
-import { HttpServer } from '../server.js';
+import { HttpServer, resolveClientIp } from '../server.js';
+import { validateUpiChannel } from '../upi-channel.js';
 import { PaymentStatus } from '@youpi/common';
 import crypto from 'node:crypto';
-import { resolveSecret } from '@youpi/common';
+import { resolveSecret, safeEqual, toPaise, toRupeesString, buildUpiUri, validateOutboundWebhookUrl } from '@youpi/common';
+import { isIP } from 'node:net';
+import fs from 'node:fs';
 import http from 'node:http';
 import https from 'node:https';
 import { LedgerRepository, MerchantRepository } from '@youpi/db';
@@ -51,11 +54,11 @@ async function fetchRazorpayIfsc(ifsc) {
     const raw = JSON.parse(res.body);
     return {
       bank: raw.BANK || '',
-      branch: raw.Branch || '',
-      city: raw.Center || '',
-      state: raw.State || '',
-      address: raw.Address || '',
-      contact: raw.Contact || '',
+      branch: raw.BRANCH || raw.Branch || '',
+      city: raw.CITY || raw.CENTRE || raw.Center || '',
+      state: raw.STATE || raw.State || '',
+      address: raw.ADDRESS || raw.Address || '',
+      contact: raw.CONTACT || raw.Contact || '',
       upi: raw.UPI === true,
       neft: raw.NEFT === true,
       rtgs: raw.RTGS === true,
@@ -67,12 +70,9 @@ async function fetchRazorpayIfsc(ifsc) {
   }
 }
 const DYNAMO_WEBHOOK_RETRY_POLICY = {
-  maxRetries: 5,
-  initialBackoffMs: 5000,
-  maxBackoffMs: 300000,
-  backoffMultiplier: 2,
-  retryableStatuses: [408, 429, 500, 502, 503, 504],
-  retryableErrors: ['ETIMEDOUT', 'ECONNRESET', 'ECONNREFUSED', 'ENOTFOUND']
+  maxAttempts:5, retryDelaysMs:[5000,30000,120000,600000], timeoutMs:10000,
+  successfulStatuses:'200-299', retryableStatuses:'All non-2xx responses and network errors',
+  deliveryIdStableAcrossRetries:true
 };
 
 /**
@@ -107,19 +107,26 @@ export function registerDynamoPayRoutes(server, ctx) {
   loadDynamoMerchants();
 
   function resolveDynamoMerchant(clientId, clientSecret, serviceId) {
-    for (const [sid, m] of dynamoMerchants.entries()) {
-      if (m.clientId === clientId && m.clientSecret === clientSecret && m.serviceId === serviceId && m.isActive) {
-        return m;
-      }
-    }
-    if (serviceId && dynamoMerchants.has(serviceId)) {
-      const m = dynamoMerchants.get(serviceId);
-      if (m.clientId === clientId && m.clientSecret === clientSecret && m.isActive) {
-        return m;
-      }
-    }
-    return null;
+    const m=dynamoMerchants.get(serviceId);
+    if(!m || !safeEqual(m.clientId,clientId) || !safeEqual(m.clientSecret,clientSecret) || !m.isActive)return null;
+    const current=merchantRepo.findById(m.merchantId);
+    if(!current)return null;
+    return {...m,webhookUrl:current.webhookUrl,ipWhitelist:current.branding?.apiIpWhitelist||[]};
   }
+  function publicOrigin(){
+    if(process.env.DYNAMO_PUBLIC_URL)return process.env.DYNAMO_PUBLIC_URL.replace(/\/+$/,'');
+    if(process.env.DYNAMO_UNIFIED_GATEWAY==='true'){
+      try{const value=fs.readFileSync(new URL('../../../../data/.secrets/quick_tunnel_url',import.meta.url),'utf8').trim();if(/^https:\/\/[a-z0-9-]+\.trycloudflare\.com$/.test(value))return value;}catch{}
+    }
+    return (process.env.BASE_CHECKOUT_URL||'http://localhost:7000').replace(/\/+$/,'');
+  }
+  function collectionResponse(session){
+    const account=session.metadata?.receivingAccountSnapshot||{};
+    const intent=session.status===PaymentStatus.ACTIVE?buildUpiUri({payeeVpa:account.upiId,payeeName:account.payeeName||'Dynamo Pay',amountPaise:session.amountPaise,transactionRef:session.orderId})+'&cu=INR':null;
+    return {transaction:session.id,uniquetransactionid:session.orderId,amount:toRupeesString(session.amountPaise),currency:'INR',status:session.status==='SUCCESS'?'SUCCESS':session.status==='FAILED'||session.status==='EXPIRED'||session.status==='CANCELLED'?'FAILED':'PENDING',internalStatus:session.status,intent,qr:intent?publicOrigin()+'/checkout/'+session.id+'/qr.svg':null,checkoutUrl:publicOrigin()+'/checkout/'+session.id,datetime:session.createdAt,expiresAt:session.expiresAt||null,payeeVpa:account.upiId||null,payeeName:account.payeeName||null,platform:'dynamo-pay'};
+  }
+  const aliases={'/v1/dynamo/collect/upi':'/v1.0/collect/upi','/v1/dynamo/checkstatus':'/v1.0/payin/checkstatus','/v1/dynamo/ifsc/:ifsc':'/v1.0/ifsc/:ifsc','/v1/dynamo/wallet':'/v1.0/wallet','/v1/dynamo/merchant/webhook':'/v1.0/merchant/webhook'};
+  function post(route,handler){server.post(route,handler);if(aliases[route])server.post(aliases[route].replace('/v1.0/','/v1\\.0/'),handler);}
 
   function checkIpWhitelist(merchant, clientIp) {
     if (!merchant.ipWhitelist || merchant.ipWhitelist.length === 0) return true;
@@ -127,9 +134,7 @@ export function registerDynamoPayRoutes(server, ctx) {
   }
 
   function getClientIp(req) {
-    return req.socket?.remoteAddress ||
-      req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
-      'unknown';
+    return resolveClientIp(req);
   }
 
   function getWalletBalances(merchantId) {
@@ -151,7 +156,7 @@ export function registerDynamoPayRoutes(server, ctx) {
   // ========================================================================
   // POST /v1/dynamo/collect/upi  — Dynamo Pay UPI collection
   // ========================================================================
-  server.post('/v1/dynamo/collect/upi', async (req, res) => {
+  post('/v1/dynamo/collect/upi', async (req, res) => {
     const clientIp = getClientIp(req);
     const clientId = req.headers['client-id'] || '';
     const clientSecret = req.headers['client-secret'] || '';
@@ -179,30 +184,18 @@ export function registerDynamoPayRoutes(server, ctx) {
     const emailid = body.emailid || '';
     const mobileno = body.mobileno || '';
 
-    if (!amount || amount < 100) {
-      return HttpServer.json(res, 400, { error: 'Minimum amount is ₹100', code: 'MIN_AMOUNT_VIOLATION', platform: 'dynamo-pay' });
+    let amountPaise;
+    try{
+      if(!['string','number'].includes(typeof amount) || !/^\d+(?:\.\d{1,2})?$/.test(String(amount)))throw new Error();
+      amountPaise=toPaise(String(amount));if(amountPaise<10000n || amountPaise>BigInt(Number.MAX_SAFE_INTEGER))throw new Error();
+    }catch{return HttpServer.json(res,400,{error:'Amount must be at least INR 100.00 with at most two decimals',code:'INVALID_AMOUNT',platform:'dynamo-pay'});}
+    if(typeof uniquetransactionid!=='string'||!/^[A-Za-z0-9_-]{1,120}$/.test(uniquetransactionid))return HttpServer.json(res,400,{error:'uniquetransactionid must contain 1-120 letters, digits, hyphens or underscores',code:'INVALID_ORDER_ID'});
+    const orderId=uniquetransactionid;
+    const existing=sessionRepo.findByOrderId(merchant.merchantId,orderId);
+    if(existing){
+      if(existing.amountPaise!==amountPaise)return HttpServer.json(res,409,{error:'Order ID already exists with another amount',code:'IDEMPOTENCY_CONFLICT'});
+      return HttpServer.json(res,200,collectionResponse(existing));
     }
-    if (!uniquetransactionid) {
-      return HttpServer.json(res, 400, { error: 'Missing uniquetransactionid', code: 'MISSING_ORDER_ID', platform: 'dynamo-pay' });
-    }
-
-    const amountPaise = Math.round(amount * 100);
-    const orderId = uniquetransactionid;
-
-    const existing = sessionRepo.findByOrderId(merchant.merchantId, orderId);
-    if (existing && existing.status === PaymentStatus.SUCCESS) {
-      return HttpServer.json(res, 200, {
-        transaction: existing.id,
-        uniquetransactionid: existing.orderId,
-        amount: existing.amountPaise / 100,
-        currency: 'INR',
-        status: 'SUCCESS',
-        intent: `upi://pay?pa=9082843142@slc&pn=Dynamo+Pay&am=${amount}&tn=${orderId}`,
-        datetime: existing.createdAt,
-        platform: 'dynamo-pay'
-      });
-    }
-
     const receivingAccount = ctx.accountRepo?.findActiveForMerchant?.(merchant.merchantId) ||
       (db.queryOne?.('SELECT * FROM payment_receiving_accounts WHERE merchant_id = $1 AND is_active = 1 LIMIT 1', [merchant.merchantId]));
 
@@ -210,7 +203,10 @@ export function registerDynamoPayRoutes(server, ctx) {
       return HttpServer.json(res, 500, { error: 'No active UPI receiving account configured', code: 'NO_RECEIVING_ACCOUNT', platform: 'dynamo-pay' });
     }
 
+    const channelError=validateUpiChannel(merchantRepo.findById(merchant.merchantId),amountPaise,receivingAccount.upiId);
+    if(channelError)return HttpServer.json(res,400,channelError);
     const session = ctx.sessionRepo.create({
+      // The settings apply only to new collections, preserving existing order status/reconciliation.
       merchantId: merchant.merchantId,
       customerId: null,
       receivingAccountId: receivingAccount.id,
@@ -230,32 +226,13 @@ export function registerDynamoPayRoutes(server, ctx) {
       ctx.timingEngine.startActiveTimer(session.id, queueResult.expiresAt);
     }
 
-    const upiUri = `upi://pay?pa=${encodeURIComponent(receivingAccount.upiId)}&pn=${encodeURIComponent(receivingAccount.payeeName || 'Dynamo Pay')}&am=${amount}&tn=${orderId}`;
-
-    return HttpServer.json(res, 201, {
-      transaction: session.id,
-      uniquetransactionid: orderId,
-      amount,
-      currency: 'INR',
-      status: 'PENDING',
-      intent: upiUri,
-      qr: '',
-      datetime: session.createdAt,
-      remarks,
-      name,
-      emailid,
-      mobileno,
-      payeeVpa: receivingAccount.upiId,
-      payeeName: receivingAccount.payeeName,
-      checkoutUrl: `${process.env.BASE_CHECKOUT_URL || 'http://localhost:7000'}/checkout/${session.id}`,
-      platform: 'dynamo-pay'
-    });
+    return HttpServer.json(res,201,collectionResponse(sessionRepo.findById(session.id)));
   });
 
   // ========================================================================
   // POST /v1/dynamo/checkstatus  — Dynamo Pay payment status check
   // ========================================================================
-  server.post('/v1/dynamo/checkstatus', async (req, res) => {
+  post('/v1/dynamo/checkstatus', async (req, res) => {
     const clientIp = getClientIp(req);
     const clientId = req.headers['client-id'] || '';
     const clientSecret = req.headers['client-secret'] || '';
@@ -304,9 +281,11 @@ export function registerDynamoPayRoutes(server, ctx) {
       [PaymentStatus.UNKNOWN]: 'PENDING'
     };
 
-    const upiTxn = session.metadata?.upiTransactionId || session.metadata?.bankReferenceNumber || null;
+    const bank= session.attributedObservationId ? db.queryOne('SELECT bank_reference_number,sender_vpa FROM payment_observations WHERE id=?',[session.attributedObservationId]) : null;
+    const upiTxn=bank?.bank_reference_number||null;
 
     return HttpServer.json(res, 200, {
+      ...collectionResponse(session),
       transaction: session.id,
       uniquetransactionid: session.orderId,
       amount: (Number(session.amountPaise) / 100).toFixed(2),
@@ -314,7 +293,9 @@ export function registerDynamoPayRoutes(server, ctx) {
       status: statusMap[session.status] || 'PENDING',
       upiTransactionId: upiTxn,
       bankReferenceNumber: upiTxn,
-      senderVpa: session.metadata?.senderVpa || null,
+      senderVpa: bank?.sender_vpa || null,
+      confirmationSource:session.verificationTag==='MERCHANT_CONFIRMED'?'MERCHANT':session.verificationLevel?'BANK_OBSERVER':null,
+      reportedUtr:session.metadata?.reportedUtr||null,
       senderName: session.metadata?.senderName || null,
       payeeVpa: session.metadata?.receivingAccountSnapshot?.upiId || null,
       payeeName: session.metadata?.receivingAccountSnapshot?.payeeName || null,
@@ -327,7 +308,7 @@ export function registerDynamoPayRoutes(server, ctx) {
   // ========================================================================
   // POST /v1/dynamo/ifsc/{ifsc}  — Dynamo Pay IFSC validation
   // ========================================================================
-  server.post('/v1/dynamo/ifsc/:ifsc', async (req, res, params) => {
+  post('/v1/dynamo/ifsc/:ifsc', async (req, res, params) => {
     const clientIp = getClientIp(req);
     const clientId = req.headers['client-id'] || '';
     const clientSecret = req.headers['client-secret'] || '';
@@ -346,7 +327,7 @@ export function registerDynamoPayRoutes(server, ctx) {
       return HttpServer.json(res, 400, { error: 'Missing IFSC code', code: 'MISSING_IFSC', platform: 'dynamo-pay' });
     }
 
-    const ifscRegex = /^[A-Z]{4,5}0[A-Z0-9]{5,6}$/;
+    const ifscRegex = /^[A-Z]{4}0[A-Z0-9]{6}$/;
     if (!ifscRegex.test(ifsc)) {
       return HttpServer.json(res, 400, { error: 'Invalid IFSC format', code: 'INVALID_IFSC_FORMAT', platform: 'dynamo-pay' });
     }
@@ -378,7 +359,7 @@ export function registerDynamoPayRoutes(server, ctx) {
   // ========================================================================
   // POST /v1/dynamo/wallet  — Dynamo Pay wallet balance
   // ========================================================================
-  server.post('/v1/dynamo/wallet', async (req, res) => {
+  post('/v1/dynamo/wallet', async (req, res) => {
     const clientIp = getClientIp(req);
     const clientId = req.headers['client-id'] || '';
     const clientSecret = req.headers['client-secret'] || '';
@@ -397,7 +378,7 @@ export function registerDynamoPayRoutes(server, ctx) {
     return HttpServer.json(res, 200, {
       merchantId: merchant.merchantId,
       currency: 'INR',
-      ...balances,
+      ...Object.fromEntries(Object.entries(balances).map(([key,value])=>[key,(value/100).toFixed(2)])),
       datetime: new Date().toISOString(),
       platform: 'dynamo-pay'
     });
@@ -406,7 +387,7 @@ export function registerDynamoPayRoutes(server, ctx) {
   // ========================================================================
   // POST /v1/dynamo/merchant/webhook  — Dynamo Pay webhook config
   // ========================================================================
-  server.post('/v1/dynamo/merchant/webhook', async (req, res) => {
+  post('/v1/dynamo/merchant/webhook', async (req, res) => {
     const clientIp = getClientIp(req);
     const clientId = req.headers['client-id'] || '';
     const clientSecret = req.headers['client-secret'] || '';
@@ -427,19 +408,14 @@ export function registerDynamoPayRoutes(server, ctx) {
       return HttpServer.json(res, 400, { error: 'Invalid JSON body', code: 'MALFORMED_JSON', platform: 'dynamo-pay' });
     }
 
-    const webhookUrl = body.webhookUrl || null;
-    const ipWhitelist = body.ipWhitelist || merchant.ipWhitelist || [];
-
-    if (webhookUrl && !/^https?:\/\//.test(webhookUrl)) {
-      return HttpServer.json(res, 400, { error: 'Invalid webhook URL', code: 'INVALID_WEBHOOK_URL', platform: 'dynamo-pay' });
-    }
-
-    merchant.webhookUrl = webhookUrl;
-    merchant.ipWhitelist = Array.isArray(ipWhitelist) ? ipWhitelist : [];
-
-    try {
-      merchantRepo.update(merchant.merchantId, { webhookUrl });
-    } catch {}
+    const current=merchantRepo.findById(merchant.merchantId);
+    const webhookUrl=body.webhookUrl===undefined?current.webhookUrl:body.webhookUrl||null;
+    const ipWhitelist=body.ipWhitelist===undefined?merchant.ipWhitelist:body.ipWhitelist;
+    const checked=webhookUrl?validateOutboundWebhookUrl(webhookUrl):{valid:true};
+    if(!checked.valid || (webhookUrl&&new URL(webhookUrl).protocol!=='https:'))return HttpServer.json(res,400,{error:'Provide a public HTTPS webhook URL',code:'INVALID_WEBHOOK_URL'});
+    if(!Array.isArray(ipWhitelist)||ipWhitelist.length>50||ipWhitelist.some(ip=>typeof ip!=='string'||!isIP(ip)))return HttpServer.json(res,400,{error:'ipWhitelist must contain up to 50 exact IPv4/IPv6 addresses',code:'INVALID_IP_WHITELIST'});
+    merchantRepo.update(merchant.merchantId,{webhookUrl,branding:{...current.branding,apiIpWhitelist:ipWhitelist}});
+    merchant.webhookUrl=webhookUrl;merchant.ipWhitelist=ipWhitelist;
 
     return HttpServer.json(res, 200, {
       merchantId: merchant.merchantId,
@@ -470,10 +446,9 @@ export function registerDynamoPayRoutes(server, ctx) {
 
     return HttpServer.json(res, 200, {
       retryPolicy: DYNAMO_WEBHOOK_RETRY_POLICY,
-      description: 'Dynamo Pay webhooks are retried with exponential backoff. Retryable statuses: 408, 429, 500, 502, 503, 504. Network errors: ETIMEDOUT, ECONNRESET, ECONNREFUSED, ENOTFOUND.',
-      maxRetries: DYNAMO_WEBHOOK_RETRY_POLICY.maxRetries,
-      initialBackoffMs: DYNAMO_WEBHOOK_RETRY_POLICY.initialBackoffMs,
-      maxBackoffMs: DYNAMO_WEBHOOK_RETRY_POLICY.maxBackoffMs,
+      description: 'Up to five total delivery attempts. Any non-2xx response or network error is retried; acknowledge with HTTP 200.',
+      maxAttempts: DYNAMO_WEBHOOK_RETRY_POLICY.maxAttempts,
+      retryDelaysMs:DYNAMO_WEBHOOK_RETRY_POLICY.retryDelaysMs,
       platform: 'dynamo-pay'
     });
   });

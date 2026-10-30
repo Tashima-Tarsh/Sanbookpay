@@ -1,0 +1,822 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Dynamo Pay Customer API",
+    "version": "1.0.0",
+    "description": "Merchant backend API. See /developers for webhook verification, queues, reconciliation and deployment limits. Channel defaults INR 200?20,000 when saved."
+  },
+  "servers": [
+    {
+      "url": "https://pay.example.com",
+      "description": "Replace with assigned Dynamo Pay HTTPS origin"
+    }
+  ],
+  "paths": {
+    "/v1.0/collect/upi": {
+      "post": {
+        "summary": "Create or replay a UPI payment",
+        "parameters": [
+          {
+            "name": "Client-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Client-Secret",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Service-Id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "amount",
+                  "uniquetransactionid"
+                ],
+                "properties": {
+                  "amount": {
+                    "oneOf": [
+                      {
+                        "type": "string",
+                        "pattern": "^\\d+(\\.\\d{1,2})?$"
+                      },
+                      {
+                        "type": "number",
+                        "minimum": 100
+                      }
+                    ]
+                  },
+                  "uniquetransactionid": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9_-]{1,120}$"
+                  },
+                  "remarks": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "emailid": {
+                    "type": "string"
+                  },
+                  "mobileno": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success or idempotent replay",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "transaction": {
+                      "type": "string"
+                    },
+                    "uniquetransactionid": {
+                      "type": "string"
+                    },
+                    "amount": {
+                      "type": "string",
+                      "example": "201.00"
+                    },
+                    "currency": {
+                      "type": "string",
+                      "enum": [
+                        "INR"
+                      ]
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "SUCCESS",
+                        "FAILED",
+                        "PENDING"
+                      ]
+                    },
+                    "internalStatus": {
+                      "type": "string"
+                    },
+                    "intent": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "qr": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "checkoutUrl": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "bankReferenceNumber": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "payeeVpa": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "payeeName": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "confirmationSource": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "reportedUtr": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "datetime": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "expiresAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "New payment created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "transaction": {
+                      "type": "string"
+                    },
+                    "uniquetransactionid": {
+                      "type": "string"
+                    },
+                    "amount": {
+                      "type": "string",
+                      "example": "201.00"
+                    },
+                    "currency": {
+                      "type": "string",
+                      "enum": [
+                        "INR"
+                      ]
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "SUCCESS",
+                        "FAILED",
+                        "PENDING"
+                      ]
+                    },
+                    "internalStatus": {
+                      "type": "string"
+                    },
+                    "intent": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "qr": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "checkoutUrl": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "bankReferenceNumber": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "payeeVpa": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "payeeName": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "confirmationSource": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "reportedUtr": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "datetime": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "expiresAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request or channel policy"
+          },
+          "401": {
+            "description": "Invalid credentials"
+          },
+          "403": {
+            "description": "IP or ownership restriction"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Idempotency conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "500": {
+            "description": "Service configuration or infrastructure failure"
+          }
+        }
+      }
+    },
+    "/v1.0/payin/checkstatus": {
+      "post": {
+        "summary": "Check merchant payment status",
+        "parameters": [
+          {
+            "name": "Client-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Client-Secret",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Service-Id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "transaction": {
+                    "type": "string"
+                  },
+                  "uniquetransactionid": {
+                    "type": "string"
+                  }
+                },
+                "anyOf": [
+                  {
+                    "required": [
+                      "transaction"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "uniquetransactionid"
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success or idempotent replay",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "transaction": {
+                      "type": "string"
+                    },
+                    "uniquetransactionid": {
+                      "type": "string"
+                    },
+                    "amount": {
+                      "type": "string",
+                      "example": "201.00"
+                    },
+                    "currency": {
+                      "type": "string",
+                      "enum": [
+                        "INR"
+                      ]
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "SUCCESS",
+                        "FAILED",
+                        "PENDING"
+                      ]
+                    },
+                    "internalStatus": {
+                      "type": "string"
+                    },
+                    "intent": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "qr": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "checkoutUrl": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "bankReferenceNumber": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "payeeVpa": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "payeeName": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "confirmationSource": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "reportedUtr": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "datetime": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "expiresAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "New payment created"
+          },
+          "400": {
+            "description": "Invalid request or channel policy"
+          },
+          "401": {
+            "description": "Invalid credentials"
+          },
+          "403": {
+            "description": "IP or ownership restriction"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Idempotency conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "500": {
+            "description": "Service configuration or infrastructure failure"
+          }
+        }
+      }
+    },
+    "/v1.0/ifsc/{ifsc}": {
+      "post": {
+        "summary": "Look up IFSC bank directory",
+        "parameters": [
+          {
+            "name": "Client-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Client-Secret",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Service-Id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "ifsc",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Z]{4}0[A-Z0-9]{6}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success or idempotent replay"
+          },
+          "201": {
+            "description": "New payment created"
+          },
+          "400": {
+            "description": "Invalid request or channel policy"
+          },
+          "401": {
+            "description": "Invalid credentials"
+          },
+          "403": {
+            "description": "IP or ownership restriction"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Idempotency conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "500": {
+            "description": "Service configuration or infrastructure failure"
+          }
+        }
+      }
+    },
+    "/v1.0/wallet": {
+      "post": {
+        "summary": "Read ledger wallet balances",
+        "parameters": [
+          {
+            "name": "Client-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Client-Secret",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Service-Id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success or idempotent replay",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "settledwallet": {
+                      "type": "string",
+                      "example": "0.00"
+                    },
+                    "unsettledbalance": {
+                      "type": "string",
+                      "example": "0.00"
+                    },
+                    "lienbalance": {
+                      "type": "string",
+                      "example": "0.00"
+                    },
+                    "loanbalance": {
+                      "type": "string",
+                      "example": "0.00"
+                    },
+                    "currency": {
+                      "type": "string",
+                      "enum": [
+                        "INR"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "New payment created"
+          },
+          "400": {
+            "description": "Invalid request or channel policy"
+          },
+          "401": {
+            "description": "Invalid credentials"
+          },
+          "403": {
+            "description": "IP or ownership restriction"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Idempotency conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "500": {
+            "description": "Service configuration or infrastructure failure"
+          }
+        }
+      }
+    },
+    "/v1.0/merchant/webhook": {
+      "post": {
+        "summary": "Configure callback and server IP allowlist",
+        "parameters": [
+          {
+            "name": "Client-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Client-Secret",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Service-Id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "webhookUrl": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "ipWhitelist": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success or idempotent replay"
+          },
+          "201": {
+            "description": "New payment created"
+          },
+          "400": {
+            "description": "Invalid request or channel policy"
+          },
+          "401": {
+            "description": "Invalid credentials"
+          },
+          "403": {
+            "description": "IP or ownership restriction"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Idempotency conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          },
+          "500": {
+            "description": "Service configuration or infrastructure failure"
+          }
+        }
+      }
+    }
+  },
+  "externalDocs": {
+    "description": "Integration guide",
+    "url": "/developers"
+  },
+  "components": {
+    "schemas": {
+      "PaymentResponse": {
+        "type": "object",
+        "properties": {
+          "transaction": {
+            "type": "string"
+          },
+          "uniquetransactionid": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "string",
+            "example": "201.00"
+          },
+          "currency": {
+            "type": "string",
+            "enum": [
+              "INR"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "SUCCESS",
+              "FAILED",
+              "PENDING"
+            ]
+          },
+          "internalStatus": {
+            "type": "string"
+          },
+          "intent": {
+            "type": "string",
+            "nullable": true
+          },
+          "qr": {
+            "type": "string",
+            "nullable": true
+          },
+          "checkoutUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "bankReferenceNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "payeeVpa": {
+            "type": "string",
+            "nullable": true
+          },
+          "payeeName": {
+            "type": "string",
+            "nullable": true
+          },
+          "confirmationSource": {
+            "type": "string",
+            "nullable": true
+          },
+          "reportedUtr": {
+            "type": "string",
+            "nullable": true
+          },
+          "datetime": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "WalletResponse": {
+        "type": "object",
+        "properties": {
+          "settledwallet": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "unsettledbalance": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "lienbalance": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "loanbalance": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "currency": {
+            "type": "string",
+            "enum": [
+              "INR"
+            ]
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

@@ -43,6 +43,7 @@ function sanitizedForwardHeaders(req, targetHost) {
       delete headers[name];
     }
   }
+  headers['x-gateway-token']=getInternalServiceToken();
   return headers;
 }
 

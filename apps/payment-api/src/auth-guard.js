@@ -25,6 +25,7 @@ function isDevTool(pathname) {
  * @returns {null | 'admin' | 'observer'} null = public, 'observer' = admin OR observer token
  */
 function requiredLevel(method, pathname) {
+  if(/^\/api\/v1\/(collections|payouts|beneficiaries|banking|settlements|ledger|reconciliation|refunds|split-settlements|operations)(?:\/|$)/.test(pathname))return 'admin';
   if (pathname.startsWith('/api/v1/admin/')) {
     if (PUBLIC_ADMIN_PATHS.has(pathname)) return null;
     if (OBSERVER_ADMIN_PATHS.has(pathname)) return 'observer';
