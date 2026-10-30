@@ -50,54 +50,55 @@ export function registerPaymentRoutes(server, ctx) {
 
   // POST /api/v1/payments
   server.post('/api/v1/payments', async (req, res) => {
-    const body = await HttpServer.parseBody(req);
-    const idempotencyKey = req.headers['idempotency-key'] || body.idempotencyKey;
+    try {
+      const body = await HttpServer.parseBody(req);
+      const idempotencyKey = req.headers['idempotency-key'] || body.idempotencyKey;
 
-    // Resolve merchant (default to first/demo merchant if none passed in header)
-    const merchantId = req.headers['x-merchant-id'] || body.merchantId;
-    let merchant;
-    if (merchantId) {
-      merchant = ctx.merchantRepo.findById(merchantId);
-    } else {
-      merchant = ctx.merchantRepo.getDefault ? ctx.merchantRepo.getDefault() : (ctx.merchantRepo.findById('00000000-0000-0000-0000-000000000001') || ctx.merchantRepo.findAll()[0]);
-    }
-
-    if (!merchant) {
-      HttpServer.json(res, 400, { error: 'Merchant not found or not configured.' });
-      return;
-    }
-
-    if (!body.orderId || !body.amount) {
-      HttpServer.json(res, 400, { error: 'Missing required fields: orderId and amount.' });
-      return;
-    }
-
-    const deviceId = body.deviceId || req.headers['x-device-id'] || null;
-    if (deviceId && ctx.deviceRepo) {
-      let dev = ctx.deviceRepo.findById(deviceId);
-      if (!dev) {
-        try {
-          ctx.deviceRepo.create({
-            id: deviceId,
-            publicKey: `adhoc_${deviceId}`,
-            fingerprintHash: `fp_${deviceId}`
-          });
-        } catch {}
+      // Resolve merchant (default to first/demo merchant if none passed in header)
+      const merchantId = req.headers['x-merchant-id'] || body.merchantId;
+      let merchant;
+      if (merchantId) {
+        merchant = ctx.merchantRepo.findById(merchantId);
+      } else {
+        merchant = ctx.merchantRepo.getDefault ? ctx.merchantRepo.getDefault() : (ctx.merchantRepo.findById('00000000-0000-0000-0000-000000000001') || ctx.merchantRepo.findAll()[0]);
       }
-    }
 
-    // Check idempotency & active session state
-    const existing = ctx.sessionRepo.findByOrderId(merchant.id, body.orderId);
-    if (existing) {
-      // If SUCCESS: order is already paid, return existing completed session
-      if (existing.status === PaymentStatus.SUCCESS) {
-        HttpServer.json(res, 200, {
-          paymentId: existing.id,
-          orderId: existing.orderId,
-          amount: toRupeesString(existing.amountPaise),
-          amountPaise: existing.amountPaise.toString(),
-          currency: existing.currency,
-          status: existing.status,
+      if (!merchant) {
+        HttpServer.json(res, 400, { error: 'Merchant not found or not configured.' });
+        return;
+      }
+
+      if (!body.orderId || !body.amount) {
+        HttpServer.json(res, 400, { error: 'Missing required fields: orderId and amount.' });
+        return;
+      }
+
+      const deviceId = body.deviceId || req.headers['x-device-id'] || null;
+      if (deviceId && ctx.deviceRepo) {
+        let dev = ctx.deviceRepo.findById(deviceId);
+        if (!dev) {
+          try {
+            ctx.deviceRepo.create({
+              id: deviceId,
+              publicKey: `adhoc_${deviceId}`,
+              fingerprintHash: `fp_${deviceId}`
+            });
+          } catch {}
+        }
+      }
+
+      // Check idempotency & active session state
+      const existing = ctx.sessionRepo.findByOrderId(merchant.id, body.orderId);
+      if (existing) {
+        // If SUCCESS: order is already paid, return existing completed session
+        if (existing.status === PaymentStatus.SUCCESS) {
+          HttpServer.json(res, 200, {
+            paymentId: existing.id,
+            orderId: existing.orderId,
+            amount: toRupeesString(existing.amountPaise),
+            amountPaise: existing.amountPaise.toString(),
+            currency: existing.currency,
+            status: existing.status,
           checkoutUrl: `${resolveCheckoutBaseUrl(merchant)}/checkout/${existing.id}`
         });
         return;
@@ -329,6 +330,10 @@ export function registerPaymentRoutes(server, ctx) {
       } : null,
       checkoutUrl: `${resolveCheckoutBaseUrl(merchant)}/checkout/${session.id}`
     });
+    } catch (err) {
+      console.error('[Payments API] Unhandled error:', err);
+      HttpServer.json(res, 500, { error: 'Internal Server Error', detail: err.message });
+    }
   });
 
   // GET /api/v1/payments/:id

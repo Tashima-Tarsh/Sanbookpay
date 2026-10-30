@@ -58,6 +58,7 @@
       display: flex !important;
       height: 100vh !important;
       overflow: hidden !important;
+      flex-direction: row-reverse !important;
     }
 
     /* Sidebar */
@@ -66,7 +67,7 @@
       background: rgba(15, 23, 42, 0.9) !important;
       backdrop-filter: blur(24px) !important;
       -webkit-backdrop-filter: blur(24px) !important;
-      border-right: 1px solid var(--dp-card-border) !important;
+      border-left: 1px solid var(--dp-card-border) !important;
       display: flex !important;
       flex-direction: column !important;
       z-index: 10 !important;
@@ -124,7 +125,7 @@
       color: var(--dp-text-muted) !important;
       text-decoration: none !important;
       border-radius: 0 !important;
-      border-left: 3px solid transparent !important;
+      border-right: 3px solid transparent !important;
       transition: all 0.2s !important;
       font-size: 14px !important;
       font-weight: 500 !important;
@@ -132,7 +133,7 @@
     }
 
     .dp-nav-item:hover { background: rgba(255, 255, 255, 0.05) !important; color: var(--dp-text) !important; }
-    .dp-nav-item.active { background: rgba(99, 102, 241, 0.15) !important; color: var(--dp-primary) !important; border-left-color: var(--dp-primary) !important; }
+    .dp-nav-item.active { background: rgba(99, 102, 241, 0.15) !important; color: var(--dp-primary) !important; border-right-color: var(--dp-primary) !important; }
     .dp-nav-item.active .dp-nav-icon { color: var(--dp-primary) !important; }
 
     .dp-nav-icon { width: 20px !important; text-align: center !important; font-size: 16px !important; }
