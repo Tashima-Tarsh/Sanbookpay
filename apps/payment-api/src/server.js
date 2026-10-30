@@ -192,19 +192,21 @@ export class HttpServer {
    */
   static async parseBody(req) {
     return new Promise((resolve, reject) => {
-      let body = '';
+      const chunks = [];
+      let totalLength = 0;
       let tooLarge = false;
       req.on('data', chunk => {
         if (tooLarge) return;
-        body += chunk;
-        if (body.length > 2 * 1024 * 1024) { // 2MB limit
+        chunks.push(Buffer.from(chunk));
+        totalLength += chunk.length;
+        if (totalLength > 2 * 1024 * 1024) { // 2MB limit
           tooLarge = true;
-          body = '';
           reject(new Error('Payload Too Large'));
         }
       });
       req.on('end', () => {
         if (tooLarge) return;
+        const body = Buffer.concat(chunks).toString('utf8');
         if (!body.trim()) {
           resolve({});
           return;

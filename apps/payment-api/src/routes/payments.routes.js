@@ -217,6 +217,11 @@ export function registerPaymentRoutes(server, ctx) {
       } catch {
         customer = ctx.customerRepo.findById(customerId);
       }
+      // If customer creation failed (e.g., invalid phone format), don't set customerId
+      // to avoid FOREIGN KEY constraint failure on payment_sessions.customer_id
+      if (!customer) {
+        customerId = null;
+      }
     } else if (customer) {
       customerId = customer.id;
     }
