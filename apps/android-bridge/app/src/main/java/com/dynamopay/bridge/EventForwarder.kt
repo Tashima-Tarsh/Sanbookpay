@@ -1,10 +1,12 @@
 package com.dynamopay.bridge
 
 import android.content.Context
+import android.content.SharedPreferences
 import android.os.Handler
 import android.os.Looper
 import androidx.security.crypto.EncryptedSharedPreferences
 import okhttp3.*
+import okhttp3.MediaType.Companion.toMediaType
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
@@ -64,7 +66,6 @@ class EventForwarder(
                 }
             }
 
-            // Small delay between events to avoid overwhelming backend
             Thread.sleep(100)
         }
 
@@ -106,7 +107,7 @@ class EventForwarder(
             .addHeader("X-Timestamp", timestamp)
             .addHeader("X-Signature", signature)
             .addHeader("Content-Type", "application/json")
-            .post(RequestBody.create(MediaType.Companion.parse("application/json"), bodyString))
+            .post(bodyString.toRequestBody("application/json".toMediaType()))
             .build()
 
         return try {
@@ -148,7 +149,6 @@ class EventForwarder(
     }
 
     private fun isDuplicateRecently(eventId: String): Boolean {
-        // Simple in-memory duplicate check for the current batch
         val key = "recent_event_$eventId"
         val existing = securePrefs.getString(key, null)
         if (existing != null) return true
@@ -174,3 +174,4 @@ class EventForwarder(
         return securePrefs.getInt(PREFS_CONSECUTIVE_FAILURES, 0)
     }
 }
+

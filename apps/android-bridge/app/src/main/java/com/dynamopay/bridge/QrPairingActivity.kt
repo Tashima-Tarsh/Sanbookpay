@@ -2,12 +2,12 @@ package com.dynamopay.bridge
 
 import android.app.Activity
 import android.content.Intent
+import android.content.SharedPreferences
 import android.os.Bundle
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKeys
-import org.json.JSONObject
 
 /**
  * Dynamo Bridge QR pairing screen.
@@ -52,3 +52,4 @@ class QrPairingActivity : AppCompatActivity() {
         finish()
     }
 }
+

@@ -1,6 +1,7 @@
 package com.dynamopay.bridge
 
 import android.content.Context
+import android.content.SharedPreferences
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -43,7 +44,6 @@ class EventQueue(
         return try {
             val existing = getAllEvents()
             if (existing.size >= MAX_QUEUE_SIZE) {
-                // Remove oldest events to make room
                 val sorted = existing.sortedBy { it.createdAt }
                 val toRemove = sorted.take(existing.size - MAX_QUEUE_SIZE + 1)
                 for (e in toRemove) removeEvent(e.id)
@@ -150,3 +150,4 @@ class EventQueue(
         )
     }
 }
+

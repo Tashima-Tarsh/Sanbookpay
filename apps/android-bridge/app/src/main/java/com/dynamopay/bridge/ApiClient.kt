@@ -1,10 +1,12 @@
 package com.dynamopay.bridge
 
 import android.content.Context
+import android.content.SharedPreferences
 import android.os.Handler
 import android.os.Looper
 import androidx.security.crypto.EncryptedSharedPreferences
 import okhttp3.*
+import okhttp3.MediaType.Companion.toMediaType
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
@@ -106,12 +108,13 @@ class ApiClient(
             val signature = cryptoHelper.hmacSha256(sigPayload, hmacSecret) ?: ""
 
             val url = "$baseUrl/api/v1/upi-mirror/pairing/confirm"
+            val body = pairingPayload.toString()
             val request = Request.Builder()
                 .url(url)
                 .addHeader("Content-Type", "application/json")
                 .addHeader("X-Timestamp", timestamp)
                 .addHeader("X-Signature", signature)
-                .post(RequestBody.create(MediaType.Companion.parse("application/json"), pairingPayload.toString()))
+                .post(body.toRequestBody("application/json".toMediaType()))
                 .build()
 
             client.newCall(request).execute().use { response ->
@@ -171,7 +174,7 @@ class ApiClient(
             .addHeader("Content-Type", "application/json")
             .addHeader("X-Timestamp", timestamp)
             .addHeader("X-Signature", signature)
-            .post(RequestBody.create(MediaType.Companion.parse("application/json"), bodyJson.toString()))
+            .post(bodyJson.toString().toRequestBody("application/json".toMediaType()))
             .build()
 
         return try {
@@ -212,7 +215,6 @@ class ApiClient(
                 val body = response.body?.string() ?: ""
                 val json = JSONObject(body)
                 val status = json.optString("status", null)
-                // Cache subscription status
                 securePrefs.edit().putString(PREFS_SUBSCRIPTION_STATUS, status ?: "UNKNOWN").apply()
                 status
             }
@@ -243,7 +245,6 @@ class ApiClient(
         return try {
             client.newCall(request).execute().use { response ->
                 if (response.isSuccessful) {
-                    // Clear local pairing state
                     securePrefs.edit()
                         .putBoolean(PREFS_PAIRED, false)
                         .remove(PREFS_DEVICE_ID)
@@ -262,3 +263,4 @@ class ApiClient(
         }
     }
 }
+

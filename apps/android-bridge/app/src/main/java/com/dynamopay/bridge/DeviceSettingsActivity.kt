@@ -1,5 +1,6 @@
 package com.dynamopay.bridge
 
+import android.content.SharedPreferences
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
 import android.widget.*
@@ -92,3 +93,4 @@ class DeviceSettingsActivity : AppCompatActivity() {
         setContentView(layout)
     }
 }
+
