@@ -1,36 +1,85 @@
-# Dynamo Pay runtime architecture
+# Sanbook Pay Runtime Architecture
 
-## Active execution path
+## Active Execution Path
 
 `scripts/start-hosted.js` resolves the canonical public origin, restores private files from PostgreSQL when configured, starts four component HTTP services and routes one public origin to them:
 
 ```
+Platform Owner -> Super Admin Control Center (port 9000) -> Payment API proxy
 Merchant backend -> authenticated create/status API -> payment session/order
 Customer browser -> hosted checkout -> QR / UPI intent / payment-done request
-Android / Gmail -> source validation -> normalized observation -> supplementary evidence
 Approved provider -> raw-body signature + amount/currency/reference validation
-Owner bank review -> authenticated explicit review + actual bank reference
 Confirmation -> atomic status + double-entry journal + outgoing callback reservation
 Callback worker -> merchant endpoint (HMAC, retry, delivery-ID deduplication)
 State invalidation -> authenticated console SSE / checkout SSE -> canonical API refresh
 ```
 
-## Services and storage
+## Services and Storage
 
-Payment API (6100), checkout (7000), merchant console (6001) and Gmail observer (6003) run in the hosted process; only the ingress binds Render's public PORT. SQLite WAL is the local/test adapter. PostgreSQL is selected with DATABASE_URL and stores hosted financial records and restored private files. Nested financial work uses transactions/savepoints. Redis/BullMQ and alternative webhook adapters exist but are not the authoritative native callback outbox or proof that distributed workers are running.
+- **Payment API** (6100): Core payment processing, provider integration, webhooks, Super Admin platform APIs
+- **Super Admin Control Center** (9000): Platform owner portal for merchant management, routing, failover, diagnostics
+- **Checkout** (7000): Customer-facing hosted UPI checkout portal
+- **Merchant Console** (6001): Merchant dashboard for independent operations
 
-## Verification and attribution
+SQLite WAL is the local/test adapter. PostgreSQL is selected with `DATABASE_URL` and stores hosted financial records and restored private files. Nested financial work uses transactions/savepoints.
 
-Production observer messages are supplementary evidence. A matching amount alone cannot mark a customer paid. Provider collection confirmation validates signature, currency, exact paise and provider payment-reference ownership, then atomically posts the state, journal and provider callback. Owner-reviewed bank credit remains labelled MERCHANT_CONFIRMED. Card/netbanking local simulation is test-only; automatic settlement is unavailable without a real bank integration. Historical records retain their existing labels.
+## Platform Schema (`pp_*` tables)
 
-Direct UPI permits one active receiving VPA per merchant and one ACTIVE/PROCESSING session per receiving account. Other sessions queue. Acceptance rules and channel limits apply to new payment requests; they do not redirect an already initiated payment. Submitted customer VPAs are request metadata, not verified payer identity.
+- `pp_merchants` — Merchant accounts with status and profile
+- `pp_users` — Platform and merchant users with roles, MFA, verification
+- `pp_sessions` — Platform sessions with CSRF, MFA verification
+- `pp_tokens` — Verification, invitation, password reset tokens
+- `pp_login_limits` — Rate limiting for login attempts
+- `pp_user_permissions` — Custom user permission overrides
+- `pp_audit` — Immutable audit log for all platform actions
+- `pp_cases` / `pp_case_events` — Support, dispute, reconciliation, incident cases
+- `pp_pricing_plans` / `pp_subscriptions` / `pp_invoices` — Pricing and billing
+- `pp_api_keys` / `pp_api_windows` / `pp_api_requests` — Merchant API credentials and usage
+- `pp_connection_policy` — Provider connection approval, enablement, routing policy, circuit breaker
+- `pp_rules` / `pp_rule_revisions` — Merchant acceptance rules (allow/block/watch)
 
-## Delivery and recovery
+## Authentication and RBAC
 
-Callbacks persist before network delivery and retry up to five attempts, with stable payload and delivery ID. Merchants must implement at-least-once delivery handling with unique order/delivery constraints and atomic wallet updates. SSE carries invalidation, not durable replay: reconnect fetches current records and the console polls every 20 seconds as fallback. Database adapter connection failure is fail-closed and may require restarting the service; always-on HA and distributed replay are not implemented by the free trial.
+- Platform staff roles: SUPER_ADMIN, OPERATIONS, FINANCE, SUPPORT, SECURITY, AUDITOR
+- Merchant roles: OWNER, ADMIN, DEVELOPER, FINANCE, SUPPORT, VIEWER
+- MFA required for sensitive operations (merchant state changes, key rotation, connection approval)
+- Sessions expire after 8 hours; CSRF protection on all state-changing requests
+- Tenant-scoped queries prevent cross-merchant access
 
-## Observers and private configuration
+## Smart UPI Routing
 
-Gmail polling is explicitly bound to an account, paginates a seven-day lookback and prevents overlapping polls. Android Java source signs events and heartbeat, persists pending delivery and retries in the foreground service. The current native source must be rebuilt using the original private signing identity; production download checks reject stale source/APK manifests. Native installation, permissions, battery behaviour and reboot recovery require a real device test.
+Routes are selected based on health, priority, weight, amount limits, and circuit breaker state. Supported strategies: priority-based, weighted, health-aware, latency-aware, success-rate-aware, capacity-aware, cost-aware, and controlled automatic failover.
 
-Credentials stay in hosting secrets, encrypted merchant configuration and ignored private files. hosted_files and backups require database-level access protection; they are not a separate encrypted vault. See [credential inventory](docs/CONFIGURATION-CREDENTIALS.md). No credentials are rotated by the code freeze.
+## Automatic Failover
+
+When a primary provider connection fails, the system automatically attempts backup connections before returning RECONCILIATION_REQUIRED. Failover events are recorded with reason, trigger, and timestamp.
+
+## Payment Verification
+
+Authoritative sources only: verified provider webhook (signature verification), authenticated provider status API, authorized bank transaction feed, provider reconciliation report, bank settlement report. No amount-only matching or customer screenshots as proof of payment.
+
+## Webhooks
+
+- Incoming: Bank/PSP → Sanbook Pay with HMAC-SHA256 signature verification
+- Outgoing: Sanbook Pay → Merchant with signed events, durable retries (5s, 30s, 2m, 10m, 1h), delivery logs
+- Webhook delivery is at-least-once; merchants must implement idempotent handling
+
+## Ledger
+
+- Integer-paise accounting
+- Double-entry ledger
+- Immutable financial records
+- Atomic posting with idempotency
+- Never silently rewrite historical ledger entries
+
+## Observers
+
+SMS/Gmail/Android observations are supplementary evidence only. Production SMS/Gmail/Android notifications do not independently prove bank settlement.
+
+## Verification and Attribution
+
+Production observer messages are supplementary evidence. A matching amount alone cannot mark a customer paid. Provider collection confirmation validates signature, currency, exact paise and provider payment-reference ownership, then atomically posts the state, journal and provider callback.
+
+## Credentials
+
+Credentials stay in hosting secrets, encrypted merchant configuration and ignored private files. No credentials are rotated by the code freeze. Never print or commit real passwords, tokens, private PDFs, keystores or connection strings.

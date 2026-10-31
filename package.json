@@ -20,6 +20,7 @@
     "start:tunnel": "node scripts/start-quick-tunnel.js",
     "start:hosted": "node scripts/start-hosted.js",
     "start:prod:api": "node apps/payment-api/src/index.js",
+    "start:super-admin": "node apps/super-admin/src/index.js",
     "dev": "node scripts/dev.js",
     "test": "node scripts/test-all.js",
     "test:all": "node scripts/test-all.js",
