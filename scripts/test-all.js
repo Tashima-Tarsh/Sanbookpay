@@ -90,8 +90,16 @@ for (let i = 0; i < testFiles.length; i++) {
       ...process.env,
       ...testEnv
     },
-    encoding: 'utf8'
+    encoding: 'utf8',
+    timeout: 120000
   });
+
+  if (result.status === null && result.error && result.error.code === 'ETIMEDOUT') {
+    const duration = ((Date.now() - startFile) / 1000).toFixed(2);
+    console.log(`⏱️ TIMEOUT (${duration}s)`);
+    console.error(`[-] Test timed out after 120s in ${file}`);
+    process.exit(1);
+  }
 
   const duration = ((Date.now() - startFile) / 1000).toFixed(2);
   const passed=result.status===0&&!/^\s*not ok\b/m.test(result.stdout||'');

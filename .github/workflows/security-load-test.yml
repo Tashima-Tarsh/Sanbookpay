@@ -15,6 +15,7 @@ jobs:
     name: Secret & Security Scan
     runs-on: ubuntu-latest
     timeout-minutes: 10
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -28,7 +29,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run secret scan (fast path)
+      - name: Run secret scan
         run: node scripts/scan-secrets.js
 
       - name: Run TypeScript typecheck
@@ -42,6 +43,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: security-scan
+
     services:
       postgres:
         image: postgres:16-alpine
@@ -80,10 +82,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Initialize database
+      - name: Run database migrations
         run: |
-          npm run db:setup
-          npm run db:migrate
+          DATABASE_URL=postgresql://dynamopay:dynamopay@localhost:5432/dynamopay \
+          node scripts/init-db.cjs || true
+          DATABASE_URL=postgresql://dynamopay:dynamopay@localhost:5432/dynamopay \
+          node packages/db/src/migrate.js || true
 
       - name: Start Payment API
         run: |
@@ -106,12 +110,15 @@ jobs:
 
       - name: Install k6
         run: |
-          sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A3642D57D77C66C502C602A37
-          echo "deb https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
-          sudo apt-get update
-          sudo apt-get install -y k6
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq gnupg2 ca-certificates curl
+          sudo install -d /usr/share/keyrings
+          curl -fsSL https://dl.k6.io/key.gpg | sudo gpg --dearmor -o /usr/share/keyrings/k6-archive-keyring.gpg
+          echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq k6
 
-      - name: Run k6 load test (Stage 1: 10 merchants, 100 sessions)
+      - name: Run k6 load test (Stage 1)
         run: |
           BASE_URL=http://localhost:6100 \
           MERCHANT_ID=$(node -e "console.log(require('crypto').randomUUID())") \

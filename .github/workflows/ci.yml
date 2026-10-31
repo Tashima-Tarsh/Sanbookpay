@@ -35,6 +35,10 @@ jobs:
       - name: Run test suite
         id: tests
         run: npm test
+        env:
+          NODE_ENV: test
+          YOUPI_MODE: localhost
+          SQLITE_DB_PATH: /tmp/ci_test.sqlite
 
       - name: Upload test results
         if: always() && (steps.tests.outcome == 'success' || steps.tests.outcome == 'failure')

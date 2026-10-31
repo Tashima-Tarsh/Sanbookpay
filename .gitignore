@@ -65,3 +65,4 @@ Thumbs.db
 
 # Read-only upstream source checkouts used for connector review
 /output/reference/
+/output/references/
