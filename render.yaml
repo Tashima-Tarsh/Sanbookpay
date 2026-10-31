@@ -11,6 +11,8 @@ services:
     healthCheckPath: /_ready
     autoDeployTrigger: checksPass
     envVars:
+      - key: GIT_LFS_SKIP_SMUDGE
+        value: "1"
       - key: NODE_VERSION
         value: 22.23.4
       - key: NODE_ENV
