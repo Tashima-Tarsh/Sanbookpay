@@ -26,14 +26,16 @@ jobs:
       - name: Type check
         run: npm run typecheck
 
+      - name: Validate JavaScript runtime
+        run: npm run build
+
       - name: Run test suite
+        id: tests
         run: npm test
 
       - name: Upload test results
-        if: always()
+        if: always() && (steps.tests.outcome == 'success' || steps.tests.outcome == 'failure')
         uses: actions/upload-artifact@v4
         with:
           name: test-results
-          path: |
-            **/__tests__/**
-            **/*.test.js
+          path: output/testing/regression-results.json
