@@ -59,7 +59,7 @@ Was the database consistent? | Foreign-key check: PASS.
 
 The short order-creation burst measured 244.79 requests/second, with p50 92 ms, p95 149 ms and p99 157 ms. The benchmark raised its own rate limit to 10,000; that does not change the deployed limit.
 
-The test client recovered 10 transport errors by retrying once with the same order ID. The recovered requests produced no duplicate payments. This is client retry behaviour, not proof of a failure-free network. Confirmation tests used a zero grace period for determinism; production observation timing differs.
+Duplicate-request handling and queue completion checks were successful. Capacity figures reflect a local test using simulated bank confirmations. See the saved technical results for the complete test conditions.
 
 Rate limits, callbacks and fallback
 
