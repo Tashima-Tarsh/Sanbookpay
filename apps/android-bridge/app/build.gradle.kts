@@ -20,9 +20,6 @@ android {
             isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
-        debug {
-            signingConfig signingConfigs.debug
-        }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
