@@ -1,54 +1,43 @@
-# DYNAMO PAY — Caddy Reverse Proxy (HTTPS/TLS)
-# Production-grade reverse proxy with automatic HTTPS
-# Replace example.com with your actual domain
+# DYNAMO PAY — Caddy Reverse Proxy with TLS
+# Production: obtain TLS certs via ACME (Let's Encrypt)
+# Local dev: use self-signed or skip TLS
 
 {
-    email admin@dynamopay.local
-    acme_ca https://acme-v02.api.letsencrypt.org/directory
-    auto_https on
-    logs {
-        output file /var/log/caddy/access.log {
-            format json
-        }
-    }
+  email admin@example.com
+  acme_ca https://acme-v02.api.letsencrypt.org/directory
 }
 
-# Payment Core API — HTTPS
-https://api.dynamopay.local {
-    reverse_proxy localhost:6100 {
-        header_up Host {upstream_hostport}
-        header_up X-Real-IP {remote_host}
-        header_up X-Forwarded-For {remote_host}
-        header_up X-Forwarded-Proto {scheme}
-    }
+# Payment API — HTTPS
+api.example.com {
+  reverse_proxy payment-api:6100
+  header {
+    Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    X-Content-Type-Options "nosniff"
+    X-Frame-Options "DENY"
+  }
 }
 
-# Checkout Portal — HTTPS
-https://checkout.dynamopay.local {
-    reverse_proxy localhost:7000 {
-        header_up Host {upstream_hostport}
-        header_up X-Real-IP {remote_host}
-        header_up X-Forwarded-For {remote_host}
-        header_up X-Forwarded-Proto {scheme}
-    }
+# Super Admin — HTTPS
+admin.example.com {
+  reverse_proxy super-admin:9000
+  header {
+    Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    X-Content-Type-Options "nosniff"
+    X-Frame-Options "DENY"
+  }
 }
 
-# Merchant Admin — HTTPS
-https://admin.dynamopay.local {
-    reverse_proxy localhost:6001 {
-        header_up Host {upstream_hostport}
-        header_up X-Real-IP {remote_host}
-        header_up X-Forwarded-For {remote_host}
-        header_up X-Forwarded-Proto {scheme}
-    }
+# Checkout portal — HTTPS
+checkout.example.com {
+  reverse_proxy payment-api:6100
+  header {
+    Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    X-Content-Type-Options "nosniff"
+    X-Frame-Options "DENY"
+  }
 }
 
-# Coin Wallet Store (Demo) — HTTPS
-https://store.dynamopay.local {
-    reverse_proxy localhost:5000 {
-        header_up Host {upstream_hostport}
-        header_up X-Real-IP {remote_host}
-        header_up X-Forwarded-For {remote_host}
-        header_up X-Forwarded-Proto {scheme}
-    }
+# HTTP to HTTPS redirect
+:80 {
+  redir https://{host}{uri} 308
 }

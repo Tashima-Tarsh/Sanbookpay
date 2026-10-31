@@ -1,53 +1,75 @@
+# ============================================================
+# DYNAMO PAY UNIVERSAL UPI MIRROR — Docker Compose
+# Profiles: local-dev, pilot, production, high-scale
+# ============================================================
+
 services:
-  # ---------------------------------------------------------------------------
-  # Database: Canonical PostgreSQL Financial Ledger
-  # ---------------------------------------------------------------------------
+  # ============================================================
+  # PostgreSQL — Durable transaction system (mandatory)
+  # ============================================================
   postgres:
     image: postgres:16-alpine
-    container_name: sanbook-pay-postgres
-    restart: unless-stopped
+    profiles:
+      - local-dev
+      - pilot
+      - production
+      - high-scale
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-sanbook_pay}
-      POSTGRES_USER: ${POSTGRES_USER:-sanbook_admin}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD privately}
+      POSTGRES_DB: dynamopay
+      POSTGRES_USER: dynamopay
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
     volumes:
-      - postgres-data:/var/lib/postgresql/data
-      - ./packages/db/src/schema.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
-    ports:
-      - "5432:5432"
+      - postgres_data:/var/lib/postgresql/data
+      - ./packages/db/src/migrations:/docker-entrypoint-initdb.d:ro
+    secrets:
+      - db_password
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sanbook_admin} -d ${POSTGRES_DB:-sanbook_pay}"]
+      test: ["CMD-SHELL", "pg_isready -U dynamopay -d dynamopay"]
       interval: 10s
       timeout: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 1G
 
-  # ---------------------------------------------------------------------------
-  # Cache & Event Broker: Redis
-  # ---------------------------------------------------------------------------
+  # ============================================================
+  # Redis — Cache and fast lookup (NOT sole durable record)
+  # ============================================================
   redis:
     image: redis:7-alpine
-    container_name: sanbook-pay-redis
-    restart: unless-stopped
-    command: redis-server --appendonly yes --requirepass "${REDIS_PASSWORD:?Set REDIS_PASSWORD privately}"
+    profiles:
+      - local-dev
+      - pilot
+      - production
+      - high-scale
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "allkeys-lru"]
     volumes:
-      - redis-data:/data
-    ports:
-      - "6379:6379"
+      - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:?Set REDIS_PASSWORD privately}", "ping"]
+      test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 512M
 
-  # ---------------------------------------------------------------------------
-  # Sanbook Pay Core Engine & Financial APIs
-  # ---------------------------------------------------------------------------
+  # ============================================================
+  # Payment API — UPI Mirror backend (stateless replicas)
+  # ============================================================
   payment-api:
     build:
       context: .
-      dockerfile: apps/payment-api/Dockerfile
-    container_name: sanbook-pay-api
-    restart: unless-stopped
+      dockerfile: Dockerfile.payment-api
+    profiles:
+      - local-dev
+      - pilot
+      - production
+      - high-scale
     depends_on:
       postgres:
         condition: service_healthy
@@ -55,94 +77,154 @@ services:
         condition: service_healthy
     environment:
       NODE_ENV: production
-      PORT: 6100
-      DATABASE_URL: postgresql://${POSTGRES_USER:-sanbook_admin}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD privately}@postgres:5432/${POSTGRES_DB:-sanbook_pay}
-      REDIS_URL: redis://:${REDIS_PASSWORD:?Set REDIS_PASSWORD privately}@redis:6379/0
-      ENCRYPTION_MASTER_KEY: ${ENCRYPTION_KEY:?Set ENCRYPTION_KEY privately}
-      INTERNAL_TOKEN: ${INTERNAL_TOKEN:?Set INTERNAL_TOKEN privately}
-      BASE_PAYMENT_API_URL: http://payment-api:6100
-      CHECKOUT_PORTAL_URL: http://checkout-portal:7000
+      DATABASE_URL: postgresql://dynamopay:${DB_PASSWORD}@postgres:5432/dynamopay
+      REDIS_URL: redis://redis:6379
+      WEBHOOK_MAX_RETRIES: 5
+      BASE_CHECKOUT_URL: ${BASE_CHECKOUT_URL:-https://checkout.example.com}
+      BASE_PAYMENT_API_URL: https://api.example.com
+      ENCRYPTION_MASTER_KEY_FILE: /run/secrets/encryption_key
+      JWT_SECRET_FILE: /run/secrets/jwt_secret
+    secrets:
+      - db_password
+      - encryption_key
+      - jwt_secret
     ports:
       - "6100:6100"
     healthcheck:
-      test: ["CMD-SHELL", "node -e 'fetch(\"http://127.0.0.1:6100/health\").then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))'"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:6100/health"]
       interval: 15s
       timeout: 5s
       retries: 3
+    deploy:
+      replicas: ${PAYMENT_API_REPLICAS:-2}
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
 
-  # ---------------------------------------------------------------------------
-  # Sanbook Pay Merchant Console
-  # ---------------------------------------------------------------------------
-  merchant-admin:
+  # ============================================================
+  # Webhook Worker — Concurrent callback dispatch
+  # ============================================================
+  webhook-worker:
     build:
       context: .
-      dockerfile: apps/merchant-admin/Dockerfile
-    container_name: sanbook-pay-admin
-    restart: unless-stopped
+      dockerfile: Dockerfile.payment-api
+    command: ["node", "scripts/webhook-worker.js"]
+    profiles:
+      - pilot
+      - production
+      - high-scale
     depends_on:
       payment-api:
         condition: service_healthy
     environment:
       NODE_ENV: production
-      PORT: 6001
-      BASE_PAYMENT_API_URL: http://payment-api:6100
-      ADMIN_API_TOKEN: ${ADMIN_API_TOKEN:?Set ADMIN_API_TOKEN privately}
-    ports:
-      - "6001:6001"
-    healthcheck:
-      test: ["CMD-SHELL", "node -e 'fetch(\"http://127.0.0.1:6001/health\").then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))'"]
-      interval: 15s
-      timeout: 5s
-      retries: 3
+      DATABASE_URL: postgresql://dynamopay:${DB_PASSWORD}@postgres:5432/dynamopay
+      REDIS_URL: redis://redis:6379
+      WEBHOOK_MAX_RETRIES: 5
+      ENCRYPTION_MASTER_KEY_FILE: /run/secrets/encryption_key
+    secrets:
+      - db_password
+      - encryption_key
+    deploy:
+      replicas: ${WEBHOOK_WORKER_REPLICAS:-2}
+      resources:
+        limits:
+          memory: 1G
 
-  # ---------------------------------------------------------------------------
-  # Sanbook Pay Checkout Portal
-  # ---------------------------------------------------------------------------
-  checkout-portal:
+  # ============================================================
+  # Super Admin — Management dashboard (port 9000)
+  # ============================================================
+  super-admin:
     build:
       context: .
-      dockerfile: apps/checkout-portal/Dockerfile
-    container_name: sanbook-pay-checkout
-    restart: unless-stopped
+      dockerfile: Dockerfile.payment-api
+    command: ["node", "apps/super-admin/src/index.js"]
+    profiles:
+      - pilot
+      - production
+      - high-scale
     depends_on:
       payment-api:
         condition: service_healthy
     environment:
       NODE_ENV: production
-      PORT: 7000
-      BASE_PAYMENT_API_URL: http://payment-api:6100
+      PAYMENT_API_URL: http://payment-api:6100
+      ENCRYPTION_MASTER_KEY_FILE: /run/secrets/encryption_key
+      JWT_SECRET_FILE: /run/secrets/jwt_secret
+    secrets:
+      - encryption_key
+      - jwt_secret
     ports:
-      - "7000:7000"
-    healthcheck:
-      test: ["CMD-SHELL", "node -e 'fetch(\"http://127.0.0.1:7000/health\").then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))'"]
-      interval: 15s
-      timeout: 5s
-      retries: 3
+      - "9000:9000"
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          memory: 1G
 
-  # ---------------------------------------------------------------------------
-  # TLS Termination & Ingress: Caddy Reverse Proxy
-  # ---------------------------------------------------------------------------
+  # ============================================================
+  # Reverse Proxy — Caddy with TLS termination
+  # ============================================================
   caddy:
     image: caddy:2-alpine
-    container_name: sanbook-pay-caddy
-    restart: unless-stopped
+    profiles:
+      - production
+      - high-scale
     ports:
       - "80:80"
       - "443:443"
-    environment:
-      DOMAIN: ${DOMAIN:-pay.yourdomain.com}
     volumes:
-      - ./deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy-data:/data
-      - caddy-config:/config
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
     depends_on:
-      - payment-api
-      - merchant-admin
-      - checkout-portal
+      payment-api:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 256M
 
+  # ============================================================
+  # Backup — PostgreSQL backup jobs
+  # ============================================================
+  backup:
+    image: postgres:16-alpine
+    profiles:
+      - production
+      - high-scale
+    environment:
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+    volumes:
+      - ./scripts/backup.sh:/backup.sh:ro
+      - backup_data:/backups
+    secrets:
+      - db_password
+    command: ["sh", "-c", "while true; do /backup.sh; sleep 3600; done"]
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+# ============================================================
+# Volumes
+# ============================================================
 volumes:
-  postgres-data:
-  redis-data:
-  caddy-data:
-  caddy-config:
+  postgres_data:
+  redis_data:
+  caddy_data:
+  caddy_config:
+  backup_data:
 
+# ============================================================
+# Secrets
+# ============================================================
+secrets:
+  db_password:
+    file: ./secrets/db_password.txt
+  encryption_key:
+    file: ./secrets/encryption_key.txt
+  jwt_secret:
+    file: ./secrets/jwt_secret.txt
