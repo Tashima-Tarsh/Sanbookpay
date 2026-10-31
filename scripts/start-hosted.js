@@ -34,7 +34,7 @@ const gateway=http.createServer((req,res)=>{
     return;
   }
   if(pathname==='/store'||pathname.startsWith('/store/')||pathname.startsWith('/wallet')||pathname.startsWith('/order-')){res.writeHead(404);res.end('Demo store is disabled.');return;}
-  const target=/^\/(checkout|pay\/|qr\/|youpi\.js|sdk\/|icons\/)/.test(pathname)?checkout.port:/^\/(api\/v1\/|v1\/dynamo\/|v1\.0\/|health$)/.test(pathname)?api.port:admin.port;
+  const target=/^\/(checkout|pay\/|qr\/|youpi\.js|sdk\/|icons\/)/.test(pathname)?checkout.port:/^\/(api\/platform\/|api\/v1\/|v1\/dynamo\/|v1\.0\/|health$)/.test(pathname)?api.port:admin.port;
   const remote=(req.socket.remoteAddress||'').replace(/^::ffff:/,'');
   // Render appends its edge client address; ignore caller-supplied Cloudflare headers.
   const forwarded=process.env.RENDER==='true'?String(req.headers['x-forwarded-for']||'').split(',').at(-1).trim():remote;
