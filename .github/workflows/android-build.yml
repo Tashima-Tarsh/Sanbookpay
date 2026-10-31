@@ -24,6 +24,12 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: |
+            cmdline-tools;latest
+            platform-tools
+            platforms;android-34
+            build-tools;34.0.0
 
       - name: Grant execute permission for gradlew
         run: chmod +x apps/android-bridge/gradlew
