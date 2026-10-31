@@ -80,8 +80,8 @@ test('Sanbook Pay - Customer Auto-Provisioning, Multi-Method & Receipts Suite', 
     assert.equal(receiptData.orderId, 'ORD-AUTO-CUST-99');
     assert.equal(receiptData.amount, '499.00');
     assert.equal(receiptData.method, 'CARD');
-    assert.equal(receiptData.smsStatus, 'SENT');
-    assert.equal(receiptData.emailStatus, 'DELIVERED');
+    assert.equal(receiptData.smsStatus, 'NOT_CONFIGURED');
+    assert.equal(receiptData.emailStatus, 'NOT_CONFIGURED');
     assert.ok(receiptData.customer.maskedPhone);
     assert.ok(receiptData.customer.maskedEmail);
 
@@ -90,7 +90,7 @@ test('Sanbook Pay - Customer Auto-Provisioning, Multi-Method & Receipts Suite', 
     assert.equal(htmlRes.status, 200);
     assert.equal(htmlRes.headers.get('content-type'), 'text/html; charset=utf-8');
     const htmlText = await htmlRes.text();
-    assert.ok(htmlText.includes('SANBOOK PAY'));
+    assert.ok(htmlText.includes('DYNAMO PAY'));
     assert.ok(htmlText.includes('ORD-AUTO-CUST-99'));
     assert.ok(htmlText.includes('499.00'));
     assert.ok(htmlText.includes('Bank UTR:'));

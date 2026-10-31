@@ -1,3 +1,4 @@
+import { confirmProviderCollection, publishProviderCollection } from '../services/provider-confirmation.js';
 import { HttpServer } from '../server.js';
 import { PaymentOrderRepository, LedgerRepository, IdempotencyRepository } from '@youpi/db';
 import { ProviderRegistry } from '@youpi/core';
@@ -264,40 +265,17 @@ export function registerCollectionsRoutes(server, ctx) {
 
     try {
       const provider = providerRegistry.getProvider(merchantId, order.provider_name);
-      const queryId = order.provider_order_id || order.merchant_order_id;
+      const queryId = order.provider_name === 'CASHFREE' ? order.merchant_order_id : (order.provider_order_id || order.merchant_order_id);
       const statusRes = await provider.getCollectionStatus(queryId);
 
       if (statusRes.status === 'SUCCESS' && order.status !== 'SUCCESS') {
-        const confirmedAt = new Date().toISOString();
-        const confirmationTimeMs = Date.now() - new Date(order.created_at).getTime();
-
-        poRepo.update(order.id, {
-          status: 'SUCCESS',
-          bankReference: statusRes.bankReference || null,
-          providerPaymentId: statusRes.providerPaymentId || null,
-          confirmedAt,
-          confirmationTimeMs,
-          actorType: 'PROVIDER_API'
+        const result=confirmProviderCollection(ctx,order.id,{
+          amountPaise:statusRes.amountPaise,currency:statusRes.currency,
+          bankReference:statusRes.bankReference,providerPaymentId:statusRes.providerPaymentId,
+          actorType:'PROVIDER_API',rawResponse:statusRes.rawResponse
         });
-
-        // Record in financial ledger: debit PROVIDER_CLEARING, credit MERCHANT_RECEIVABLES
-        try {
-          ledgerRepo.recordDoubleEntry(
-            merchantId,
-            'COLLECTION',
-            order.id,
-            `Collection confirmed via ${order.provider_name} status inquiry`,
-            'PROVIDER_CLEARING',
-            'MERCHANT_RECEIVABLES',
-            order.amount_paise
-          );
-        } catch {}
-
-        return HttpServer.json(res, 200, {
-          status: 'SUCCESS',
-          bankReference: statusRes.bankReference,
-          confirmationTimeMs
-        });
+        publishProviderCollection(server,ctx,result);
+        return HttpServer.json(res,200,{status:result.order.status,bankReference:result.order.bank_reference,confirmationTimeMs:result.order.confirmation_time_ms});
       }
 
       return HttpServer.json(res, 200, {

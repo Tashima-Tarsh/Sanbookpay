@@ -250,6 +250,7 @@ export class AdminServer {
           }
         });
 
+        res.on('close',()=>proxyReq.destroy());
         req.pipe(proxyReq);
         return;
       }

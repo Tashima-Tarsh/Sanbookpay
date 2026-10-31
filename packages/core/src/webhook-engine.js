@@ -7,14 +7,21 @@ export class WebhookEngine {
    * @param {{
    *   db: import('@youpi/db').Database,
    *   merchantRepo: import('@youpi/db').MerchantRepository,
-   *   maxRetries?: number
+   *   maxRetries?: number,
+   *   deliveryTable?: string
    * }} options
    */
   constructor(options) {
     this.db = options.db;
     this.merchantRepo = options.merchantRepo;
     this.maxRetries = options.maxRetries || 5;
+    this.deliveryTable = options.deliveryTable === 'provider_webhook_deliveries' ? 'provider_webhook_deliveries' : 'webhook_deliveries';
+    this.inFlight = new Set();
+    this.controllers = new Set();
+    this.stopped = false;
   }
+
+  stop() { this.stopped=true;for(const controller of this.controllers)controller.abort(); }
 
   /**
    * Formats and dispatches a signed webhook for a payment event.
@@ -23,6 +30,15 @@ export class WebhookEngine {
    * @returns {Promise<{ delivered: boolean, deliveryId: string, status?: number, error?: string }>}
    */
   async dispatch(event, session) {
+    const queued = this.enqueue(event, session);
+    if (!queued.deliveryId) return queued;
+    const result = await this.retryPending(queued.deliveryId);
+    const sent = result[0];
+    return { delivered:sent?.success || false, deliveryId:queued.deliveryId, status:sent?.status, error:sent?.error };
+  }
+
+  enqueue(event, session) {
+    if(this.stopped) throw new Error('Webhook engine is stopped');
     const merchant = this.merchantRepo.findById(session.merchantId);
     if (!merchant || !merchant.webhookUrl) {
       return { delivered: false, deliveryId: '', error: 'No webhook URL configured for merchant.' };
@@ -50,61 +66,24 @@ export class WebhookEngine {
       transaction:session.id,
       uniquetransactionid:session.orderId,
       status:publicOutcome==='SUCCESS'?'SUCCESS':'FAILED',
-      bankReferenceNumber:bank?.bank_reference_number||null,
-      utr:bank?.bank_reference_number||null,
+      bankReferenceNumber:bank?.bank_reference_number||session.bankReference||null,
+      utr:bank?.bank_reference_number||session.bankReference||null,
       senderVpa:bank?.sender_vpa||null,
       payeeVpa:snapshot.upiId||null,
       beneficiary:{name:snapshot.payeeName||null,upiId:snapshot.upiId||null},
-      confirmationSource:session.verificationTag==='MERCHANT_CONFIRMED'?'MERCHANT':session.verificationLevel?'BANK_OBSERVER':null,
+      confirmationSource:session.confirmationSource||(session.verificationTag==='MERCHANT_CONFIRMED'?'MERCHANT':session.verificationLevel?'BANK_OBSERVER':null),
       completedAt: session.completedAt ? session.completedAt.toISOString() : new Date().toISOString(),
       metadata: session.metadata || {}
     };
 
     const payloadString = JSON.stringify(payloadObj);
-    const signature = generateHmac(payloadString, merchant.webhookSecret);
     const deliveryId = crypto.randomUUID();
-    const timestamp = Date.now().toString();
-
-    const headers = {
-      'Content-Type': 'application/json',
-      'X-Gateway-Event': publicOutcome,
-      'X-Gateway-Signature': `sha256=${signature}`,
-      'X-Gateway-Delivery-Id': deliveryId,
-      'X-Gateway-Timestamp': timestamp
-    };
-
-    let responseStatus = null;
-    let responseBody = null;
-    let isSuccessful = false;
-
-    try {
-      const res = await fetch(endpointCheck.url.toString(), {
-        method: 'POST',
-        headers,
-        body: payloadString,
-        // Never follow redirects: a public URL could otherwise 302 into the internal network.
-        redirect: 'manual',
-        signal: AbortSignal.timeout(10000) // 10s timeout
-      });
-
-      responseStatus = res.status;
-      responseBody = (await res.text()).substring(0, 1000);
-      isSuccessful = res.ok;
-    } catch (err) {
-      responseBody = err.message || 'Network timeout';
-    }
-
-    // Persist delivery record in webhook_deliveries
     const nowIso = new Date().toISOString();
-    const nextRetryAt = isSuccessful
-      ? null
-      : new Date(Date.now() + 5000).toISOString(); // initial 5s backoff
-
     this.db.execute(`
-      INSERT INTO webhook_deliveries (
+      INSERT INTO ${this.deliveryTable} (
         id, merchant_id, payment_id, event_type, payload, endpoint_url,
         response_status, response_body, attempt_count, is_successful, next_retry_at, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)
     `, [
       deliveryId,
       merchant.id,
@@ -112,18 +91,16 @@ export class WebhookEngine {
       publicOutcome,
       payloadString,
       merchant.webhookUrl,
-      responseStatus,
-      responseBody,
-      isSuccessful ? 1 : 0,
-      nextRetryAt,
+      null,
+      null,
+      0,
+      nowIso,
       nowIso
     ]);
 
     return {
-      delivered: isSuccessful,
-      deliveryId,
-      status: responseStatus,
-      error: isSuccessful ? undefined : responseBody
+      delivered: false,
+      deliveryId
     };
   }
 
@@ -131,24 +108,30 @@ export class WebhookEngine {
    * Retries overdue pending webhook deliveries with exponential backoff.
    * Backoff strategy: 5s, 30s, 2m, 10m, 1h
    */
-  async retryPending() {
+  async retryPending(deliveryId = null) {
+    if(this.stopped)return [];
     const nowIso = new Date().toISOString();
     const pending = this.db.query(`
-      SELECT * FROM webhook_deliveries
+      SELECT * FROM ${this.deliveryTable}
       WHERE is_successful = 0 AND attempt_count < ? AND next_retry_at <= ?
-      LIMIT 20
-    `, [this.maxRetries, nowIso]);
+      ${deliveryId ? 'AND id = ?' : ''} ORDER BY created_at ASC LIMIT 20
+    `, deliveryId ? [this.maxRetries, nowIso, deliveryId] : [this.maxRetries, nowIso]);
 
     const results = [];
     const backoffs = [5000, 30000, 120000, 600000, 3600000];
 
     for (const item of pending) {
+      if (this.inFlight.has(item.id)) continue;
       const merchant = this.merchantRepo.findById(item.merchant_id);
       if (!merchant || !item.endpoint_url) continue;
 
       // Re-validate the stored endpoint before every retry (SSRF guard).
       const retryEndpoint = validateOutboundWebhookUrl(item.endpoint_url);
       if (!retryEndpoint.valid) continue;
+
+      this.inFlight.add(item.id);
+      const controller=new AbortController();this.controllers.add(controller);
+      try {
 
       const signature = generateHmac(item.payload, merchant.webhookSecret);
       const timestamp = Date.now().toString();
@@ -169,7 +152,7 @@ export class WebhookEngine {
           },
           body: item.payload,
           redirect: 'manual',
-          signal: AbortSignal.timeout(10000)
+          signal: AbortSignal.any([controller.signal,AbortSignal.timeout(10000)])
         });
         respStatus = res.status;
         respBody = (await res.text()).substring(0, 1000);
@@ -178,6 +161,7 @@ export class WebhookEngine {
         respBody = err.message;
       }
 
+      if(this.stopped)break;
       const nextAttempt = item.attempt_count + 1;
       const nextRetryDelay = backoffs[Math.min(nextAttempt - 1, backoffs.length - 1)];
       const nextRetryAt = isSuccess || nextAttempt >= this.maxRetries
@@ -185,13 +169,14 @@ export class WebhookEngine {
         : new Date(Date.now() + nextRetryDelay).toISOString();
 
       this.db.execute(`
-        UPDATE webhook_deliveries
+        UPDATE ${this.deliveryTable}
         SET attempt_count = ?, is_successful = ?, response_status = ?,
             response_body = ?, next_retry_at = ?
         WHERE id = ?
       `, [nextAttempt, isSuccess ? 1 : 0, respStatus, respBody, nextRetryAt, item.id]);
 
-      results.push({ id: item.id, success: isSuccess, attempt: nextAttempt });
+      results.push({ id: item.id, success: isSuccess, attempt: nextAttempt, status:respStatus, error:isSuccess?undefined:respBody });
+      } finally { this.inFlight.delete(item.id);this.controllers.delete(controller); }
     }
 
     return results;

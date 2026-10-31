@@ -22,8 +22,25 @@ test('Postgres: schema, API collection, queue, bank matching and rollback',{skip
   assert.throws(()=>db.transaction(()=>{db.execute("INSERT INTO operational_alerts(id,severity,category,title,message) VALUES ('rollback','INFO','TEST','Test','Test')");throw Error('rollback');}),/rollback/);
   assert.equal(db.queryOne("SELECT id FROM operational_alerts WHERE id='rollback'"),null);
   const {createPaymentApp}=await import('../apps/payment-api/src/index.js');app=createPaymentApp(db);server=app.rawServer;await new Promise(r=>server.listen(0,'127.0.0.1',r));
+  const {PaymentOrderRepository,LedgerRepository}=await import('@youpi/db');
+  const {confirmProviderCollection}=await import('../apps/payment-api/src/services/provider-confirmation.js');
   const merchant=new MerchantRepository(db).getDefault();new MerchantRepository(db).update(merchant.id,{webhookUrl:null});
-  const headers={'Content-Type':'application/json','Client-ID':'dp_client_'+merchant.id,'Client-Secret':crypto.createHmac('sha256',resolveSecret('dynamo_client_master_key')).update(merchant.id).digest('hex'),'Service-Id':merchant.id};
+  const ledger=new LedgerRepository(db),post=()=>ledger.recordDoubleEntry(merchant.id,'TEST','nested-posting','Acceptance test','PROVIDER_CLEARING','MERCHANT_RECEIVABLES',400);
+  assert.throws(()=>db.transaction(()=>{post();throw Error('nested rollback');}),/nested rollback/);
+  assert.equal(db.queryOne("SELECT COUNT(*) AS n FROM ledger_transactions WHERE reference_type='TEST'").n,0);
+  assert.equal(post().transactionId,post().transactionId);
+  const providerOrder=new PaymentOrderRepository(db).create({merchantId:merchant.id,merchantOrderId:'PG-PROVIDER',providerOrderId:'PG-PROVIDER',amountPaise:20100});
+  new MerchantRepository(db).update(merchant.id,{webhookUrl:'https://merchant.example.com/webhook'});
+  const evidence={amountPaise:20100,currency:'INR',providerPaymentId:'isolated-postgres-test',bankReference:'900000000002',actorType:'PROVIDER_API',rawResponse:{synthetic:true}};
+  const execute=db.execute.bind(db);db.execute=(sql,params)=>{if(sql.includes('INSERT INTO ledger_entries'))throw Error('synthetic rollback');return execute(sql,params);};
+  try{assert.throws(()=>confirmProviderCollection(app.context,providerOrder.id,evidence),/synthetic rollback/);}finally{db.execute=execute;}
+  assert.notEqual(new PaymentOrderRepository(db).findById(providerOrder.id).status,'SUCCESS');
+  assert.equal(db.queryOne('SELECT COUNT(*) AS n FROM provider_payment_claims').n,0);
+  confirmProviderCollection(app.context,providerOrder.id,evidence);assert.equal(confirmProviderCollection(app.context,providerOrder.id,evidence).changed,false);
+  assert.equal(db.queryOne('SELECT COUNT(*) AS n FROM provider_webhook_deliveries').n,1);
+  db.execute("UPDATE provider_webhook_deliveries SET next_retry_at='2099-01-01T00:00:00.000Z'");
+  new MerchantRepository(db).update(merchant.id,{webhookUrl:null});
+  const headers={'Connection':'close','Content-Type':'application/json','Client-ID':'dp_client_'+merchant.id,'Client-Secret':crypto.createHmac('sha256',resolveSecret('dynamo_client_master_key')).update(merchant.id).digest('hex'),'Service-Id':merchant.id};
   const base=`http://127.0.0.1:${server.address().port}`;
   const create=order=>fetch(base+'/v1.0/collect/upi',{method:'POST',headers,body:JSON.stringify({amount:'201.00',uniquetransactionid:order})});
   const first=await create('PG-ONE');assert.equal(first.status,201);const payment=await first.json();assert.equal(payment.internalStatus,'ACTIVE');assert.equal((await create('PG-ONE')).status,200);
@@ -35,7 +52,7 @@ test('Postgres: schema, API collection, queue, bank matching and rollback',{skip
   const balance=await fetch(base+'/v1.0/wallet',{method:'POST',headers,body:'{}'});assert.equal(balance.status,200);
   const previousOrigin=process.env.DYNAMO_PUBLIC_URL;process.env.DYNAMO_PUBLIC_URL='https://hosted.example.test';
   try{
-   const legacy=await fetch(base+'/api/v1/payments',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({orderId:'PG-HOSTED-LINK',amount:'201.00'})});
+   const legacy=await fetch(base+'/api/v1/payments',{method:'POST',headers:{'Content-Type':'application/json','Connection':'close'},body:JSON.stringify({orderId:'PG-HOSTED-LINK',amount:'201.00'})});
    assert.equal(legacy.status,201);assert.ok((await legacy.json()).checkoutUrl.startsWith('https://hosted.example.test/checkout/'));
   }finally{if(previousOrigin===undefined)delete process.env.DYNAMO_PUBLIC_URL;else process.env.DYNAMO_PUBLIC_URL=previousOrigin;}
  }finally{

@@ -28,3 +28,15 @@ test('callbacks recover after 400/429/500, preserve signatures and stop after fi
  const down=sessions.create({merchantId:m.id,orderId:'NETWORK-DOWN',amountPaise:20100,status:'SUCCESS'});assert.equal((await engine.dispatch('SUCCESS',down)).delivered,false);
  }finally{receiver.closeAllConnections?.();if(receiver.listening)await new Promise(r=>receiver.close(r));db.close();}
 });
+
+test('stopping a webhook engine cancels delivery before the database closes',async()=>{
+ const db=new Database({inMemory:true});runMigrations(db);const merchants=new MerchantRepository(db),sessions=new PaymentSessionRepository(db),merchant=merchants.getDefault();
+ merchants.update(merchant.id,{webhookUrl:'https://merchant.example.com/webhook',webhookSecret:'test-secret'});
+ const engine=new WebhookEngine({db,merchantRepo:merchants});const session=sessions.create({merchantId:merchant.id,orderId:'SHUTDOWN',amountPaise:400,status:'SUCCESS'});
+ const original=globalThis.fetch;
+ globalThis.fetch=async(_url,options)=>new Promise((resolve,reject)=>options.signal.addEventListener('abort',()=>reject(Error('aborted')),{once:true}));
+ try{
+  const dispatch=engine.dispatch('SUCCESS',session);assert.equal(engine.inFlight.size,1);
+  engine.stop();db.close();assert.equal((await dispatch).delivered,false);assert.deepEqual(await engine.retryPending(),[]);
+ }finally{globalThis.fetch=original;}
+});

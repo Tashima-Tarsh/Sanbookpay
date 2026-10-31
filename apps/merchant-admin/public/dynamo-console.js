@@ -6,12 +6,14 @@
   const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const badge=s=>`<span class="status ${esc(String(s).toLowerCase())}">${esc((s==='VERIFICATION_PENDING'?'Awaiting bank verification':String(s).replaceAll('_',' ').toLowerCase()))}</span>`;
   const failureStatuses=['FAILED','EXPIRED','CANCELLED','SUSPICIOUS'];
-  let payments=[],allocations=[],settings={},timer,toastTimer,activePage='overview';
+  let payments=[],allocations=[],settings={},timer,toastTimer,activePage='overview',stream,liveTimer,refreshing=false,refreshAgain=false,authenticated=false,sessionVersion=0;
   const pages={overview:['Your business at a glance','Payments, collections and the details that need your attention.'],transactions:['Transactions','Search, inspect and export your payment history.'],failures:['Failed payments','Find unsuccessful attempts and understand their status.'],refunds:['Refunds','Manage full and partial refund requests and transfer records.'],splits:['Split payments','Configure your platform fee and distribute merchant proceeds.'],settlements:['Settlements','Track settlement batches and confirmed bank credits.'],upi:['UPI accounts','Manage where your customer payments are received.'],merchants:['Business profile','Keep your business identity and customer support details up to date.'],api:['Developer tools','Connect your website and receive signed payment events.'],alerts:['Connections & alerts','Monitor bank observation channels and operational alerts.']};
   function toast(message,error=false){ $('toast').textContent=message;$('toast').className='toast'+(error?' error':'');$('toast').hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').hidden=true,5000); }
   async function api(path,body,method){
+    const version=sessionVersion;
     const res=await fetch('/api/console/'+path,{method:method||(body?'POST':'GET'),headers:body?{'Content-Type':'application/json'}:{},body:body?JSON.stringify(body):undefined});
     let data; try{data=await res.json();}catch{throw new Error('The service returned an unreadable response. Try Refresh data.');}
+    if(version!==sessionVersion)throw new Error('Your sign-in session has changed.');
     if(res.status===401){signedOut();throw new Error('Your session has expired. Sign in again.');}
     if(!res.ok) throw new Error(data.error||`Request failed (${res.status})`);
     return data;
@@ -28,12 +30,12 @@
     if(focus)$(open?'menuClose':'menuToggle').focus();
   }
   compactNavigation.addEventListener('change',()=>setMenu(false));setMenu(false);
-  function signedOut(){setMenu(false);clearInterval(timer);$('console').hidden=true;$('loginScreen').hidden=false;$('clientSecret').value='';$('webhookSecret').value='';$('smsPairingQr').replaceChildren();$('gmailClientSecret').value='';$('gmailRefreshToken').value='';}
+  function signedOut(){setMenu(false);authenticated=false;sessionVersion++;refreshAgain=false;clearInterval(timer);clearTimeout(liveTimer);stream?.close();stream=null;$('console').hidden=true;$('loginScreen').hidden=false;$('clientSecret').value='';$('webhookSecret').value='';$('smsPairingQr').replaceChildren();$('gmailClientSecret').value='';$('gmailRefreshToken').value='';}
   function table(target,headers,rows,empty='No records yet. New activity will appear here.'){
     $(target).innerHTML=`<table class="dp-table"><thead><tr>${headers.map(h=>`<th scope="col">${esc(h)}</th>`).join('')}</tr></thead><tbody>${rows.length?rows.join(''):`<tr><td class="empty" colspan="${headers.length}">${esc(empty)}</td></tr>`}</tbody></table>`;
     $(target).querySelectorAll?.('tbody tr').forEach(row=>row.querySelectorAll('td').forEach((cell,i)=>{if(!cell.hasAttribute('colspan'))cell.setAttribute('data-label',headers[i]||'');}));
   }
-  function paymentRows(list){return list.map(p=>`<tr><td>${p.source==='SESSION'?`<a href="/checkout/${encodeURIComponent(p.id)}" title="Open payment QR and UPI"><strong>${esc(p.orderId)}</strong></a>`:`<strong>${esc(p.orderId)}</strong>`}<small>${esc(p.id.slice(0,12))}</small></td><td>${esc(p.customer||'—')}</td><td><strong>${money(p.amountPaise)}</strong></td><td>${esc(p.method||'UPI')}</td><td>${badge(p.status)}</td><td>${esc(p.utr||'—')}</td><td>${esc(date(p.createdAt))}</td><td><a class="btn small" target="_blank" rel="noopener" href="/checkout/${encodeURIComponent(p.id)}">Details ↗</a>${p.status==='SUCCESS'&&p.method!=='COD'?` <button class="btn small" data-refund="${esc(p.id)}">Refund</button>`:''}</td></tr>`);}
+  function paymentRows(list){return list.map(p=>`<tr><td>${p.source==='SESSION'?`<a href="/checkout/${encodeURIComponent(p.id)}" title="Open payment QR and UPI"><strong>${esc(p.orderId)}</strong></a>`:`<strong>${esc(p.orderId)}</strong>`}<small>${esc(p.id.slice(0,12))}</small></td><td>${esc(p.customer||'—')}</td><td><strong>${money(p.amountPaise)}</strong></td><td>${esc(p.method||'UPI')}</td><td>${badge(p.status)}</td><td>${esc(p.utr||'—')}</td><td>${esc(date(p.createdAt))}</td><td><button class="btn small" data-payment-detail="${esc(p.id)}">Details</button>${p.status==='SUCCESS'&&p.method!=='COD'?` <button class="btn small" data-refund="${esc(p.id)}">Refund</button>`:''}</td></tr>`);}
   function renderPayments(){
     const headers=['Order','Customer','Amount','Method','Status','UTR','Created','Actions'];
     const query=$('paymentSearch').value.trim().toLowerCase(),status=$('paymentStatus').value;
@@ -47,10 +49,11 @@
     $('refundPayment').value=selected;
   }
   async function overview(){
-    const [s,p,r]=await Promise.all([consoleApi('summary'),consoleApi('payments'),consoleApi('refunds')]);payments=p.payments;renderPayments();
+    const [s,p,r,o]=await Promise.all([consoleApi('summary'),consoleApi('payments'),consoleApi('refunds'),consoleApi('operations')]);if(!authenticated)return;payments=p.payments;renderPayments();
+    $('operationSummary').innerHTML=[['Callbacks delivered',o.callbacks.delivered],['Callbacks awaiting retry',o.callbacks.pending],['Callbacks needing review',o.callbacks.exhausted],['Unmatched bank observations',o.unmatchedObservations],['Provider confirmations measured',o.providerConfirmation.samples],['Average provider confirmation',o.providerConfirmation.averageMs===null?'No measurements yet':(o.providerConfirmation.averageMs/1000).toFixed(1)+' seconds']].map(([label,value])=>`<div class="summary-line"><span>${esc(label)}</span><strong>${esc(value)}</strong></div>`).join('');
     const awaiting=(r.refunds||[]).filter(refund=>refund.status==='PENDING_MANUAL').length;
     $('dashboardAttention').hidden=!awaiting;
-    $('dashboardAttention').innerHTML=awaiting?`<div><strong>${awaiting===1?'A refund needs your attention':awaiting+' refunds need your attention'}</strong><span>Check the request and record the bank transfer when it is complete.</span></div><button class="btn small" data-goto="refunds">Review ${awaiting===1?'refund':'refunds'} ?</button>`:'';
+    $('dashboardAttention').innerHTML=awaiting?`<div><strong>${awaiting===1?'A refund needs your attention':awaiting+' refunds need your attention'}</strong><span>Check the request and record the bank transfer when it is complete.</span></div><button class="btn small" data-goto="refunds">Review ${awaiting===1?'refund':'refunds'}</button>`:'';
     $('statVolume').textContent=money(s.collectedPaise);$('statTotal').textContent=s.total.toLocaleString('en-IN');$('statPending').textContent=s.pending;
     const resolved=payments.filter(p=>p.method!=='COD'&&['SUCCESS',...failureStatuses].includes(p.status));
     $('statSuccess').textContent=resolved.length?`${(100*s.paid/resolved.length).toFixed(1)}%`:'—';
@@ -58,7 +61,7 @@
     $('activityBreakdown').innerHTML=[['Received',s.paid],['In progress',s.pending],['Unsuccessful',s.failed]].map(([label,count])=>`<div><span>${label}</span><strong>${count}</strong></div>`).join('');
     const dayKey=value=>new Date(value).toLocaleDateString('en-CA',{timeZone:'Asia/Kolkata'});
     const days=Array.from({length:7},(_,i)=>{const d=new Date(Date.now()-(6-i)*86400000);return {key:dayKey(d),label:d.toLocaleDateString('en-IN',{timeZone:'Asia/Kolkata',weekday:'short'}),amount:0};});
-    payments.filter(p=>p.status==='SUCCESS'&&p.method!=='COD').forEach(p=>{const day=days.find(d=>d.key===dayKey(p.createdAt));if(day)day.amount+=p.amountPaise;});
+    payments.filter(p=>p.status==='SUCCESS'&&p.method!=='COD').forEach(p=>{const day=days.find(d=>d.key===dayKey(p.completedAt||p.createdAt));if(day)day.amount+=p.amountPaise;});
     const peak=Math.max(...days.map(d=>d.amount),100);
     $('collectionChart').innerHTML='<div class="collection-bars">'+days.map(d=>`<div class="collection-day"><span class="collection-value">${money(d.amount)}</span><div class="collection-track"><div class="collection-fill${d.amount?' has-value':''}" style="height:${d.amount?Math.max(5,d.amount/peak*100):2}%"></div></div><span class="collection-label">${d.label}</span></div>`).join('')+'</div>';
     $('dashboardDate').textContent=new Date().toLocaleDateString('en-IN',{timeZone:'Asia/Kolkata',weekday:'long',day:'numeric',month:'long',year:'numeric'});
@@ -120,10 +123,30 @@
   }
   const loaders={overview:()=>Promise.all([overview(),settlements()]),transactions:overview,failures:overview,refunds:refunds,splits:splits,settlements:settlements,upi:upi,merchants:loadSettings,api:credentials,alerts:alerts};
   async function refresh(){
-    $('refresh').disabled=true;$('loadError').hidden=true;
-    try{await loaders[activePage]();}catch(e){$('loadError').textContent=e.message;$('loadError').hidden=false;}
-    finally{$('refresh').disabled=false;}
+    if(!authenticated)return;
+    if(refreshing){refreshAgain=true;return;}
+    refreshing=true;$('refresh').disabled=true;$('loadError').hidden=true;
+    try{await loaders[activePage]();}catch(e){if(authenticated){$('loadError').textContent=e.message;$('loadError').hidden=false;}}
+    finally{refreshing=false;$('refresh').disabled=false;if(refreshAgain&&authenticated){refreshAgain=false;refresh();}}
   }
+  function scheduleRefresh(){
+    if(document.hidden||!authenticated)return;
+    clearTimeout(liveTimer);liveTimer=setTimeout(()=>refresh(),250);
+  }
+  function connectStream(){
+    stream?.close();
+    if(!authenticated||document.hidden)return;
+    $('liveStatus').textContent='Refreshes every 20 seconds';
+    if(!globalThis.EventSource)return;
+    stream=new EventSource('/api/console/v1/admin/console/stream');
+    stream.addEventListener('connected',()=>{$('liveStatus').textContent='Live updates connected';scheduleRefresh();});
+    stream.addEventListener('activity',scheduleRefresh);
+    stream.onerror=()=>{$('liveStatus').textContent='Reconnecting; refreshes every 20 seconds';};
+  }
+  document.addEventListener('visibilitychange',()=>{
+    if(document.hidden){stream?.close();stream=null;clearTimeout(liveTimer);}
+    else if(authenticated){connectStream();refresh();}
+  });
   function navigate(page){
     if(!pages[page])page='overview';activePage=page;
     document.querySelectorAll('.dp-view').forEach(el=>el.hidden=el.id!=='page-'+page);
@@ -132,9 +155,9 @@
     history.replaceState(null,'','#'+page);setMenu(false);refresh();
   }
   async function signedIn(){
-    $('loginScreen').hidden=true;$('console').hidden=false;
+    authenticated=true;sessionVersion++;$('loginScreen').hidden=true;$('console').hidden=false;
     try{await Promise.all([loadSettings(),overview()]);navigate(location.hash.slice(1)||'overview');}catch(e){$('loadError').textContent=e.message;$('loadError').hidden=false;}
-    clearInterval(timer);timer=setInterval(()=>{if(!document.hidden&&['overview','transactions','failures'].includes(activePage))refresh();},20000);
+    connectStream();clearInterval(timer);timer=setInterval(()=>{if(!document.hidden&&['overview','transactions','failures','alerts','settlements','refunds','splits'].includes(activePage))refresh();},20000);
   }
   function submit(id,handler){$(id).addEventListener('submit',async e=>{e.preventDefault();const button=e.submitter;button.disabled=true;try{await handler();}catch(err){toast(err.message,true);}finally{button.disabled=false;}});}
   submit('loginForm',async()=>{
@@ -201,7 +224,7 @@
       if(el.dataset.refund){navigate('refunds');$('refundPayment').value=el.dataset.refund;$('refundAmount').focus();}
       if(el.dataset.paymentDetail){
         const p=payments.find(p=>p.id===el.dataset.paymentDetail);
-        $('paymentDetails').innerHTML=[['Order ID',p.orderId],['Payment ID',p.id],['Amount',money(p.amountPaise)],['Method',p.method],['Status',p.status],['Customer',p.customer||'—'],['Bank reference',p.utr||'—'],['Created',date(p.createdAt)]].map(([label,value])=>`<div class="summary-line"><span>${label}</span><strong style="max-width:65%;overflow-wrap:anywhere;text-align:right">${esc(value)}</strong></div>`).join('');
+        $('paymentDetails').innerHTML=[['Order ID',p.orderId],['Payment ID',p.id],['Amount',money(p.amountPaise)],['Method',p.method],['Status',p.status],['Customer',p.customer||'—'],['Bank reference',p.utr||'Not supplied'],['Confirmation source',p.confirmationSource?.replaceAll('_',' ')||'Awaiting confirmation'],['Confirmed at',date(p.completedAt)],['Created',date(p.createdAt)]].map(([label,value])=>`<div class="summary-line"><span>${label}</span><strong style="max-width:65%;overflow-wrap:anywhere;text-align:right">${esc(value)}</strong></div>`).join('');
         $('detailsCheckout').hidden=p.source!=='SESSION';$('detailsCheckout').href='/checkout/'+encodeURIComponent(p.id);$('paymentDetailsDialog').showModal();
       }
       if(el.dataset.confirmRefund){$('confirmRefundId').value=el.dataset.confirmRefund;$('refundBankReference').value='';$('confirmRefundDialog').showModal();}

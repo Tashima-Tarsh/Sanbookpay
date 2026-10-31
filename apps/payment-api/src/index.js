@@ -126,6 +126,7 @@ export function createPaymentApp(customDb = null, options = {}) {
     auditRepo
   });
 
+  const providerWebhookEngine = new WebhookEngine({db,merchantRepo,deliveryTable:'provider_webhook_deliveries'});
   const webhookEngine = new WebhookEngine({
     db,
     merchantRepo,
@@ -195,6 +196,15 @@ export function createPaymentApp(customDb = null, options = {}) {
     return promoted;
   }
 
+  for(const name of ['SESSION.ACTIVATED','SESSION.QUEUED','SESSION.PROCESSING','PAYMENT.SUCCESS','PAYMENT.FAILED','PAYMENT.EXPIRED','PAYMENT.CANCELLED','PAYMENT.VERIFICATION_PENDING','PAYMENT.VERIFICATION_UPGRADED']) {
+    eventEmitter.on(name,data=>{
+      const id=data.paymentId||data.sessionId;
+      if(!id)return;
+      const session=sessionRepo.findById(id);
+      if(session) server.broadcastSse(`console_${session.merchantId}`,'activity',{paymentId:session.id,status:session.status});
+    });
+  }
+
   // When a payment succeeds, fails, expires, or cancels: dispatch webhook & promote next queued customer
   eventEmitter.on('PAYMENT.SUCCESS', (data) => {
     const session = sessionRepo.findById(data.paymentId);
@@ -209,7 +219,7 @@ export function createPaymentApp(customDb = null, options = {}) {
       try {
         const customer = session.customerId ? customerRepo.findById(session.customerId) : null;
         const merchant = (session.merchantId ? merchantRepo.findById(session.merchantId) : null) || defaultMerchant;
-        receiptService.sendPaymentReceipt(session, customer, merchant);
+        receiptService.sendPaymentReceipt(session, customer, merchant).catch(error=>console.error('[Receipt generation]',error.message));
       } catch (err) {
         console.error('[ReceiptNotification] Failed to dispatch receipt:', err.message);
       }
@@ -493,6 +503,7 @@ export function createPaymentApp(customDb = null, options = {}) {
     whatsappBerryService,
     receiptService,
     webhookEngine,
+    providerWebhookEngine,
     dynamoQueue,
     dynamoWebhooks,
     dynamoGmail,
@@ -518,6 +529,7 @@ export function createPaymentApp(customDb = null, options = {}) {
 
   function destroy() {
     clearInterval(webhookRetryTimer);
+    webhookEngine.stop();providerWebhookEngine.stop();
     clearInterval(queueSyncDaemon);
     clearInterval(aggressivePollerDaemon);
     for (const timer of activeSweepTimers) {
@@ -537,7 +549,7 @@ export function createPaymentApp(customDb = null, options = {}) {
   let webhookRetryRunning=false;
   const webhookRetryTimer=setInterval(async()=>{
     if(webhookRetryRunning)return;webhookRetryRunning=true;
-    try{await webhookEngine.retryPending();}catch(error){console.error('[Webhook retry]',error.message);}finally{webhookRetryRunning=false;}
+    try{await webhookEngine.retryPending();await providerWebhookEngine.retryPending();}catch(error){console.error('[Webhook retry]',error.message);}finally{webhookRetryRunning=false;}
   },5000);
   webhookRetryTimer.unref?.();
 

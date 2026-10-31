@@ -12,6 +12,7 @@ CREATE OR REPLACE FUNCTION datetime(value text, modifier text) RETURNS text LANG
 CREATE OR REPLACE FUNCTION json_extract(value text, json_path text) RETURNS text LANGUAGE SQL IMMUTABLE AS $$ SELECT value::jsonb #>> string_to_array(substr(json_path,3),'.') $$;`);
  }
  request(sql,params=[],action='query'){
+  if(this.closed)throw Error('Postgres connection is closed');
   if(this.failed)throw Error('Postgres connection is unavailable; restart required');
   Atomics.store(this.control,0,0);this.port.postMessage({sql,params,action});
   if(Atomics.wait(this.control,0,0,30000)==='timed-out'){this.failed=true;this.worker.terminate();throw Error('Postgres operation timed out; restart required');}
@@ -48,6 +49,12 @@ CREATE OR REPLACE FUNCTION json_extract(value text, json_path text) RETURNS text
  execute(sql,params=[]){const result=this.request(this.normalizeSql(sql),params);return {changes:result.rowCount,lastInsertRowid:0};}
  run(sql,params=[]){return this.execute(sql,params);}
  exec(sql){if(/^\s*PRAGMA\b/i.test(sql))return;return this.request(this.normalizeSql(sql));}
- transaction(callback){this.exec('BEGIN ISOLATION LEVEL SERIALIZABLE');try{const result=callback();this.exec('COMMIT');return result;}catch(error){try{this.exec('ROLLBACK');}catch{}throw error;}}
- close(){try{this.request('',[],'close');}finally{this.port.close();this.worker.terminate();}}
+ transaction(callback){
+  const depth=this.transactionDepth||0,savepoint=`nested_${depth}`;
+  this.exec(depth?`SAVEPOINT ${savepoint}`:'BEGIN ISOLATION LEVEL SERIALIZABLE');this.transactionDepth=depth+1;
+  try{const result=callback();if(result&&typeof result.then==='function')throw new Error('Database transactions require a synchronous callback');this.exec(depth?`RELEASE SAVEPOINT ${savepoint}`:'COMMIT');return result;}
+  catch(error){try{this.exec(depth?`ROLLBACK TO SAVEPOINT ${savepoint}`:'ROLLBACK');if(depth)this.exec(`RELEASE SAVEPOINT ${savepoint}`);}catch{}throw error;}
+  finally{this.transactionDepth=depth;}
+ }
+ close(){if(this.closed)return;try{this.request('',[],'close');}finally{this.closed=true;this.port.close();this.worker.terminate();}}
 }

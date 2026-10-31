@@ -21,6 +21,18 @@ export function registerMerchantConsoleRoutes(server, ctx) {
   db.execute(`CREATE TABLE IF NOT EXISTS console_split_transfers (payment_id TEXT NOT NULL REFERENCES console_split_allocations(payment_id), recipient_vpa TEXT NOT NULL, bank_reference TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY(payment_id,recipient_vpa))`);
   const merchant = req => (req.headers['x-merchant-id'] ? merchantRepo.findById(req.headers['x-merchant-id']) : null) || merchantRepo.getDefault();
   const root = '/api/v1/admin/console';
+  server.get(root+'/stream',(req,res)=>{
+    server.initSse(`console_${merchant(req).id}`,res);
+    const expiry=setTimeout(()=>res.end(),300000);expiry.unref?.();res.on('close',()=>clearTimeout(expiry));
+  });
+  server.get(root+'/operations',(req,res)=>{
+    const mid=merchant(req).id;
+    const callbacks=['webhook_deliveries','provider_webhook_deliveries'].map(table=>db.queryOne(`SELECT COUNT(*) AS total,COALESCE(SUM(CASE WHEN is_successful=1 THEN 1 ELSE 0 END),0) AS delivered,COALESCE(SUM(CASE WHEN is_successful=0 AND attempt_count>=5 THEN 1 ELSE 0 END),0) AS exhausted FROM ${table} WHERE merchant_id=?`,[mid]));
+    const total=callbacks.reduce((n,r)=>n+Number(r.total),0),delivered=callbacks.reduce((n,r)=>n+Number(r.delivered),0),exhausted=callbacks.reduce((n,r)=>n+Number(r.exhausted),0);
+    const unmatched=Number(db.queryOne("SELECT COUNT(*) AS n FROM payment_observations o JOIN payment_receiving_accounts a ON a.id=o.receiving_account_id WHERE a.merchant_id=? AND o.attribution_status='UNATTRIBUTED'",[mid]).n);
+    const timing=db.queryOne("SELECT COUNT(*) AS samples,AVG(confirmation_time_ms) AS average FROM payment_orders WHERE merchant_id=? AND status='SUCCESS' AND confirmation_time_ms>0",[mid]);
+    HttpServer.json(res,200,{callbacks:{total,delivered,pending:total-delivered-exhausted,exhausted},unmatchedObservations:unmatched,providerConfirmation:{samples:Number(timing.samples),averageMs:timing.average===null?null:Math.round(Number(timing.average))}});
+  });
   server.get(root+'/upi-channel',(req,res)=>HttpServer.json(res,200,upiChannelSettings(merchant(req))));
   server.post(root+'/upi-channel',async(req,res)=>{
     const body=await HttpServer.parseBody(req),m=merchant(req);
@@ -31,9 +43,9 @@ export function registerMerchantConsoleRoutes(server, ctx) {
   const config = m => m.branding?.splitConfig || { platformFeeBps: 0, gstPercent: 18, recipients: [] };
   const fail = (res, message) => HttpServer.json(res, 400, { error: message });
   function payments(mid) {
-    const sessions = db.query(`SELECT ps.*, c.name AS customer_name, obs.bank_reference_number AS bank_reference FROM payment_sessions ps LEFT JOIN customers c ON ps.customer_id=c.id LEFT JOIN payment_observations obs ON ps.attributed_observation_id=obs.id WHERE ps.merchant_id=? ORDER BY ps.created_at DESC`, [mid]);
+    const sessions = db.query(`SELECT ps.*, c.name AS customer_name, COALESCE(obs.bank_reference_number,po.bank_reference) AS bank_reference,po.id AS provider_order_id FROM payment_sessions ps LEFT JOIN payment_orders po ON po.payment_session_id=ps.id AND po.status='SUCCESS' LEFT JOIN customers c ON ps.customer_id=c.id LEFT JOIN payment_observations obs ON ps.attributed_observation_id=obs.id WHERE ps.merchant_id=? ORDER BY ps.created_at DESC`, [mid]);
     const orders = db.query(`SELECT * FROM payment_orders WHERE merchant_id=? AND (payment_session_id IS NULL OR payment_session_id NOT IN (SELECT id FROM payment_sessions WHERE merchant_id=?)) ORDER BY created_at DESC`, [mid, mid]);
-    return [...sessions.map(p => ({ id:p.id, orderId:p.order_id, amountPaise:Number(p.amount_paise), method:p.method, status:p.status, customer:p.customer_name || '', utr:p.bank_reference || '', reportedUtr:JSON.parse(p.metadata || '{}').reportedUtr||'', failureReason:JSON.parse(p.metadata || '{}').cancelledReason || '', createdAt:p.created_at, source:'SESSION' })), ...orders.map(p => ({ id:p.id, orderId:p.merchant_order_id, amountPaise:Number(p.amount_paise), method:p.payment_method, status:p.status, customer:p.customer_name || '', utr:p.bank_reference || '', failureReason:'', createdAt:p.created_at, source:'PROVIDER' }))].sort((a,b) => b.createdAt.localeCompare(a.createdAt));
+    return [...sessions.map(p => ({ id:p.id, orderId:p.order_id, amountPaise:Number(p.amount_paise), method:p.method, status:p.status, customer:p.customer_name || '', utr:p.bank_reference || '', reportedUtr:JSON.parse(p.metadata || '{}').reportedUtr||'', failureReason:JSON.parse(p.metadata || '{}').cancelledReason || '', createdAt:p.created_at, completedAt:p.completed_at, confirmationSource:p.method==='COD'?'ORDER_PLACED':p.provider_order_id?'PROVIDER':p.verification_tag==='MERCHANT_CONFIRMED'?'MERCHANT':p.attributed_observation_id?'BANK_OBSERVER':null, source:'SESSION' })), ...orders.map(p => ({ id:p.id, orderId:p.merchant_order_id, amountPaise:Number(p.amount_paise), method:p.payment_method, status:p.status, customer:p.customer_name || '', utr:p.bank_reference || '', failureReason:'', createdAt:p.created_at, completedAt:p.confirmed_at, confirmationSource:p.status==='SUCCESS'?'PROVIDER':null, source:'PROVIDER' }))].sort((a,b) => b.createdAt.localeCompare(a.createdAt));
   }
   server.get(root + '/summary', (req,res) => {
     const list = payments(merchant(req).id);

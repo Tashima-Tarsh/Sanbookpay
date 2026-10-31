@@ -154,6 +154,32 @@ CREATE TABLE IF NOT EXISTS webhook_deliveries (
 );
 
 -- 8. Support Tickets & Ticket Messages
+CREATE TABLE IF NOT EXISTS provider_webhook_deliveries (
+    id TEXT PRIMARY KEY,
+    merchant_id TEXT NOT NULL REFERENCES merchants(id) ON DELETE CASCADE,
+    payment_id TEXT NOT NULL REFERENCES payment_orders(id) ON DELETE CASCADE,
+    event_type TEXT NOT NULL,
+    payload TEXT NOT NULL,
+    endpoint_url TEXT NOT NULL,
+    response_status INTEGER,
+    response_body TEXT,
+    attempt_count INTEGER NOT NULL DEFAULT 0,
+    is_successful INTEGER NOT NULL DEFAULT 0,
+    next_retry_at TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_provider_webhook_retry ON provider_webhook_deliveries(is_successful,next_retry_at);
+CREATE TABLE IF NOT EXISTS provider_payment_claims (
+    provider_name TEXT NOT NULL,
+    provider_payment_id TEXT NOT NULL,
+    payment_order_id TEXT NOT NULL REFERENCES payment_orders(id),
+    PRIMARY KEY(provider_name,provider_payment_id)
+);
+CREATE TABLE IF NOT EXISTS payment_receipts (
+    payment_id TEXT PRIMARY KEY REFERENCES payment_sessions(id) ON DELETE CASCADE,
+    receipt TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS support_tickets (
     id TEXT PRIMARY KEY,
     merchant_id TEXT NOT NULL REFERENCES merchants(id) ON DELETE CASCADE,

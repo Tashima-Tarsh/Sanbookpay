@@ -1,0 +1,195 @@
+{
+  "origin": "http://localhost:8080",
+  "checkedAt": "2026-10-31T07:20:00.197Z",
+  "results": [
+    {
+      "size": "desktop",
+      "page": "transactions",
+      "visible": [
+        "page-transactions"
+      ],
+      "error": null,
+      "overflow": false
+    },
+    {
+      "size": "desktop",
+      "page": "failures",
+      "visible": [
+        "page-failures"
+      ],
+      "error": null,
+      "overflow": false
+    },
+    {
+      "size": "desktop",
+      "page": "refunds",
+      "visible": [
+        "page-refunds"
+      ],
+      "error": null,
+      "overflow": false
+    },
+    {
+      "size": "desktop",
+      "page": "splits",
+      "visible": [
+        "page-splits"
+      ],
+      "error": null,
+      "overflow": false
+    },
+    {
+      "size": "desktop",
+      "page": "settlements",
+      "visible": [
+        "page-settlements"
+      ],
+      "error": null,
+      "overflow": false
+    },
+    {
+      "size": "desktop",
+      "page": "upi",
+      "visible": [
+        "page-upi"
+      ],
+      "error": null,
+      "overflow": false
+    },
+    {
+      "size": "desktop",
+      "page": "merchants",
+      "visible": [
+        "page-merchants"
+      ],
+      "error": null,
+      "overflow": false
+    },
+    {
+      "size": "desktop",
+      "page": "api",
+      "visible": [
+        "page-api"
+      ],
+      "error": null,
+      "overflow": false
+    },
+    {
+      "size": "desktop",
+      "page": "alerts",
+      "visible": [
+        "page-alerts"
+      ],
+      "error": null,
+      "overflow": false
+    },
+    {
+      "size": "desktop",
+      "overview": {
+        "signedIn": true,
+        "error": null,
+        "live": "Live updates connected",
+        "operations": "Callbacks delivered0Callbacks awaiting retry0Callbacks needing review0Unmatched bank observations0Provider confirmations measured0Average provider confirmationNo measurements yet",
+        "overflow": false,
+        "total": "2",
+        "view": "page-overview",
+        "liveVisible": true
+      }
+    },
+    {
+      "size": "mobile",
+      "page": "transactions",
+      "visible": [
+        "page-transactions"
+      ],
+      "error": null,
+      "overflow": false
+    },
+    {
+      "size": "mobile",
+      "page": "failures",
+      "visible": [
+        "page-failures"
+      ],
+      "error": null,
+      "overflow": false
+    },
+    {
+      "size": "mobile",
+      "page": "refunds",
+      "visible": [
+        "page-refunds"
+      ],
+      "error": null,
+      "overflow": false
+    },
+    {
+      "size": "mobile",
+      "page": "splits",
+      "visible": [
+        "page-splits"
+      ],
+      "error": null,
+      "overflow": false
+    },
+    {
+      "size": "mobile",
+      "page": "settlements",
+      "visible": [
+        "page-settlements"
+      ],
+      "error": null,
+      "overflow": false
+    },
+    {
+      "size": "mobile",
+      "page": "upi",
+      "visible": [
+        "page-upi"
+      ],
+      "error": null,
+      "overflow": false
+    },
+    {
+      "size": "mobile",
+      "page": "merchants",
+      "visible": [
+        "page-merchants"
+      ],
+      "error": null,
+      "overflow": false
+    },
+    {
+      "size": "mobile",
+      "page": "api",
+      "visible": [
+        "page-api"
+      ],
+      "error": null,
+      "overflow": false
+    },
+    {
+      "size": "mobile",
+      "page": "alerts",
+      "visible": [
+        "page-alerts"
+      ],
+      "error": null,
+      "overflow": false
+    },
+    {
+      "size": "mobile",
+      "overview": {
+        "signedIn": true,
+        "error": null,
+        "live": "Live updates connected",
+        "operations": "Callbacks delivered0Callbacks awaiting retry0Callbacks needing review0Unmatched bank observations0Provider confirmations measured0Average provider confirmationNo measurements yet",
+        "overflow": false,
+        "total": "2",
+        "view": "page-overview",
+        "liveVisible": true
+      }
+    }
+  ],
+  "browserErrors": []
+}

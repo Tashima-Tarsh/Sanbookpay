@@ -164,7 +164,7 @@ export class CashfreeProvider extends PaymentProvider {
     const checkoutUrl = data.payment_link || (data.payment_session_id ? `https://payments.cashfree.com/order/#${data.payment_session_id}` : null);
 
     return {
-      providerOrderId: data.cf_order_id ? String(data.cf_order_id) : data.order_id,
+      providerOrderId: data.order_id || (data.cf_order_id ? String(data.cf_order_id) : null),
       merchantOrderId: data.order_id,
       paymentSessionId: data.payment_session_id,
       checkoutUrl,
@@ -192,6 +192,7 @@ export class CashfreeProvider extends PaymentProvider {
       return {
         status: od.order_status === 'PAID' ? 'SUCCESS' : od.order_status,
         amountPaise: Math.round(Number(od.order_amount) * 100),
+        currency: od.order_currency,
         bankReference: null,
         providerPaymentId: null,
         rawResponse: od
@@ -205,7 +206,8 @@ export class CashfreeProvider extends PaymentProvider {
       return {
         status: 'SUCCESS',
         amountPaise: Math.round(Number(successfulPayment.payment_amount) * 100),
-        bankReference: successfulPayment.bank_reference || successfulPayment.payment_gateway_details?.gateway_order_id || null,
+        currency: successfulPayment.payment_currency,
+        bankReference: successfulPayment.bank_reference || null,
         providerPaymentId: String(successfulPayment.cf_payment_id),
         paymentMethod: successfulPayment.payment_group || 'UPI',
         rawResponse: successfulPayment

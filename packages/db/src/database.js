@@ -148,18 +148,24 @@ export class Database {
     // IMMEDIATE (not DEFERRED) so the write lock is taken up front. A deferred transaction
     // starts as a read transaction and only upgrades on first write, which lets two
     // concurrent slot-acquisition callers both observe a free slot before either writes.
-    this.db.exec('BEGIN IMMEDIATE;');
+    const depth = this.transactionDepth || 0;
+    const savepoint = `nested_${depth}`;
+    this.db.exec(depth ? `SAVEPOINT ${savepoint}` : 'BEGIN IMMEDIATE;');
+    this.transactionDepth = depth + 1;
     try {
       const result = callback();
-      this.db.exec('COMMIT;');
+      if (result && typeof result.then === 'function') throw new Error('Database transactions require a synchronous callback');
+      this.db.exec(depth ? `RELEASE SAVEPOINT ${savepoint}` : 'COMMIT;');
       return result;
     } catch (err) {
       try {
-        this.db.exec('ROLLBACK;');
+        this.db.exec(depth ? `ROLLBACK TO SAVEPOINT ${savepoint}; RELEASE SAVEPOINT ${savepoint};` : 'ROLLBACK;');
       } catch {
         // Ignore rollback error if already rolled back
       }
       throw err;
+    } finally {
+      this.transactionDepth = depth;
     }
   }
 

@@ -67,10 +67,11 @@ export class LedgerRepository {
    * Credit increases LIABILITY / REVENUE / EQUITY, decreases ASSET / EXPENSE.
    */
   recordDoubleEntry(merchantId, referenceType, referenceId, narration, debitAccountCode, creditAccountCode, amountPaise) {
-    if (!amountPaise || amountPaise <= 0) {
+    if (!Number.isSafeInteger(amountPaise) || amountPaise <= 0 || debitAccountCode === creditAccountCode) {
       throw new Error(`Invalid ledger entry amount: ${amountPaise}. Must be positive integer paise.`);
     }
 
+    return this.db.transaction(() => {
     this.ensureAccounts(merchantId);
     const debitAcc = this.getAccount(merchantId, debitAccountCode);
     const creditAcc = this.getAccount(merchantId, creditAccountCode);
@@ -78,7 +79,12 @@ export class LedgerRepository {
     if (!debitAcc) throw new Error(`Debit ledger account ${debitAccountCode} not found for merchant ${merchantId}`);
     if (!creditAcc) throw new Error(`Credit ledger account ${creditAccountCode} not found for merchant ${merchantId}`);
 
-    return this.db.transaction(() => {
+      const existing = this.db.queryOne(`SELECT t.id FROM ledger_transactions t JOIN ledger_entries d ON d.transaction_id=t.id AND d.direction='DEBIT' JOIN ledger_entries c ON c.transaction_id=t.id AND c.direction='CREDIT' WHERE t.merchant_id=? AND t.reference_type=? AND t.reference_id=? AND d.account_id=? AND c.account_id=?`, [merchantId, referenceType, referenceId, debitAcc.id, creditAcc.id]);
+      if (existing) {
+        const entries = this.db.query('SELECT account_id,direction,amount_paise FROM ledger_entries WHERE transaction_id=?', [existing.id]);
+        if (entries.length !== 2 || !entries.some(e=>e.account_id===debitAcc.id&&e.direction==='DEBIT'&&Number(e.amount_paise)===amountPaise) || !entries.some(e=>e.account_id===creditAcc.id&&e.direction==='CREDIT'&&Number(e.amount_paise)===amountPaise)) throw new Error('Ledger reference already posted with different entries');
+        return { transactionId:existing.id,referenceType,referenceId,amountPaise,debitAccount:debitAccountCode,creditAccount:creditAccountCode };
+      }
       const txId = crypto.randomUUID();
       const insertTxSql = `
         INSERT INTO ledger_transactions (id, merchant_id, reference_type, reference_id, narration, status)

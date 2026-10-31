@@ -42,6 +42,7 @@ const gateway=http.createServer((req,res)=>{
   delete headers['x-internal-token'];delete headers['x-internal-render'];
   const upstream=http.request({host:'127.0.0.1',port:target,path:req.url,method:req.method,headers},reply=>{res.writeHead(reply.statusCode,reply.headers);reply.pipe(res);});
   upstream.on('error',()=>{if(!res.headersSent)res.writeHead(502,{'Content-Type':'application/json'});res.end(JSON.stringify({error:'Service temporarily unavailable'}));});
+  res.on('close',()=>upstream.destroy());
   req.on('aborted',()=>upstream.destroy());req.pipe(upstream);
 });
 const port=Number(process.env.PORT||8080);

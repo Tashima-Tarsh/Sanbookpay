@@ -478,6 +478,8 @@ export function registerPaymentRoutes(server, ctx) {
       return;
     }
 
+    if(session.status!=='SUCCESS') return HttpServer.json(res,409,{error:'A receipt is available after payment confirmation or COD order placement.'});
+
     let customer = null;
     if (session.customerId && ctx.customerRepo) {
       customer = ctx.customerRepo.findById(session.customerId);
@@ -501,16 +503,18 @@ export function registerPaymentRoutes(server, ctx) {
         currency: session.currency,
         status: session.status,
         method: session.method,
-        utr: receipt?.utr || session.utr || session.bankReference || 'CONFIRMED',
+        utr: receipt?.utr || null,
         customer: customer ? {
           id: customer.id,
           name: customer.name,
           maskedPhone: maskPhone(customer.mobileNumber),
           maskedEmail: maskEmail(customer.email)
         } : null,
-        smsStatus: receipt?.smsStatus || 'SENT',
-        emailStatus: receipt?.emailStatus || 'DELIVERED',
-        dispatchedAt: receipt?.dispatchedAt || new Date().toISOString()
+        confirmationSource:receipt?.confirmationSource || null,
+        generatedAt:receipt?.generatedAt || null,
+        smsStatus: receipt?.smsStatus || 'NOT_CONFIGURED',
+        emailStatus: receipt?.emailStatus || 'NOT_CONFIGURED',
+        dispatchedAt: receipt?.dispatchedAt || null
       });
       return;
     }
@@ -519,7 +523,7 @@ export function registerPaymentRoutes(server, ctx) {
       'Content-Type': 'text/html; charset=utf-8',
       'X-Content-Type-Options': 'nosniff'
     });
-    res.end(receipt?.emailHtml || `<!DOCTYPE html><html><body><h3>Receipt for Order #${session.orderId}</h3><p>Amount: ₹${toRupeesString(session.amountPaise)}</p></body></html>`);
+    res.end(receipt?.emailHtml || '<!doctype html><html><body><p>Receipt unavailable. Please try again.</p></body></html>');
   });
 }
 
