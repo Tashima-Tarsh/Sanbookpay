@@ -281,7 +281,8 @@ export class SanbookPayClient {
   async createPayment(params) {
     const url = `${this.apiUrl}/api/v1/payments`;
     const headers = {
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
+      ...this._getHeaders(),
     };
 
     if (this.merchantId) {

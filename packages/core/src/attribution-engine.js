@@ -229,7 +229,7 @@ export class AttributionEngine {
       const isEligibleStatus = [PaymentStatus.ACTIVE, PaymentStatus.PROCESSING].includes(currentSession.status) || (currentSession.status === PaymentStatus.VERIFICATION_PENDING && BANK_SOURCES.includes(normalizedObs.source) && Boolean(normalizedObs.bankReferenceNumber) && currentSession.metadata?.reportedUtr === normalizedObs.bankReferenceNumber);
 
       // Invariant Check 2: Exact Amount Match (in integer paise)
-      const isAmountMatch = currentSession.amountPaise === normalizedObs.amountPaise;
+      const isAmountMatch = Number(currentSession.amountPaise) === Number(normalizedObs.amountPaise);
 
       // Invariant Check 3: Temporal Window (with 5-minute clock skew tolerance, strictly preventing hijacking of prior expired sessions)
       let isPriorExpiredSession = false;
@@ -239,7 +239,7 @@ export class AttributionEngine {
           normalizedObs.receivingAccountId,
           thirtyMinutesAgo
         );
-        isPriorExpiredSession = recentExpired.some(s => s.amountPaise === normalizedObs.amountPaise);
+        isPriorExpiredSession = recentExpired.some(s => Number(s.amountPaise) === Number(normalizedObs.amountPaise));
       }
 
       const slotStart = currentSession.slotAcquiredAt
@@ -249,6 +249,7 @@ export class AttributionEngine {
       const isTimeValid = !isPriorExpiredSession && (normalizedObs.observedAt >= slotStart);
 
       if (isEligibleStatus && isAmountMatch && isTimeValid) {
+      console.error('[DEBUG-ATTRIB] Found session:', currentSession.id, currentSession.status, currentSession.amountPaise, normalizedObs.amountPaise);
         const wasActive = currentSession.status === PaymentStatus.ACTIVE;
 
         // Check if there is already an active grace period awaiting second source for this session

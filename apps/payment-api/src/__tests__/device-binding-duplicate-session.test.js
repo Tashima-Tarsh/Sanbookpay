@@ -15,6 +15,8 @@ describe('YOUPI PG: Device Binding & Duplicate Session Detection', () => {
   const merchantId = '00000000-0000-0000-0000-000000000001';
   const receivingAccountId = '00000000-0000-0000-0000-000000000002';
 
+  let merchantWebhookSecret = 'sim_test_webhook_secret_001';
+
   before(async () => {
     testDb = new Database({ inMemory: true });
     merchantRepo = new MerchantRepository(testDb);
@@ -23,6 +25,11 @@ describe('YOUPI PG: Device Binding & Duplicate Session Detection', () => {
 
     apiInstance = await startPaymentApi(6201, testDb);
     baseUrl = `http://localhost:${apiInstance.port}`;
+
+    // Set a known webhook secret for the demo merchant so raw requests authenticate
+    testDb.execute("UPDATE merchants SET webhook_secret = 'sim_test_webhook_secret_001' WHERE id = ?", [merchantId]);
+    const m = merchantRepo.findById(merchantId);
+    merchantWebhookSecret = m?.webhookSecret || 'sim_test_webhook_secret_001';
   });
 
   after(async () => {
@@ -38,6 +45,7 @@ describe('YOUPI PG: Device Binding & Duplicate Session Detection', () => {
         headers: {
           'Content-Type': 'application/json',
           'x-merchant-id': merchantId,
+          'x-merchant-key': merchantWebhookSecret,
           ...authHeadersFor(path), ...(options.headers || {})
         }
       }, res => {

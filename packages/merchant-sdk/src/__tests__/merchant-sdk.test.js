@@ -55,7 +55,8 @@ describe('Merchant SDK Integration Tests', () => {
     assert.ok(['INITIATED', 'ACTIVE', 'QUEUED'].includes(payment.status));
 
     // Cleanup: cancel session to release UPI slot for subsequent tests
-    await fetch(`${client.apiUrl}/api/v1/checkout/${payment.paymentId}/cancel`, { method: 'POST' });
+    const cancelRes = await fetch(`${client.apiUrl}/api/v1/checkout/${payment.paymentId}/cancel`, { method: 'POST' });
+    await cancelRes.text();
   });
 
   test('queries payment status and details', async () => {

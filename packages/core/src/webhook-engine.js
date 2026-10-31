@@ -18,10 +18,11 @@ export class WebhookEngine {
     this.deliveryTable = options.deliveryTable === 'provider_webhook_deliveries' ? 'provider_webhook_deliveries' : 'webhook_deliveries';
     this.inFlight = new Set();
     this.controllers = new Set();
+    this.timeouts = new Set();
     this.stopped = false;
   }
 
-  stop() { this.stopped=true;for(const controller of this.controllers)controller.abort(); }
+  stop() { this.stopped=true;for(const timeout of this.timeouts)clearTimeout(timeout);this.timeouts.clear();for(const controller of this.controllers)controller.abort(); }
 
   /**
    * Formats and dispatches a signed webhook for a payment event.
@@ -136,6 +137,7 @@ export class WebhookEngine {
 
       this.inFlight.add(item.id);
       const controller=new AbortController();this.controllers.add(controller);
+      const timeout=setTimeout(()=>controller.abort(),10000);this.timeouts.add(timeout);
       try {
 
       const signature = generateHmac(item.payload, merchant.webhookSecret);
@@ -157,7 +159,7 @@ export class WebhookEngine {
           },
           body: item.payload,
           redirect: 'manual',
-          signal: AbortSignal.any([controller.signal,AbortSignal.timeout(10000)])
+          signal: controller.signal
         });
         respStatus = res.status;
         respBody = (await res.text()).substring(0, 1000);
@@ -181,7 +183,7 @@ export class WebhookEngine {
       `, [nextAttempt, isSuccess ? 1 : 0, respStatus, respBody, nextRetryAt, item.id]);
 
       results.push({ id: item.id, success: isSuccess, attempt: nextAttempt, status:respStatus, error:isSuccess?undefined:respBody });
-      } finally { this.inFlight.delete(item.id);this.controllers.delete(controller); }
+      } finally { clearTimeout(timeout);this.timeouts.delete(timeout);this.inFlight.delete(item.id);this.controllers.delete(controller); }
     }
 
     return results;

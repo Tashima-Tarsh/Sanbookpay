@@ -28,7 +28,12 @@ const UNSAFE_PLACEHOLDERS = [
 function loadEnv() {
   if (typeof process.loadEnvFile === 'function') {
     try {
-      if (fs.existsSync(ENV_FILE)) process.loadEnvFile(ENV_FILE);
+      if (fs.existsSync(ENV_FILE)) {
+        // Preserve NODE_ENV if already set (e.g. test mode), since loadEnvFile overwrites it
+        const existingNodeEnv = process.env.NODE_ENV;
+        process.loadEnvFile(ENV_FILE);
+        if (existingNodeEnv) process.env.NODE_ENV = existingNodeEnv;
+      }
       return;
     } catch {}
   }

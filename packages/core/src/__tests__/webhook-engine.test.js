@@ -48,6 +48,9 @@ describe('Webhook Engine Integration Tests', () => {
       });
     });
 
+    receiverServer.keepAliveTimeout = 0;
+    receiverServer.headersTimeout = 0;
+
     await new Promise(resolve => {
       receiverServer.listen(0, () => {
         receiverPort = receiverServer.address().port;

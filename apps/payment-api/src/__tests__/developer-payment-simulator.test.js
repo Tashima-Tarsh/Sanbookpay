@@ -13,6 +13,7 @@ describe('Feature 65: Developer Payment Simulator Integration & Acceptance Suite
   let sessionRepo;
   let customerRepo;
   let customerSessionRepo;
+  let merchantWebhookSecret = 'sim_test_webhook_secret_001';
   const merchantId = '00000000-0000-0000-0000-000000000001';
   const receivingAccountId = '00000000-0000-0000-0000-000000000002';
 
@@ -25,6 +26,11 @@ describe('Feature 65: Developer Payment Simulator Integration & Acceptance Suite
 
     apiInstance = await startPaymentApi(6205, testDb);
     baseUrl = `http://localhost:${apiInstance.port}`;
+
+    // Set a known webhook secret for the demo merchant so SDK/raw requests authenticate
+    testDb.execute("UPDATE merchants SET webhook_secret = 'sim_test_webhook_secret_001' WHERE id = ?", [merchantId]);
+    const m = merchantRepo.findById(merchantId);
+    merchantWebhookSecret = m?.webhookSecret || 'sim_test_webhook_secret_001';
 
     testDb.execute("UPDATE payment_sessions SET status = 'CANCELLED' WHERE status IN ('ACTIVE', 'PROCESSING', 'QUEUED')");
     testDb.execute('UPDATE payment_receiving_accounts SET is_slot_busy = 0, current_active_session_id = NULL WHERE id = ?', [receivingAccountId]);
@@ -47,8 +53,9 @@ describe('Feature 65: Developer Payment Simulator Integration & Acceptance Suite
         'Content-Type': 'application/json',
         ...authHeadersFor(path), ...(options.headers || {})
       };
-      if (options.merchantAuth !== false && !headers['x-merchant-id']) {
-        headers['x-merchant-id'] = merchantId;
+      if (options.merchantAuth !== false) {
+        if (!headers['x-merchant-id']) headers['x-merchant-id'] = merchantId;
+        if (!headers['x-merchant-key']) headers['x-merchant-key'] = merchantWebhookSecret;
       }
 
       const req = http.request(url, {

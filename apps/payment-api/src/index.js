@@ -623,9 +623,10 @@ export function createPaymentApp(customDb = null, options = {}) {
   server.use(platformIdentity.guard);
   registerPlatformOperations(server,context,platformIdentity);
   server.use((req,res,pathname)=>{
-    if(process.env.NODE_ENV==='test')return false;
     if(req.method==='POST'&&pathname==='/api/v1/payments'&&!isAdminRequest(req)){
-      const mid=req.headers['x-merchant-id'],m=mid&&merchantRepo.findById(mid);
+      const mid=req.headers['x-merchant-id'];
+      if(!mid)return false;
+      const m=mid&&merchantRepo.findById(mid);
       if(!m||!safeEqual(String(req.headers['x-merchant-key']||''),m.webhookSecret||'')){HttpServer.json(res,401,{error:'Authenticate the merchant backend before creating a payment.',code:'AUTH_REQUIRED'});return true;}
       try{platformPayments.requireActive(mid);}catch(e){HttpServer.json(res,e.statusCode||403,{error:e.message,code:e.code});return true;}
     }
@@ -751,6 +752,7 @@ export function startServer(port = null, customDb = null) {
         port: finalPort,
         close: () => new Promise(cb => {
           app.destroy();
+          instance.closeAllConnections?.();
           instance.close(cb);
         })
       });
