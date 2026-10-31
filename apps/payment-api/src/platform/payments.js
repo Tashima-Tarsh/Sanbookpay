@@ -126,9 +126,51 @@ export function registerPlatformPayments(server,ctx,identity){
   if(!conn||conn.merchant_id!==mid||!conn.is_active||!policy?.approved||!policy.enabled||conn.environment!==req.platform.environment||Number(paise)<Number(policy.min_paise)||Number(paise)>Number(policy.max_paise)||policy.open_until&&Date.parse(policy.open_until)>Date.now())throw error(503,'No approved eligible provider connection is available.','CONNECTION_UNAVAILABLE');
   if(b.returnUrl){const u=new URL(b.returnUrl);if(u.protocol!=='https:')throw error(400,'Return URL must use HTTPS.');}
   const denied=enforcePaymentControls(ctx,mid,{PROVIDER:conn.provider_name,CUSTOMER_VPA:b.payerVpa,CUSTOMER:b.customer?.id});if(denied)throw error(403,denied.error,denied.code);
-  const order=db.transaction(()=>{enforcePolicies(mid,{PROVIDER:conn.provider_name,CUSTOMER:b.customer?.id},Number(paise));return orders.create({merchantId:mid,merchantOrderId:b.orderId,providerName:conn.provider_name,amountPaise:Number(paise),currency:'INR',status:'SUBMITTING',customerName:b.customer?.name,customerPhone:b.customer?.phone,customerEmail:b.customer?.email,metadata:{connectionId:conn.id,environment:conn.environment}});});
-  try{const provider=registry.getProvider(mid,conn.provider_name,conn.id);const result=await provider.createCollection({merchantOrderId:b.orderId,amountPaise:Number(paise),currency:'INR',customerName:b.customer?.name,customerPhone:b.customer?.phone,customerEmail:b.customer?.email,returnUrl:b.returnUrl});orders.update(order.id,{status:'PENDING',providerOrderId:result.providerOrderId,paymentSessionId:result.paymentSessionId,checkoutUrl:result.checkoutUrl,providerResponse:result.rawResponse});db.execute('UPDATE pp_connection_policy SET failures=0,open_until=NULL WHERE connection_id=?',[conn.id]);HttpServer.json(res,201,providerResponse(orders.findById(order.id)));}
-  catch{orders.update(order.id,{status:'RECONCILIATION_REQUIRED',providerResponse:{error:'Provider order creation could not be confirmed. Recheck the same order reference.'}});db.execute('UPDATE pp_connection_policy SET failures=failures+1 WHERE connection_id=?',[conn.id]);const count=Number(db.queryOne('SELECT failures FROM pp_connection_policy WHERE connection_id=?',[conn.id]).failures);if(count>=3)db.execute('UPDATE pp_connection_policy SET open_until=? WHERE connection_id=?',[new Date(Date.now()+60000).toISOString(),conn.id]);HttpServer.json(res,502,{error:'Provider submission requires reconciliation; retry only the same order ID.',paymentId:order.id,status:'RECONCILIATION_REQUIRED'});}
+  const order=db.transaction(()=>{enforcePolicies(mid,{PROVIDER:conn.provider_name,CUSTOMER:b.customer?.id},Number(paise));return orders.create({merchantId:mid,merchantOrderId:b.orderId,providerName:conn.provider_name,amountPaise:Number(paise),currency:'INR',status:'SUBMITTING',customerName:b.customer?.name,customerPhone:b.customer?.phone,customerEmail:b.customer?.email,metadata:{connectionId:conn.id,environment:conn.environment,failoverAttempts:[]}});});
+  async function tryCreateOnConnection(connection,orderId,amount,orderRow){
+    const provider=registry.getProvider(mid,connection.provider_name,connection.id);
+    const result=await provider.createCollection({merchantOrderId:orderId,amountPaise:Number(amount),currency:'INR',customerName:b.customer?.name,customerPhone:b.customer?.phone,customerEmail:b.customer?.email,returnUrl:b.returnUrl});
+    orders.update(orderRow.id,{status:'PENDING',providerOrderId:result.providerOrderId,paymentSessionId:result.paymentSessionId,checkoutUrl:result.checkoutUrl,providerResponse:result.rawResponse});
+    db.execute('UPDATE pp_connection_policy SET failures=0,open_until=NULL WHERE connection_id=?',[connection.id]);
+    return providerResponse(orders.findById(orderRow.id));
+  }
+  function recordFailoverAttempt(orderId,fromConnectionId,toConnectionId,reason){
+    db.execute('INSERT INTO pp_audit (id,merchant_id,user_id,action,entity_id,details,created_at) VALUES (?,?,?,?,?,?,?)',[crypto.randomUUID(),mid,req.platform?.userId||null,'FAILOVER_ATTEMPT',orderId,JSON.stringify({fromConnectionId,toConnectionId,reason,orderId}),now()]);
+    try{ctx.routingEngine?.recordFailover(orderId,String(fromConnectionId),String(toConnectionId),reason,'PROVIDER_FAILURE');}catch{}
+  }
+  try{
+    const result=await tryCreateOnConnection(conn,b.orderId,paise,order);
+    return HttpServer.json(res,201,result);
+  }catch(primaryError){
+    db.execute('UPDATE pp_connection_policy SET failures=failures+1 WHERE connection_id=?',[conn.id]);
+    const failCount=Number(db.queryOne('SELECT failures FROM pp_connection_policy WHERE connection_id=?',[conn.id]).failures);
+    if(failCount>=3)db.execute('UPDATE pp_connection_policy SET open_until=? WHERE connection_id=?',[new Date(Date.now()+60000).toISOString(),conn.id]);
+    recordFailoverAttempt(b.orderId,conn.id,null,'Primary provider connection failed: '+primaryError.message);
+    const allConnections=db.query('SELECT * FROM provider_connections WHERE merchant_id=? AND is_active=1 AND environment=? ORDER BY created_at ASC',[mid,req.platform.environment]);
+    const eligibleBackups=allConnections.filter(c=>c.id!==conn.id);
+    let lastError=primaryError;
+    for(const backup of eligibleBackups){
+      const bpol=db.queryOne('SELECT * FROM pp_connection_policy WHERE connection_id=?',[backup.id]);
+      if(!bpol?.approved||!bpol.enabled)continue;
+      if(Number(paise)<Number(bpol.min_paise)||Number(paise)>Number(bpol.max_paise)||bpol.open_until&&Date.parse(bpol.open_until)>Date.now())continue;
+      const bdenied=enforcePaymentControls(ctx,mid,{PROVIDER:backup.provider_name,CUSTOMER_VPA:b.payerVpa,CUSTOMER:b.customer?.id});if(bdenied)continue;
+      try{
+        const switched=db.transaction(()=>{orders.update(order.id,{providerName:backup.provider_name,metadata:{...order.metadata,failoverAttempts:[...(order.metadata?.failoverAttempts||[]),{from:conn.id,to:backup.id,reason:'Primary failed',at:now()}]}});return orders.findById(order.id);});
+        const result=await tryCreateOnConnection(backup,b.orderId,paise,switched);
+        recordFailoverAttempt(b.orderId,conn.id,backup.id,'Automatic failover after primary failure');
+        return HttpServer.json(res,201,result);
+      }catch(backupError){
+        db.execute('UPDATE pp_connection_policy SET failures=failures+1 WHERE connection_id=?',[backup.id]);
+        const bfc=Number(db.queryOne('SELECT failures FROM pp_connection_policy WHERE connection_id=?',[backup.id]).failures);
+        if(bfc>=3)db.execute('UPDATE pp_connection_policy SET open_until=? WHERE connection_id=?',[new Date(Date.now()+60000).toISOString(),backup.id]);
+        recordFailoverAttempt(b.orderId,conn.id,backup.id,'Backup provider connection failed: '+backupError.message);
+        lastError=backupError;
+        continue;
+      }
+    }
+    orders.update(order.id,{status:'RECONCILIATION_REQUIRED',providerResponse:{error:'All eligible provider routes failed. Last error: '+lastError.message}});
+    HttpServer.json(res,502,{error:'All provider routes failed; retry only the same order ID.',paymentId:order.id,status:'RECONCILIATION_REQUIRED',failoverAttempted:true});
+  }
  }));
  server.get('/v1/payments/:id',wrap((req,res,p)=>{const mid=tenant(req),s=sessionRepo.findById(p.id);if(s?.merchantId===mid)return HttpServer.json(res,200,response(s));const o=orders.findById(p.id);if(o?.merchant_id===mid)return HttpServer.json(res,200,providerResponse(o));throw error(404,'Payment not found.');}));
  server.get('/v1/balance',wrap((req,res)=>{const mid=tenant(req);ledger.ensureAccounts(mid);HttpServer.json(res,200,{currency:'INR',accounts:db.query('SELECT account_code,balance_paise FROM ledger_accounts WHERE merchant_id=?',[mid]).map(r=>({code:r.account_code,balancePaise:String(r.balance_paise)}))});}));

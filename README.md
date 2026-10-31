@@ -1,33 +1,69 @@
-# Dynamo Pay
+# Sanbook Pay
 
-Dynamo Pay is a merchant payment console, hosted UPI checkout and payment observation service. The active hosted entry point is `npm run start:hosted`, which runs the payment API, checkout, merchant console and Gmail observer behind one HTTPS origin. The demo store is disabled on the hosted gateway.
+Sanbook Pay is a production-ready, multi-merchant payment orchestration SaaS platform. The Platform Owner (Root Super Admin) operates Sanbook Pay as the central supplier, creating and managing hundreds or thousands of independent merchant accounts.
 
-Start with the [configuration and integration manual](docs/OPERATIONS-MANUAL.md), [credential inventory](docs/CONFIGURATION-CREDENTIALS.md) and [current acceptance report](docs/PRODUCTION_ACCEPTANCE_REPORT.md). Public merchant API: `apps/merchant-admin/public/dynamo-openapi.json`. Operator/legacy API: `openapi.yaml`.
+## Architecture
 
-## Supported behaviour
+**Sanbook Pay Platform**
+  - Platform Owner / Root Super Admin
+    - Platform Administrators, Operations, Finance, Security, Support
+  - Merchant N — Independent dashboard, settings, API credentials, bank/UPI routes, payment links, webhooks, staff users
 
-- Hosted QR/UPI checkout, authenticated merchant create/status/IFSC/wallet endpoints, order-ID replay and per-account queues.
-- Merchant dashboard with mobile navigation, live SSE invalidation and polling recovery.
-- UPI channel enable/disable, amount limits and receiving-VPA allowlist.
-- Merchant-scoped allow/block/watch acceptance rules with expiry, audit history and reversible state changes.
-- Signed provider collection callbacks, amount/currency/reference validation, atomic journal/outbox writes and durable callback retries.
-- SMS/Gmail/Android observations stored as supplementary production evidence. They do not independently prove settlement.
-- Explicit owner bank-review confirmation with actual reference, reason, audit, journal and callback reservation.
-- Refund reservation, manual transfer records, split fee/GST and recipient allocation workflows.
-- Public setup PDF and protected owner credential/operations PDF; no real keys in public documentation.
+## Core Capabilities
 
-## What requires external activation
+### Platform Owner (Super Admin Control Center)
+- Create and manage merchant accounts with unique Merchant IDs
+- Assign approved receiving bank accounts and UPI routes
+- Configure pricing plans, transaction fees, API quotas
+- Smart UPI routing with automatic failover
+- Authorized bank/PSP payment verification with signature validation
+- Merchant callbacks and webhook management with durable retries
+- Gaming wallet integration with idempotent fulfillment
+- Settlement and reconciliation with double-entry ledger
+- Payment diagnostics and incident management
+- Full audit trail for all platform actions
 
-Approved provider/bank credentials, bank agreements, OAuth consent, a current signed Android APK and real-device acceptance are separate requirements. Legacy local card/netbanking simulators do not process production money. Unconfigured automatic settlement returns an explicit unavailable response. Direct UPI without an authoritative confirmation feed requires owner bank review. The disabled demo wallet is not a production gaming-wallet service; customer systems implement durable callback deduplication and wallet posting.
+### Merchants
+- Independent secure login and dashboard
+- Amount-only payment link creation (amount ₹ only — no manual Order ID, customer name, mobile, or UTR)
+- Dynamic UPI QR/intent generation
+- API key management with scopes and rate limits
+- Webhook configuration and delivery monitoring
+- Transaction history and reporting
+- Staff and role management (Owner, Admin, Developer, Finance, Operations, Viewer)
 
-## Runtime and development
+## Documentation
 
-Use Node.js 22.13 or newer (the Render deployment pins 22.23.4). Install with `npm ci --include=dev`. Run `npm run typecheck`, `npm run build`, `npm test`, and `node scripts/scan-secrets.js`. Build validates native JavaScript; historical TypeScript sources are not the active runtime.
+Complete documentation is in `docs/`:
 
-Set private configuration from `.env.example`. With `DATABASE_URL`, the app uses PostgreSQL through a synchronous repository adapter backed by an I/O worker. Without it, local installations use SQLite WAL. Do not run reset/cleanup scripts on a live database. Test PostgreSQL only in an isolated temporary schema with a privately supplied `DYNAMO_POSTGRES_TEST_URL`.
+- `docs/README.md` — Documentation index
+- `docs/admin/` — Super Admin manuals (25 modules)
+- `docs/merchant/` — Merchant guides (onboarding, dashboard, payment links, etc.)
+- `docs/developers/` — API integration, webhook integration, gaming wallet
+- `docs/payments/` — Bank API config, UPI intent, automatic verification, reconciliation
+- `docs/support/` — Merchant FAQ and troubleshooting
+- `docs/security/` — Credential configuration
+- `docs/deployment/` — Docker setup, production configuration, backup/recovery
 
-`npm run start:hosted` exposes one public port and keeps component ports on loopback. Render Free sleeps while idle and the free database expires; see `docs/RENDER-TRIAL.md`. No uptime, instant bank notification or thousand-payment concurrency guarantee is claimed.
+## Runtime and Development
 
-## Release discipline
+Use Node.js 22.13 or newer. Install with `npm ci --include=dev`. Run `npm run typecheck`, `npm run build`, `npm test`, and `node scripts/scan-secrets.js`.
 
-Keep the current forest-green console and mobile checkout design. Preserve records, existing encryption keys and unrelated work. Work on a review branch; merge/deploy production only with explicit approval. The acceptance report identifies remaining external and infrastructure gates. Never commit `data/.secrets`, backups, keystores or private PDFs.
+Start the Super Admin Control Center: `npm run start:super-admin` (port 9000)
+Start the Payment API: `npm run start:prod:api` (port 6100)
+Start all services hosted: `npm run start:hosted`
+
+Set private configuration from `.env.example`. With `DATABASE_URL`, the app uses PostgreSQL. Without it, local installations use SQLite WAL.
+
+## Security
+
+- Tenant isolation: server-authoritative merchant identity, no cross-tenant access
+- MFA required for sensitive operations
+- API key secrets SHA-256 hashed, client secrets encrypted at rest
+- Never commit plaintext credentials to Git
+- Webhook signatures verified with HMAC-SHA256
+- No manual UTR entry; automatic capture from authorized provider APIs
+
+## Release Discipline
+
+Work on a review branch; merge/deploy production only with explicit approval. Never commit `data/.secrets`, backups, keystores or private PDFs.

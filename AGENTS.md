@@ -1,4 +1,4 @@
-# Dynamo Pay engineering instructions
+# Sanbook Pay Engineering Instructions
 
 Read README.md, ARCHITECTURE.md, docs/OPERATIONS-MANUAL.md and docs/PRODUCTION_ACCEPTANCE_REPORT.md before editing. Verify local HEAD against GitHub's default branch and identify the deployed commit. Do not assume an older test report describes current production.
 
@@ -23,3 +23,17 @@ JavaScript files are the active runtime. Node.js 22.13+ is required. Run typeche
 ## Secrets and documents
 
 Never print or commit real passwords, tokens, private PDFs, keystores or connection strings. Preserve existing encryption keys. Public configuration is generated from docs/OPERATIONS-MANUAL.md using scripts/build-operations-manual.py. The private handover generator reads ignored owner credentials and writes only to data/.secrets. Review rendered PDFs and verify that public PDFs contain no private credential values. Do not overwrite current manuals with historical build scripts or claim unconfigured bank adapters are live.
+
+## Super Admin Control Center
+
+The Super Admin Control Center runs on port 9000 (`npm run start:super-admin`) and proxies API requests to the Payment API (port 6100). All 25 navigation modules are implemented:
+
+Command Center, Merchant Directory, Create Merchant, Merchant Access & Users, Receiving Bank Settings, Receiving UPI Management, Smart UPI Routing, Automatic Failover, Global Payment Links, Global Transactions, Payment Verification, API Management, Callback & Webhook Control, Gaming Wallet Integration, Settlement & Reconciliation, Merchant Pricing & Billing, Risk & UPI Policies, Payment Diagnostic Center, Operations & Incidents, Platform Analytics, Staff & Permissions, Security & Audit Logs, System Configuration, Documentation & Support.
+
+## Automatic Failover
+
+When a primary provider connection fails during payment creation, the system automatically attempts eligible backup connections before returning RECONCILIATION_REQUIRED. Failover events are recorded with reason, trigger, and timestamp in the audit log.
+
+## Amount-Only Payment Links
+
+The Create Payment Link endpoint (`POST /api/v1/payment-links/amount-only`) requires only the amount. Order ID, Payment ID, receiving route, UPI QR/intent, and checkout URL are all generated automatically. No manual Order ID, customer name, customer mobile, or UTR is required.
