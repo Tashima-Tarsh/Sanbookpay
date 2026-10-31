@@ -40,15 +40,20 @@ export class ProviderRegistry {
    * @param {string} [providerName='CASHFREE']
    * @returns {import('./payment-provider.interface.js').PaymentProvider}
    */
-  getProvider(merchantId, providerName = 'CASHFREE') {
+  getProvider(merchantId, providerName = 'CASHFREE', connectionId = null) {
     const normalizedName = providerName.toUpperCase();
     const cacheKey = `${merchantId}:${normalizedName}`;
 
-    // Lookup connection from database
-    const conn = this.db.queryOne(
-      `SELECT * FROM provider_connections WHERE merchant_id = $1 AND provider_name = $2 AND is_active = 1 LIMIT 1`,
-      [merchantId, normalizedName]
-    );
+    let conn;
+    if(connectionId){
+      conn=this.db.queryOne('SELECT * FROM provider_connections WHERE id=? AND merchant_id=? AND provider_name=?',[connectionId,merchantId,normalizedName]);
+      if(!conn)throw Error('Provider connection does not belong to this merchant/provider');
+    }else{
+      const candidates=this.db.query('SELECT * FROM provider_connections WHERE merchant_id=? AND provider_name=? AND is_active=1',[merchantId,normalizedName]);
+      if(candidates.length>1)throw Error('An exact provider connection ID is required');
+      conn=candidates[0];
+    }
+    if(!conn&&process.env.NODE_ENV!=='test')throw Error('Approved merchant provider connection is required');
 
     const clientSecret = conn?.client_secret_encrypted
       ? this._decryptSecret(conn.client_secret_encrypted)
@@ -69,6 +74,8 @@ export class ProviderRegistry {
       clientSecret,
       webhookSecret,
       extra: {
+        connectionId:conn?.id,
+        capabilities:JSON.parse(conn?.diagnostics||'{}').capabilities||[],
         corporateId: conn?.corporate_id,
         merchantVpa: conn?.merchant_vpa,
         terminalId: conn?.terminal_id

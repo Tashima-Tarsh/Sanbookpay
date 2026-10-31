@@ -7,7 +7,7 @@ const source = fs.readFileSync(new URL('../../public/platform.js', import.meta.u
 const markup = fs.readFileSync(new URL('../../public/platform.html', import.meta.url), 'utf8');
 const flush = async () => { for (let i = 0; i < 8; i++) await new Promise(resolve => setImmediate(resolve)); };
 
-function harness(authenticated = true) {
+function harness(authenticated = true, platformOwner = false) {
   const elements = new Map(), requests = [], windowEvents = {};
   class Element {
     constructor(tag = 'div') { this.tagName = tag; this.children = []; this.events = {}; this.attributes = {}; this.nodeType = 1; this.hidden = false; this.value = ''; this._text = ''; this.classList = { toggle() {}, contains() { return false; } }; }
@@ -32,17 +32,20 @@ function harness(authenticated = true) {
   const get = id => { if (!elements.has(id)) { const element = new Element(); element.id = id; } return elements.get(id); };
   const auth = get('auth'); auth.append(get('authForm'));
   const user = { id: 'owner', merchantId: 'merchant-a', email: '<img src=x onerror=alert(1)>', role: 'OWNER', permissions: ['*'], platform: false };
+  if(platformOwner)Object.assign(user,{role:'SUPER_ADMIN',merchantId:null,platform:true});
   const responses = {
     '/me': { user, csrfToken: 'session-csrf' }, '/analytics': { transactions: 1, successful: 1, pending: 0, successfulAmountPaise: '450' },
     '/balance': { accounts: [{ code: 'CASH', balancePaise: '450' }] }, '/api-keys': { keys: [] }, '/webhook-deliveries': { deliveries: [] },
     '/transactions': { items: [], total: 0 }, '/settings': { businessName: 'Business', apiIpWhitelist: [], channel: { allowedVpas: [] } },
     '/staff': { users: [] }, '/connections': { connections: [] }, '/receiving-accounts': { accounts: [] }, '/rules': { rules: [] },
     '/onboarding': { profile: {}, status: 'PROFILE_INCOMPLETE' }, '/cases': { items: [] }, '/operations/health': {},
-    '/billing/invoices': { items: [] }, '/billing/subscriptions': { items: [] }
+    '/billing/invoices': { items: [] }, '/billing/subscriptions': { items: [] }, '/billing/plans': {items:[]},
+    '/merchants': {merchants:[{merchant_id:'merchant-a',profile:{businessName:'Independent A'},status:'EMAIL_PENDING'}],total:1},
+    '/payments': {checkoutUrl:'/checkout/created-payment'}
   };
   const context = {
     document: { getElementById: get, createElement: tag => new Element(tag), createTextNode: text => Object.assign(new Element('#text'), { textContent: text }), addEventListener() {}, body: new Element('body') },
-    location: { hash: '' }, window: { addEventListener: (name, listener) => { windowEvents[name] = listener; } }, URLSearchParams, Intl, console, crypto: { randomUUID: () => 'stable-test-key' },
+    location: { hash: '' }, window: { location:{assign:value=>requests.push({navigation:value})},addEventListener: (name, listener) => { windowEvents[name] = listener; } }, URLSearchParams, Intl, console, crypto: { randomUUID: () => 'stable-test-key' },
     fetch: async (url, init) => { requests.push({ url, init }); const path = url.replace('/api/platform/v1', '').split('?')[0]; if (path === '/me' && !authenticated) return { ok: false, status: 401, json: async () => ({ error: 'Platform login required' }) }; return { ok: true, status: 200, json: async () => path === '/api-keys' && init.method === 'POST' ? { secret: 'one-time-created-secret' } : responses[path] || {} }; }
   };
   vm.runInNewContext(source, context);
@@ -59,6 +62,37 @@ test('platform renders role-scoped routes with safe text and numeric-string ledg
     assert.doesNotMatch(app.get('view').textContent, /Could not load this view/, route);
   }
   assert.ok(app.requests.every(request => request.init.credentials === 'same-origin'));
+});
+
+test('platform owner can find merchant creation and open a scoped dashboard without impersonation',async()=>{
+  const app=harness(true,true);await flush();
+  assert.ok(app.get('pageActions').find(node=>node.textContent==='Add merchant'));
+  const nav=app.get('navigation').textContent;assert.match(nav,/Merchants/);assert.doesNotMatch(nav,/Your business at a glance|Connections & acceptance/);
+  app.context.location.hash='#merchants';app.windowEvents.hashchange();await flush();
+  assert.match(app.get('view').textContent,/Independent A/);
+  await app.get('view').find(node=>node.tagName==='button'&&node.textContent==='Open dashboard').events.click();
+  app.windowEvents.hashchange();await flush();
+  assert.match(app.get('merchantContext').textContent,/Independent A/);
+  assert.equal(app.get('pageTitle').textContent,'Merchant dashboard');
+  assert.ok(app.requests.some(r=>r.url.endsWith('/analytics?merchantId=merchant-a')));
+  for(const route of ['transactions','keys','connections','operations','billing']){
+    app.context.location.hash='#'+route;app.windowEvents.hashchange();await flush();
+    assert.doesNotMatch(app.get('view').textContent,/Could not load this view/,route);
+  }
+  for(const path of ['/transactions?','/api-keys?','/connections?','/cases?','/billing/invoices?'])assert.ok(app.requests.some(r=>r.url.includes(path)&&r.url.includes('merchantId=merchant-a')),path);
+  assert.equal(app.get('accountRole').textContent,'SUPER_ADMIN');
+});
+
+test('merchant workspace creates a payment with amount only and a stable automatic order ID',async()=>{
+  const app=harness();await flush();
+  app.get('pageActions').find(node=>node.tagName==='button'&&node.textContent==='Create payment').events.click();
+  const form=app.get('resultBody').find(node=>node.tagName==='form');
+  assert.equal(form.elements.namedItem('customerName'),undefined);assert.equal(form.elements.namedItem('phone'),undefined);
+  form.elements.namedItem('amount').value='201.00';await form.events.submit({preventDefault(){}});await flush();
+  const request=app.requests.find(r=>r.url.endsWith('/payments')&&r.init.method==='POST');
+  assert.deepEqual(JSON.parse(request.init.body),{amount:201,orderId:'ORDER-stable-test-key',currency:'INR'});
+  assert.equal(request.init.headers['Idempotency-Key'],'ORDER-stable-test-key');assert.equal(request.init.headers['X-CSRF-Token'],'session-csrf');
+  assert.ok(app.requests.some(r=>r.navigation==='/checkout/created-payment'));
 });
 
 test('key issuance uses session CSRF, reveals a secret only after POST, and discards it when dialog closes', async () => {

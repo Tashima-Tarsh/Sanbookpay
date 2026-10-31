@@ -34,5 +34,38 @@ input,textarea{caret-color:#284d44}
 #statusMessage.error{color:#942737;background:#fcebed}
 #console .dp-table td .actions{gap:6px}
 #console .dp-table td{white-space:normal}
+.platform-form .field{min-width:0;margin-bottom:0;line-height:1.5}
+.platform-form .field>span{display:block}
+.platform-form .field-checkbox{display:grid;grid-template-columns:20px minmax(0,1fr);align-items:start;column-gap:10px}
+.platform-form .field-checkbox input{grid-column:1;grid-row:1;margin:0}
+.platform-form .field-checkbox>span{grid-column:2;grid-row:1}
+.platform-form .field-checkbox small{grid-column:2}
+#authForm .grid{grid-template-columns:minmax(0,1fr);gap:18px}
+#authForm .field{margin-top:0}
+#authForm{margin-top:24px}
+#authLinks{gap:10px}
+#authLinks .btn{width:auto;white-space:normal;flex:1 1 140px;margin:0}
+#console .nav{line-height:1.5;text-decoration:none}
+#console .page-head>div{min-width:0}
+#console .topbar{height:auto;min-height:73px;padding-top:12px;padding-bottom:12px}
+#console .topbar>.actions{min-width:0}
+#tenantName{display:flex;align-items:center;gap:10px;min-width:0}
+#tenantName label{font-size:12px;color:var(--muted)}
+#merchantSelector{width:clamp(160px,22vw,300px);min-height:44px}
+.merchant-context{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:16px 20px;margin-bottom:24px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+.merchant-context strong{font-size:15px}
+.merchant-context p{font-size:12px;margin-top:4px}
+#console .dp-table td{overflow-wrap:anywhere;line-height:1.6}
+#console .dp-table td .btn{overflow-wrap:normal;white-space:normal;text-align:center;min-height:44px}
+#console .dp-stats-grid strong{overflow-wrap:anywhere}
+#console .account>div{min-width:0}
+#accountName{overflow-wrap:anywhere}
+#resultDialog{width:min(720px,calc(100vw - 32px))}
+#resultBody>div>p{margin:14px 0 20px}
+#resultBody h3{margin:24px 0 12px}
+#resultBody .platform-form{margin-top:20px}
+#resultBody .platform-form .field{margin-bottom:0}
+@media(max-width:960px){#console .topbar .right #tenantName{display:flex}.merchant-context{align-items:flex-start}#merchantSelector{max-width:100%;width:220px}}
+@media(max-width:640px){#console .topbar .right{padding-left:0;flex-wrap:nowrap}#tenantName{flex:1;min-width:0}#tenantName label{display:none}#merchantSelector{width:100%}.merchant-context{flex-direction:column;gap:12px}#console .page-head{align-items:flex-start;flex-wrap:wrap}#console .page-head>.actions{width:100%}#console .page-head>.actions .btn{flex:1}#resultBody .grid{grid-template-columns:minmax(0,1fr)}#console .btn{white-space:normal;min-height:44px}}
 @media(max-width:960px){#console .menu-close{width:auto;font-size:12px}#console .topbar .right{display:flex}#console .topbar .right>span{display:none}#console .topbar .right .btn{font-size:11px;padding:9px}.platform-form{max-width:100%}}
 @media(max-width:640px){#console .page-head>.actions{display:flex}.platform-secret{font-size:12px}.platform-tabs .btn{flex:1}#console .dp-table td[data-label="Actions"]{grid-column:1/-1}}

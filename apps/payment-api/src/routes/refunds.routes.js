@@ -16,6 +16,7 @@ export function registerRefundsRoutes(server, ctx) {
   const providerRegistry = new ProviderRegistry({ db });
 
   function getMerchantId(req) {
+    if(req.platform?.merchantId)return req.platform.merchantId;
     const key = req.headers['x-api-key'] || req.headers['authorization']?.replace(/^Bearer\s+/i, '');
     if (!key) return null;
     const merchant = db.queryOne(`SELECT id FROM merchants WHERE id = $1`, [key]);
@@ -76,7 +77,7 @@ export function registerRefundsRoutes(server, ctx) {
       });
     }catch(error){return HttpServer.json(res,409,{error:error.message});}
     try{
-      const provider=providerRegistry.getProvider(merchantId,order.provider_name);
+      const provider=providerRegistry.getProvider(merchantId,order.provider_name,JSON.parse(order.metadata||'{}').connectionId||null);
       const result=await provider.createRefund({merchantOrderId:order.merchant_order_id,refundId,amountPaise:refundAmountPaise,reason:body.reason||'Merchant requested refund'});
       refund=db.transaction(()=>{
         if(['FAILED','REJECTED'].includes(result.status))ledgerRepo.recordDoubleEntry(merchantId,'REFUND_REVERSAL',refund.id,'Provider rejected reserved refund','PROVIDER_CLEARING','REFUND_LIABILITIES',refundAmountPaise);

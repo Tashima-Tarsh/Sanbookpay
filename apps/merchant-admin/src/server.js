@@ -313,6 +313,7 @@ export class AdminServer {
       }
 
       // Dashboard View: GET / or GET /admin
+      if(pathname==='/super-admin'||pathname.startsWith('/super-admin/')){res.writeHead(302,{'Location':'/platform','Cache-Control':'no-store',...BASE_SECURITY_HEADERS});res.end();return;}
       if (pathname === '/platform') {
         const html = fs.readFileSync(path.join(__dirname, '../public/platform.html'), 'utf8');
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache', ...BASE_SECURITY_HEADERS });

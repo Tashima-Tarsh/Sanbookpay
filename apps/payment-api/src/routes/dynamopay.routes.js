@@ -197,6 +197,7 @@ export function registerDynamoPayRoutes(server, ctx) {
       if(existing.amountPaise!==amountPaise)return HttpServer.json(res,409,{error:'Order ID already exists with another amount',code:'IDEMPOTENCY_CONFLICT'});
       return HttpServer.json(res,200,collectionResponse(existing));
     }
+    if(ctx.platformPayments){try{ctx.platformPayments.requireActive(merchant.merchantId);}catch(e){return HttpServer.json(res,e.statusCode||403,{error:e.message,code:e.code});}}
     const receivingAccount = ctx.accountRepo?.findActiveForMerchant?.(merchant.merchantId) ||
       (db.queryOne?.('SELECT * FROM payment_receiving_accounts WHERE merchant_id = $1 AND is_active = 1 LIMIT 1', [merchant.merchantId]));
 

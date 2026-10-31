@@ -5,7 +5,7 @@ Prepared for the current multi-merchant release. This manual describes the contr
 
 ## 1. Sign in and workspace security
 
-Open `/platform`. A merchant owner signs in with the account email and password. A platform operator uses the same screen after the Super Admin creates the account. Sessions use an HttpOnly cookie, CSRF tokens for changes, expiry, revocation, login throttling and optional MFA. Platform owners and merchant owners must enroll and confirm MFA before issuing keys, changing settings, inviting staff, or changing financial controls.
+Open `/platform`. A merchant owner signs in with the account email and password. A platform operator uses the same screen after the Super Admin creates the account. Sessions use an HttpOnly cookie, CSRF tokens for changes, expiry, revocation, login throttling and TOTP MFA and one-time hashed recovery codes. Platform owners and merchant owners must enroll and confirm MFA before issuing keys, changing settings, inviting staff, or changing financial controls.
 
 If verification delivery is not configured, registration remains `EMAIL_PENDING` and returns a clear pending response. It does not activate the account or create a receiving account. Configure an HTTPS delivery adapter, send both email and mobile verification, then complete onboarding.
 
@@ -33,7 +33,7 @@ Super Admin opens **Merchants** to search accounts and review onboarding. **Tran
 
 Every state change requires the appropriate role and is audited. There is no unrestricted force-success action. Provider timeouts remain reconciliation work. Refund and payout uncertainty retains reservations until the real provider result is checked.
 
-Platform roles are Super Admin, Operations, Finance, Support, Security and Auditor. Merchant roles are Owner, Admin, Developer, Finance, Support and Viewer. Staff invitations are tenant-scoped and cannot grant permissions the inviter does not hold.
+Platform roles are Super Admin, Operations, Finance, Support, Security and Auditor. Merchant roles are Owner, Admin, Developer, Finance, Operations, Support and Viewer. Staff invitations are tenant-scoped and cannot grant permissions the inviter does not hold.
 
 ## 6. UPI rules and risk controls
 
@@ -41,10 +41,20 @@ Use **Connections & acceptance** to create ALLOW, BLOCK or WATCH rules for a mer
 
 ## 7. Observers, reconciliation and recovery
 
-Android device heartbeats and Gmail messages are authenticated, deduplicated and stored with original observation time. They do not independently mark a payment successful. If a provider confirmation is missing, investigate the transaction timeline, check the bank account, and use **Review bank credit** with the actual 12-digit reference and a reason. Never invent a UTR or reuse a reference.
+Android device heartbeats and Gmail messages are authenticated, deduplicated and stored with original observation time. They do not independently mark a payment successful. If provider confirmation is missing, preserve the original attempt and use authenticated provider inquiry. Conflicting verified credits create reconciliation work. Normal customer checkout has no UTR form and the console no longer exposes the manual bank-review dialog. Exceptional back-office review remains separately authorized and labelled MERCHANT.
 
 Back up PostgreSQL before migrations or deployment. Restore into a separate database and verify counts, ledger balances, private files, keys and webhook delivery state before switching the service. Render Free can sleep and the current trial database has an expiry; durable production hosting is an operational requirement.
 
 ## 8. Where to read next
 
 Use `docs/OPERATIONS-MANUAL.md` for the detailed current API and observer contract, `docs/CONFIGURATION-CREDENTIALS.md` for secret names and ownership, `docs/PRODUCTION_ACCEPTANCE_REPORT.md` for tested evidence and limits, and `/developers/openapi.json` for the merchant-facing schema.
+
+## 9. Add and manage merchants
+
+Sign in at /admin and choose Manage merchants, then Add merchant in /platform. The new owner receives a one-time invitation through the configured delivery adapter and chooses their password. If delivery is unconfigured, activation stays pending. The owner must verify contacts and complete onboarding. Open dashboard selects the merchant without impersonation; All merchants returns to the directory. Access & details shows owner activation and verification.
+
+## 10. Payment and provider limits
+
+Create payment asks only for amount and generates the order reference. Customer name, phone and manual UTR entry are removed from the active creation/checkout UI. Approved providers may still require real customer information from the merchant backend. Cashfree Orders requires a genuine phone; it is not fabricated. A local direct-UPI QR is not a Cashfree dynamic QR. Without approved provider access, automatic provider verification cannot be certified.
+
+The separate 25-module control-center claim is superseded by the actual grouped platform controls and docs/audit/ATTACHED_REQUIREMENTS_MATRIX.md. Render Free hosting, missing provider/KYC credentials and unfinished external acceptance prevent a production-readiness claim.

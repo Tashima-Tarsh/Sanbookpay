@@ -40,6 +40,14 @@ test('checkout polls the actual public payment state API',()=>{
   const {requests}=checkout();
   assert.equal(requests[0].url,'/api/v1/checkout/payment-1/state');
 });
+
+test('payment-done requires no customer-supplied bank reference and does not confirm payment',async()=>{
+  const html=fs.readFileSync(new URL('../views/checkout-premium.html',import.meta.url),'utf8');
+  assert.doesNotMatch(html,/reportedUtr|saveReference|verify-utr|referenceBox/);
+  const {element,requests,messages}=checkout();await element('paymentDone').click();
+  const request=requests.find(r=>r.url.endsWith('/payment-done'));
+  assert.deepEqual(JSON.parse(request.init.body),{});assert.equal(messages.length,0);
+});
 test('unconfirmed payments remain pending and do not emit a failed or successful result',()=>{
   const {element,messages}=checkout('VERIFICATION_PENDING');
   assert.equal(element('statusTitle').textContent,'Awaiting bank verification');

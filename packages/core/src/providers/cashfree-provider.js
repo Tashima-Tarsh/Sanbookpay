@@ -24,7 +24,7 @@ export class CashfreeProvider extends PaymentProvider {
       ? 'https://payout-gamma.cashfree.com/payout/v1'
       : 'https://payout-api.cashfree.com/payout/v1';
 
-    this.apiVersion = '2023-08-01';
+    this.apiVersion = config.apiVersion || '2023-08-01';
   }
 
   /**
@@ -110,6 +110,7 @@ export class CashfreeProvider extends PaymentProvider {
       };
     }
 
+    if(!pgRes.ok)return {valid:false,error:'Cashfree credential validation could not be completed (HTTP '+pgRes.status+').'};
     return {
       valid: true,
       details: {
@@ -124,15 +125,8 @@ export class CashfreeProvider extends PaymentProvider {
    * Retrieves available capabilities.
    */
   async getCapabilities() {
-    const caps = [
-      { code: 'COLLECTIONS', enabled: true, description: 'Cashfree Payment Gateway UPI / QR / NetBanking collections' },
-      { code: 'WEBHOOKS', enabled: true, description: 'Signed webhook verification (HMAC-SHA256)' },
-      { code: 'REFUNDS', enabled: true, description: 'API-driven refunds & reversals' },
-      { code: 'PAYOUTS', enabled: true, description: 'Outbound disbursements to Bank Accounts & UPI IDs' },
-      { code: 'BENEFICIARY_VERIFY', enabled: true, description: 'Penny-drop bank account & UPI ID verification' },
-      { code: 'SETTLEMENTS', enabled: true, description: 'Automated settlement batches & bank UTR reconciliation' },
-      { code: 'BALANCE_CHECK', enabled: true, description: 'Real-time payout ledger balance check' }
-    ];
+    const enabled=new Set(this.extra?.capabilities||[]);
+    const caps=['COLLECTIONS','WEBHOOKS','REFUNDS','PAYOUTS','BENEFICIARY_VERIFY','SETTLEMENTS','BALANCE_CHECK','DYNAMIC_QR'].map(code=>({code,enabled:enabled.has(code),description:enabled.has(code)?'Account capability explicitly configured; provider validation required.':'Account entitlement not configured.'}));
     return caps;
   }
 
@@ -140,16 +134,16 @@ export class CashfreeProvider extends PaymentProvider {
    * Creates a payment collection order in Cashfree.
    */
   async createCollection(order) {
-    if(!/^[0-9]{10}$/.test(String(order.customerPhone||'')))throw Error('A real 10-digit customer phone is required by the provider');
+    if(!/^[0-9]{10}$/.test(String(order.customerPhone||'')))throw Object.assign(Error('This Cashfree product requires a real customer phone supplied by the authenticated merchant backend; amount-only availability is not configured.'),{definitiveRejection:true,code:'PROVIDER_CUSTOMER_DATA_REQUIRED'});
     const amountRupees = Number((order.amountPaise / 100).toFixed(2));
     const payload = {
       order_id: order.merchantOrderId,
       order_amount: amountRupees,
       order_currency: order.currency || 'INR',
       customer_details: {
-        customer_id: order.customerPhone || order.customerEmail || `cust_${Date.now()}`,
+        customer_id: order.customerId || order.customerPhone,
         customer_phone: order.customerPhone,
-        customer_name: order.customerName || 'Customer',
+        customer_name: order.customerName || undefined,
         customer_email: order.customerEmail || undefined
       },
       order_meta: {
@@ -160,16 +154,17 @@ export class CashfreeProvider extends PaymentProvider {
 
     const res = await this._request(`${this.pgBaseUrl}/orders`, {
       method: 'POST',
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
+      headers: order.idempotencyKey?{'x-idempotency-key':order.idempotencyKey}:{}
     });
 
     if (!res.ok) {
-      throw new Error(`Cashfree createCollection failed (HTTP ${res.status}): ${res.data?.message || JSON.stringify(res.data)}`);
+      throw Object.assign(new Error('Cashfree rejected or could not acknowledge order creation.'),{code:'PROVIDER_ORDER_CREATE_FAILED',definitiveRejection:[400,401,403,404,422].includes(res.status),httpStatus:res.status});
     }
 
     const data = res.data;
     if(!data.order_id || (!data.payment_session_id&&!data.payment_link))throw Error('Provider did not return a valid payable collection order');
-    const checkoutUrl = data.payment_link || (data.payment_session_id ? `https://payments.cashfree.com/order/#${data.payment_session_id}` : null);
+    const checkoutUrl = null; // Hosted checkout is opened using Cashfree JS v3 and the returned session ID.
 
     return {
       providerOrderId: data.order_id || (data.cf_order_id ? String(data.cf_order_id) : null),

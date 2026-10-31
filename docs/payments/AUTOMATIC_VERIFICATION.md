@@ -1,31 +1,13 @@
-# Automatic Verification
+# Authoritative automatic verification
 
-Payment verification uses authoritative sources:
+Cashfree ingress is POST /api/v1/webhooks/cashfree/collections. The legacy /api/v1/callbacks/providers/cashfree URL delegates to that exact verified handler. Unknown provider aliases fail closed. Signatures cover the raw bytes and timestamp using the actual selected account secret; no generic unsigned success path remains.
 
-- Verified provider webhook (with signature verification)
-- Authenticated provider status API
-- Authorized bank transaction feed
-- Provider reconciliation report
-- Bank settlement report
+The verified event is retained encrypted in pp_provider_events. The order must match the provider reference without ambiguous merchant ownership. Confirmation requires exact integer paise, currency and a non-reused provider payment ID. State, reference claim, double-entry journal and outgoing callback reservation commit atomically. The dashboard is invalidated afterward through authenticated SSE.
 
-## Process
+A duplicate successful reference does not post again. A second distinct successful reference is retained for reconciliation without changing the original success or crediting twice. Missing, mismatched and conflicting evidence does not become success. FAILED provider attempts do not prove no future successful attempt will arrive.
 
-1. Receive provider event
-2. Authenticate and verify it (signature verification over raw bytes)
-3. Apply replay protection (deduplication by fingerprint)
-4. Persist event
-5. Match provider reference to payment attempt
-6. Validate merchant, amount, and currency
-7. Update payment state atomically
-8. Post ledger entries (double-entry, integer paise)
-9. Publish real-time update (SSE)
-10. Enqueue merchant callback (signed webhook)
-11. Track wallet fulfillment
-12. Reconcile records
+POST /v1/payments/:id/refresh-status requires an owned payment and payments.read. It uses the original provider order and credentials. It never creates another payment after a timeout. Existing historical Cashfree order correlation remains compatible.
 
-## Restrictions
+SMS, Gmail and Android evidence remains supplementary in production. Customer Payment done events never prove settlement. The normal checkout no longer requests a UTR. Exceptional back-office credit review remains separately authorized and labelled MERCHANT; it is not provider verification and cannot fund the provider-only wallet credit endpoint.
 
-- Never use amount-only matching or customer screenshots as proof of payment
-- Never force-success a payment without authoritative provider evidence
-- Never switch an already potentially paid UPI attempt without safe status handling
-- Manual UTR entry is removed from all customer-facing screens
+An approved Cashfree account, product entitlement, credentials and actual sandbox/live acceptance are required. None were supplied for this repair. Do not mark this integration SANDBOX_VERIFIED or LIVE_PROVIDER_VERIFIED.

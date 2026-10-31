@@ -1,3 +1,5 @@
+import crypto from 'node:crypto';
+import {encryptAtRest} from '@youpi/common';
 import { toPaise } from '@youpi/common';
 import { confirmProviderCollection, publishProviderCollection } from '../services/provider-confirmation.js';
 import { HttpServer } from '../server.js';
@@ -18,6 +20,8 @@ export function registerProviderWebhooksRoutes(server, ctx) {
   const payoutRepo = new PayoutRepository(db);
   const ledgerRepo = new LedgerRepository(db);
   const providerRegistry = new ProviderRegistry({ db });
+  db.execute(`CREATE TABLE IF NOT EXISTS pp_provider_events(id TEXT PRIMARY KEY,merchant_id TEXT NOT NULL,payment_order_id TEXT NOT NULL,provider_name TEXT NOT NULL,provider_payment_id TEXT,event_type TEXT NOT NULL,payload_encrypted TEXT NOT NULL,status TEXT NOT NULL,received_at TEXT NOT NULL)`);
+
 
 
   // 1. POST /api/v1/webhooks/cashfree/collections — Ingress for Cashfree PG Webhooks
@@ -54,7 +58,7 @@ export function registerProviderWebhooksRoutes(server, ctx) {
     }
 
     const merchantId = order.merchant_id;
-    const provider = providerRegistry.getProvider(merchantId, 'CASHFREE');
+    const provider = providerRegistry.getProvider(merchantId, 'CASHFREE',JSON.parse(order.metadata||'{}').connectionId||null);
 
     // Authoritative HMAC signature verification
     const isValid = provider.verifyCollectionWebhook({
@@ -66,6 +70,8 @@ export function registerProviderWebhooksRoutes(server, ctx) {
       return HttpServer.json(res, 401, { error: 'Invalid Cashfree webhook signature' });
     }
 
+    const eventId=crypto.createHash('sha256').update(rawBody).digest('hex');
+    db.execute('INSERT INTO pp_provider_events(id,merchant_id,payment_order_id,provider_name,provider_payment_id,event_type,payload_encrypted,status,received_at) VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO NOTHING',[eventId,merchantId,order.id,'CASHFREE',paymentData.cf_payment_id?String(paymentData.cf_payment_id):null,String(payload.type||paymentData.payment_status||'UNKNOWN'),encryptAtRest(rawBody.toString()),'RECEIVED',new Date().toISOString()]);
     const paymentStatus = paymentData.payment_status;
     if (paymentStatus === 'SUCCESS') {
       let amountPaise;
@@ -79,7 +85,10 @@ export function registerProviderWebhooksRoutes(server, ctx) {
           actorType:'PROVIDER_WEBHOOK',rawResponse:payload
         });
         publishProviderCollection(server,ctx,result);
+        db.execute('UPDATE pp_provider_events SET status=? WHERE id=?',['PROCESSED',eventId]);
       } catch(error) {
+        db.execute('UPDATE pp_provider_events SET status=? WHERE id=?',['RECONCILIATION_REQUIRED',eventId]);
+        if(!db.queryOne('SELECT id FROM pp_cases WHERE payment_id=? AND title=?',[order.id,'Provider confirmation mismatch '+eventId.slice(0,12)]))db.execute('INSERT INTO pp_cases(id,merchant_id,kind,title,description,payment_id,status,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)',[crypto.randomUUID(),merchantId,'RECONCILIATION','Provider confirmation mismatch '+eventId.slice(0,12),'Verified provider event could not be posted. Review retained provider reference and exact order evidence.',order.id,'OPEN','PROVIDER',new Date().toISOString(),new Date().toISOString()]);
         console.error('[Provider confirmation]',error.message);
         return HttpServer.json(res,409,{error:'Payment confirmation could not be reconciled. Retry or review the order.'});
       }

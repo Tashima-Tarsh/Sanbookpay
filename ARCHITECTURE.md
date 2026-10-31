@@ -83,3 +83,6 @@ Production observer messages are supplementary evidence. A matching amount alone
 ## Credentials
 
 Credentials stay in hosting secrets, encrypted merchant configuration and ignored private files. No credentials are rotated by the code freeze. Never print or commit real passwords, tokens, private PDFs, keystores or connection strings.
+## Security repair architecture
+
+The active owner/merchant workspace is /platform; /super-admin redirects there. Legacy superadmin API aliases use canonical cookie, CSRF, TOTP and recovery-code handling. Payment links reuse the scoped canonical payment engine. pp_payment_attempts preserves the selected connection/environment/provider correlation and route snapshot; an uncertain response never rewrites it or sends a second provider request. Verified provider events are retained encrypted; duplicate success journals and wallet fulfillment are uniquely claimed. See docs/audit/ATTACHED_REQUIREMENTS_MATRIX.md for actual acceptance limits.

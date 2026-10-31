@@ -1,3 +1,5 @@
+import {toPaise} from '@youpi/common';
+import crypto from 'node:crypto';
 import {enforcePaymentControls} from '../payment-controls.js';
 import { confirmProviderCollection, publishProviderCollection } from '../services/provider-confirmation.js';
 import { HttpServer } from '../server.js';
@@ -34,8 +36,20 @@ export function registerCollectionsRoutes(server, ctx) {
     return firstMerchant ? firstMerchant.id : null;
   }
 
+  server.get('/api/v1/provider-checkout/:id',(req,res,p)=>{
+    const order=poRepo.findById(p.id);
+    if(!order||order.provider_name!=='CASHFREE'||!order.payment_session_id)return HttpServer.json(res,404,{error:'Provider checkout not available'});
+    if(order.status==='SUCCESS')return HttpServer.json(res,200,{status:'SUCCESS',message:'Payment already confirmed'});
+    if(order.status!=='PENDING')return HttpServer.json(res,409,{error:'This payment is not payable; reconcile the original attempt'});
+    const metadata=JSON.parse(order.metadata||'{}'),nonce=crypto.randomBytes(16).toString('hex');
+    const config=JSON.stringify({mode:metadata.environment==='SANDBOX'?'sandbox':'production',paymentSessionId:order.payment_session_id}).replaceAll('<','\\u003c');
+    res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','Content-Security-Policy':`default-src 'self'; script-src 'nonce-${nonce}' https://sdk.cashfree.com; connect-src https://*.cashfree.com; frame-src https://*.cashfree.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://*.cashfree.com; base-uri 'none'; form-action https://*.cashfree.com`});
+    res.end(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sanbook Pay checkout</title><link rel="stylesheet" href="/dynamo-console.css"></head><body><main class="login-screen"><section class="login-box"><h1>Complete your payment</h1><p>Continue to the approved Cashfree checkout. Your payment is confirmed only by the provider.</p><button class="btn primary" id="pay">Continue to Cashfree</button><p id="error" role="alert"></p></section></main><script nonce="${nonce}" src="https://sdk.cashfree.com/js/v3/cashfree.js"></script><script nonce="${nonce}">const config=${config};document.getElementById('pay').onclick=async()=>{try{await Cashfree({mode:config.mode}).checkout({paymentSessionId:config.paymentSessionId,redirectTarget:'_self'});}catch{document.getElementById('error').textContent='Checkout unavailable. Keep your order reference and retry this same checkout.';}};</script></body></html>`);
+  });
+
   // 1. POST /api/v1/collections — Create real payment collection order
   server.post('/api/v1/collections', async (req, res) => {
+    if(process.env.NODE_ENV==='production')return HttpServer.json(res,410,{error:'Create provider orders through the scoped /v1/payments API. Existing collection inquiry and historical records remain available.',code:'USE_CANONICAL_PAYMENT_API'});
     const merchantId = getMerchantId(req);
     if (!merchantId) {
       return HttpServer.json(res, 401, { error: 'Unauthorized: Invalid or missing API key' });
@@ -60,13 +74,9 @@ export function registerCollectionsRoutes(server, ctx) {
       }
     }
 
-    const amountPaise = typeof body.amount === 'number' 
-      ? Math.round(body.amount * 100) 
-      : Math.round(parseFloat(body.amount) * 100);
-
-    if (isNaN(amountPaise) || amountPaise <= 0) {
-      return HttpServer.json(res, 400, { error: 'Invalid amount. Must be positive monetary value.' });
-    }
+    let amountPaise;
+    try{amountPaise=Number(toPaise(body.amount));if(!Number.isSafeInteger(amountPaise))throw Error();}
+    catch{return HttpServer.json(res,400,{error:'Supply a positive INR amount with at most two decimals.'});}
 
     // Check if duplicate orderId for merchant
     const existing = poRepo.findByMerchantAndOrderId(merchantId, String(body.orderId));
@@ -135,7 +145,7 @@ export function registerCollectionsRoutes(server, ctx) {
       amount: (order.amount_paise / 100).toFixed(2),
       amountPaise: order.amount_paise,
       currency: order.currency,
-      checkoutUrl: order.checkout_url || `/checkout/${order.id}`,
+      checkoutUrl: order.checkout_url || `/api/v1/provider-checkout/${order.id}`,
       paymentSessionId: order.payment_session_id,
       status: order.status,
       provider: order.provider_name,
@@ -209,7 +219,7 @@ export function registerCollectionsRoutes(server, ctx) {
       method: order.payment_method,
       bankReference: order.bank_reference,
       providerPaymentId: order.provider_payment_id,
-      checkoutUrl: order.checkout_url || `/checkout/${order.id}`,
+      checkoutUrl: order.checkout_url || `/api/v1/provider-checkout/${order.id}`,
       initiationTimeMs: order.initiation_time_ms,
       confirmationTimeMs: order.confirmation_time_ms,
       createdAt: order.created_at,
@@ -267,8 +277,9 @@ export function registerCollectionsRoutes(server, ctx) {
     }
 
     try {
-      const provider = providerRegistry.getProvider(merchantId, order.provider_name);
-      const queryId = order.provider_name === 'CASHFREE' ? order.merchant_order_id : (order.provider_order_id || order.merchant_order_id);
+      const provider = providerRegistry.getProvider(merchantId, order.provider_name,JSON.parse(order.metadata||'{}').connectionId||null);
+      const metadata=JSON.parse(order.metadata||'{}');
+      const queryId = metadata.attemptId?order.provider_order_id:(order.provider_name==='CASHFREE'?order.merchant_order_id:(order.provider_order_id||order.merchant_order_id));
       const statusRes = await provider.getCollectionStatus(queryId);
 
       if (statusRes.status === 'SUCCESS' && order.status !== 'SUCCESS') {
