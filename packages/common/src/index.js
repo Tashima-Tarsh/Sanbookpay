@@ -5,6 +5,7 @@ export * from './crypto.js';
 export * from './observation.js';
 export * from './upi.js';
 export * from './upi-providers.js';
+export * from './upi-qr.js';
 export * from './contracts.js';
 export * from './runtime-config.js';
 export * from './secrets.js';

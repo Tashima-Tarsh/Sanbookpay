@@ -158,3 +158,33 @@ export class SecurityMiddleware {
     }
   }
 }
+
+/**
+ * IP Allowlist for PSP webhook endpoints.
+ * Only allows webhooks from known PhonePe/Paytm/Cashfree IP ranges.
+ * Merchants can add their PSP's documented callback IPs via WEBHOOK_ALLOWED_IPS env var.
+ */
+export class IpAllowlist {
+  constructor(allowedRanges = []) {
+    this.allowedRanges = allowedRanges;
+  }
+
+  isAllowed(ip) {
+    if (!ip) return false;
+    const ipv4 = ip.replace(/^::ffff:/, '');
+    if (this.allowedRanges.length === 0) return true;
+    return this.allowedRanges.some(range => this._cidrMatch(ipv4, range));
+  }
+
+  _cidrMatch(ip, cidr) {
+    const [range, bits] = cidr.split('/');
+    const netMask = ~((1 << (32 - Number(bits))) - 1) >>> 0;
+    const ipNum = this._ipToNumber(ip);
+    const rangeNum = this._ipToNumber(range);
+    return (ipNum & netMask) === (rangeNum & netMask);
+  }
+
+  _ipToNumber(ip) {
+    return ip.split('.').reduce((int, octet) => (int << 8) + parseInt(octet, 10), 0) >>> 0;
+  }
+}

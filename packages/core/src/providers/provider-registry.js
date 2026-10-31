@@ -1,6 +1,8 @@
 import { decrypt, resolveSecret } from '@youpi/common';
 import { CashfreeProvider } from './cashfree-provider.js';
 import { DirectBankProvider } from './direct-bank-provider.js';
+import { PhonePeProvider } from './phonepe-provider.js';
+import { PaytmProvider } from './paytm-provider.js';
 
 /**
  * Provider Registry
@@ -57,14 +59,14 @@ export class ProviderRegistry {
 
     const clientSecret = conn?.client_secret_encrypted
       ? this._decryptSecret(conn.client_secret_encrypted)
-      : (process.env.CASHFREE_CLIENT_SECRET || '');
+      : (process.env.CASHFREE_CLIENT_SECRET || process.env.PHONEPE_SALT_KEY || process.env.PAYTM_MERCHANT_KEY || '');
 
     const webhookSecret = conn?.webhook_secret_encrypted
       ? this._decryptSecret(conn.webhook_secret_encrypted)
-      : (process.env.CASHFREE_WEBHOOK_SECRET || clientSecret);
+      : (process.env.CASHFREE_WEBHOOK_SECRET || process.env.PHONEPE_SALT_KEY || process.env.PAYTM_MERCHANT_KEY || clientSecret);
 
-    const clientId = conn?.client_id || process.env.CASHFREE_CLIENT_ID || '';
-    const environment = conn?.environment || process.env.CASHFREE_ENVIRONMENT || 'PRODUCTION';
+    const clientId = conn?.client_id || process.env.CASHFREE_CLIENT_ID || process.env.PHONEPE_MERCHANT_ID || process.env.PAYTM_MERCHANT_ID || '';
+    const environment = conn?.environment || process.env.CASHFREE_ENVIRONMENT || process.env.PHONEPE_ENVIRONMENT || process.env.PAYTM_ENVIRONMENT || 'PRODUCTION';
 
     const config = {
       merchantId,
@@ -74,16 +76,28 @@ export class ProviderRegistry {
       clientSecret,
       webhookSecret,
       extra: {
-        connectionId:conn?.id,
-        capabilities:JSON.parse(conn?.diagnostics||'{}').capabilities||[],
+        connectionId: conn?.id,
+        capabilities: JSON.parse(conn?.diagnostics || '{}').capabilities || [],
         corporateId: conn?.corporate_id,
         merchantVpa: conn?.merchant_vpa,
-        terminalId: conn?.terminal_id
+        terminalId: conn?.terminal_id,
+        // PhonePe specific
+        saltKey: conn?.salt_key_encrypted ? this._decryptSecret(conn.salt_key_encrypted) : (process.env.PHONEPE_SALT_KEY || ''),
+        saltIndex: conn?.salt_index || process.env.PHONEPE_SALT_INDEX || '1',
+        // Paytm specific
+        merchantKey: conn?.merchant_key_encrypted ? this._decryptSecret(conn.merchant_key_encrypted) : (process.env.PAYTM_MERCHANT_KEY || ''),
+        website: conn?.website || process.env.PAYTM_WEBSITE || 'WEBSTAGING',
+        industryType: conn?.industry_type || process.env.PAYTM_INDUSTRY_TYPE || 'Retail',
+        channelId: conn?.channel_id || process.env.PAYTM_CHANNEL_ID || 'WEB'
       }
     };
 
     if (normalizedName === 'CASHFREE') {
       return new CashfreeProvider(config);
+    } else if (normalizedName === 'PHONEPE') {
+      return new PhonePeProvider(config);
+    } else if (normalizedName === 'PAYTM') {
+      return new PaytmProvider(config);
     } else {
       return new DirectBankProvider(config);
     }

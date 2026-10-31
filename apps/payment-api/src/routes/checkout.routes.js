@@ -1,5 +1,5 @@
 import { HttpServer } from '../server.js';
-import { toRupeesString, buildUpiUri, PaymentStatus, PaymentMethod, UPI_PROVIDERS, isInternalServiceRequest } from '@youpi/common';
+import { toRupeesString, buildUpiUri, buildUpiIntentLinks, generateQrDataUri, PaymentStatus, PaymentMethod, UPI_PROVIDERS, isInternalServiceRequest } from '@youpi/common';
 import { validateSessionDeviceAccess } from '@youpi/core';
 import { SplitSettlementRepository } from '@youpi/db';
 
@@ -644,6 +644,8 @@ export function registerCheckoutRoutes(server, ctx) {
       expiresAt: session.expiresAt ? session.expiresAt.toISOString() : null,
       serverNow: new Date().toISOString(),
       upiUri,
+      upiQr: upiUri ? generateQrDataUri(upiUri) : null,
+      upiDeepLinks: upiUri ? buildUpiIntentLinks(upiUri) : null,
       payeeVpa,
       payeeName,
       isMerchantEnabled,
@@ -666,6 +668,107 @@ export function registerCheckoutRoutes(server, ctx) {
     const merchantId = req.query?.merchantId || '00000000-0000-0000-0000-000000000001';
     const health = await checkUpiServerHealth(ctx, [], 'OFFLINE', merchantId);
     HttpServer.json(res, 200, health);
+  });
+
+  // GET /api/v1/checkout/:id/upi-qr — Get UPI QR code data URI for a checkout session
+  server.get('/api/v1/checkout/:id/upi-qr', async (req, res, params) => {
+    const session = ctx.sessionRepo.findById(params.id);
+    if (!session) return HttpServer.json(res, 404, { error: 'Checkout session not found' });
+    const payeeVpa = session.metadata?.receivingAccountSnapshot?.upiId || session.metadata?.payeeVpa;
+    const payeeName = session.metadata?.receivingAccountSnapshot?.payeeName || session.metadata?.payeeName || 'Merchant';
+    if (!payeeVpa) return HttpServer.json(res, 400, { error: 'No VPA configured for this session' });
+    let upiUri;
+    try {
+      upiUri = buildUpiUri({
+        vpa: payeeVpa,
+        name: payeeName,
+        amount: session.amountPaise / 100,
+        orderId: session.orderId,
+        note: `Order ${session.orderId}`,
+        mode: 'fixed'
+      });
+    } catch {
+      return HttpServer.json(res, 500, { error: 'Failed to generate UPI URI' });
+    }
+    HttpServer.json(res, 200, {
+      upiUri,
+      upiQr: generateQrDataUri(upiUri),
+      upiDeepLinks: buildUpiIntentLinks(upiUri)
+    });
+  });
+
+  // GET /api/v1/checkout/:id/upi-links — Get UPI deep links for a checkout session
+  server.get('/api/v1/checkout/:id/upi-links', async (req, res, params) => {
+    const session = ctx.sessionRepo.findById(params.id);
+    if (!session) return HttpServer.json(res, 404, { error: 'Checkout session not found' });
+    const payeeVpa = session.metadata?.receivingAccountSnapshot?.upiId || session.metadata?.payeeVpa;
+    const payeeName = session.metadata?.receivingAccountSnapshot?.payeeName || session.metadata?.payeeName || 'Merchant';
+    if (!payeeVpa) return HttpServer.json(res, 400, { error: 'No VPA configured for this session' });
+    let upiUri;
+    try {
+      upiUri = buildUpiUri({
+        vpa: payeeVpa,
+        name: payeeName,
+        amount: session.amountPaise / 100,
+        orderId: session.orderId,
+        note: `Order ${session.orderId}`,
+        mode: 'fixed'
+      });
+    } catch {
+      return HttpServer.json(res, 500, { error: 'Failed to generate UPI URI' });
+    }
+    HttpServer.json(res, 200, {
+      upiUri,
+      upiDeepLinks: buildUpiIntentLinks(upiUri)
+    });
+  });
+
+  // POST /api/v1/payments/phonepe — Create PhonePe payment (requires PhonePe Business account)
+  server.post('/api/v1/payments/phonepe', async (req, res) => {
+    const body = await HttpServer.parseBody(req);
+    const { merchantId, orderId, amountPaise, customerPhone, customerName, returnUrl, notifyUrl, idempotencyKey } = body;
+    if (!merchantId || !orderId || !amountPaise) return HttpServer.json(res, 400, { error: 'merchantId, orderId, amountPaise required' });
+
+    const providerRegistry = new (require('@youpi/core').ProviderRegistry)(ctx.db);
+    const provider = providerRegistry.getProvider(merchantId, 'PHONEPE');
+    try {
+      const result = await provider.createCollection({
+        merchantOrderId: orderId,
+        amountPaise: Number(amountPaise),
+        customerPhone,
+        customerName,
+        returnUrl,
+        notifyUrl,
+        idempotencyKey
+      });
+      HttpServer.json(res, 201, result);
+    } catch (err) {
+      HttpServer.json(res, 400, { error: err.message, code: err.code });
+    }
+  });
+
+  // POST /api/v1/payments/paytm — Create Paytm payment (requires Paytm Business account)
+  server.post('/api/v1/payments/paytm', async (req, res) => {
+    const body = await HttpServer.parseBody(req);
+    const { merchantId, orderId, amountPaise, customerPhone, customerName, returnUrl, notifyUrl, idempotencyKey } = body;
+    if (!merchantId || !orderId || !amountPaise) return HttpServer.json(res, 400, { error: 'merchantId, orderId, amountPaise required' });
+
+    const providerRegistry = new (require('@youpi/core').ProviderRegistry)(ctx.db);
+    const provider = providerRegistry.getProvider(merchantId, 'PAYTM');
+    try {
+      const result = await provider.createCollection({
+        merchantOrderId: orderId,
+        amountPaise: Number(amountPaise),
+        customerPhone,
+        customerName,
+        returnUrl,
+        notifyUrl,
+        idempotencyKey
+      });
+      HttpServer.json(res, 201, result);
+    } catch (err) {
+      HttpServer.json(res, 400, { error: err.message, code: err.code });
+    }
   });
 
   // POST /api/v1/checkout/:id/bind-customer
