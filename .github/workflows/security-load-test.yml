@@ -64,6 +64,8 @@ jobs:
           export SQLITE_DB_PATH="$RUNNER_TEMP/loadtest.sqlite"
           export ENCRYPTION_MASTER_KEY=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
           export JWT_SECRET=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
+          export INITIAL_ADMIN_EMAIL=admin@loadtest.example
+          export INITIAL_ADMIN_PASSWORD=$(node -e "console.log(require('crypto').randomBytes(24).toString('hex'))")
           node scripts/serve-for-load.js > output/testing/api.log 2>&1 &
           API_PID=$!
           READY=0
