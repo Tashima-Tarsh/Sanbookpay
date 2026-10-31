@@ -1,0 +1,126 @@
+name: Security & Load Testing
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  security-scan:
+    name: Secret & Security Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run secret scan (fast path)
+        run: node scripts/scan-secrets.js
+
+      - name: Run TypeScript typecheck
+        run: npm run typecheck
+
+      - name: Validate JavaScript runtime
+        run: npm run build
+
+  load-test:
+    name: k6 Load Test (UPI Mirror)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: security-scan
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: dynamopay
+          POSTGRES_USER: dynamopay
+          POSTGRES_PASSWORD: dynamopay
+        ports:
+          - "5432:5432"
+        options: >-
+          --health-cmd "pg_isready -U dynamopay -d dynamopay"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - "6379:6379"
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Initialize database
+        run: |
+          npm run db:setup
+          npm run db:migrate
+
+      - name: Start Payment API
+        run: |
+          DATABASE_URL=postgresql://dynamopay:dynamopay@localhost:5432/dynamopay \
+          REDIS_URL=redis://localhost:6379 \
+          NODE_ENV=test \
+          ENCRYPTION_MASTER_KEY=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))") \
+          JWT_SECRET=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))") \
+          npm run start:prod:api &
+        env:
+          DATABASE_URL: postgresql://dynamopay:dynamopay@localhost:5432/dynamopay
+
+      - name: Wait for API to be ready
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:6100/health > /dev/null 2>&1; then echo "API ready"; exit 0; fi
+            sleep 2
+          done
+          echo "API not ready after 60s"; exit 1
+
+      - name: Install k6
+        run: |
+          sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A3642D57D77C66C502C602A37
+          echo "deb https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
+          sudo apt-get update
+          sudo apt-get install -y k6
+
+      - name: Run k6 load test (Stage 1: 10 merchants, 100 sessions)
+        run: |
+          BASE_URL=http://localhost:6100 \
+          MERCHANT_ID=$(node -e "console.log(require('crypto').randomUUID())") \
+          DEVICE_ID=$(node -e "console.log('dev_' + require('crypto').randomUUID())") \
+          k6 run scripts/load-test-upi-mirror.js
+
+      - name: Upload load test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k6-load-test-results
+          path: output/testing/load-test-summary.json
