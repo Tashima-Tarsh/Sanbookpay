@@ -5,7 +5,11 @@
 # Prerequisites:
 # 1. Install Android SDK (command line tools)
 # 2. Set ANDROID_HOME environment variable
-# 3. Install Gradle
+# 3. Install Gradle (gradle-wrapper.properties targets Gradle 8.5)
+
+# First time only: generate the Gradle Wrapper bootstrap jar
+# cd apps/android-bridge
+# gradle wrapper
 
 # Build commands:
 # cd apps/android-bridge
