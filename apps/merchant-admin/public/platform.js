@@ -3,7 +3,7 @@
   'use strict';
   const API = '/api/platform/v1';
   const $ = id => document.getElementById(id);
-  let session = null, route = 'overview', renderVersion = 0, authMode = 'login', selectedMerchant = '', merchantOptions = [], fieldSequence = 0;
+  let session = null, route = 'overview', renderVersion = 0, authMode = 'login', selectedMerchant = '', merchantOptions = [], fieldSequence = 0, stream = null, livePoll = null, liveRefreshTimer = null;
   const navLabels = {overview:'Overview',merchants:'Merchants',transactions:'Transactions',keys:'Developer tools',onboarding:'Onboarding',staff:'Team & security',connections:'Connections',operations:'Payment operations',billing:'Billing & finance',settings:'Business profile'};
   const tenantRoutes = new Set(['keys','settings','connections']);
   const titles = {
@@ -81,6 +81,11 @@
   }
   async function mutate(path, body, success='Changes saved.') { const data=await api(path,body);message(success);return data; }
   function showAuth(mode) {
+    stream?.close();stream=null;if(livePoll!==null&&typeof clearInterval==='function')clearInterval(livePoll);livePoll=null;
+    if(mode==='ownerInvite'){
+      $('auth').hidden=false;$('console').hidden=true;$('authTitle').textContent='Activate your merchant workspace';$('authError').textContent='';
+      $('authForm').replaceWith(form([{name:'password',label:'Choose your password',type:'password',required:true,minLength:12}],'Activate owner login',async body=>{body.token=location.hash.slice('#owner-invitation/'.length);await api('/owner-invitations/accept',body);location.hash='';showAuth('login');$('authError').textContent='Owner login activated. Sign in to verify your mobile and complete onboarding.';}));$('auth').querySelector('form').id='authForm';$('authLinks').replaceChildren();return;
+    }
     authMode=mode;$('auth').hidden=false;$('console').hidden=true;$('authError').textContent='';
     const register=mode==='register',verify=mode==='verify',invite=mode==='invite';
     $('authTitle').textContent=register?'Create your merchant workspace':verify?'Verify your contact details':invite?'Accept your team invitation':'Sign in to your workspace';
@@ -89,11 +94,17 @@
       const response=await api(register?'/register':verify?'/verify':invite?'/invitations/accept':'/login',data);
       if(register){result('Check your email and phone',el('p',{text:'Use the verification tokens sent to your email and mobile, then sign in to complete onboarding.'}));showAuth('login');return;}
       if(verify||invite){showAuth('login');$('authError').textContent=verify?'Contact verified. Sign in to continue.':'Invitation accepted. Sign in to continue.';return;}
-      if(response.mfaRequired){result('Verify your sign in',form([{name:'code',label:'Authenticator code',required:true}],'Verify and sign in',async body=>{await api('/login/mfa',{challenge:response.challenge,code:body.code});$('resultDialog').close();await boot();}));return;}
+      if(response.mfaRequired){loginChallenge(response.challenge);return;}
       await boot();
     }));
     $('auth').querySelector('form').id='authForm';
     $('authLinks').replaceChildren(button(register?'Already registered? Sign in':'Create merchant account',()=>showAuth(register?'login':'register')),button('Verify contact',()=>showAuth('verify')),button('Accept invitation',()=>showAuth('invite')));
+  }
+  function loginChallenge(challenge,recovery=false){
+    result(recovery?'Use a recovery code':'Verify your sign in',el('div',{},[
+      form([{name:recovery?'recoveryCode':'code',label:recovery?'One-time recovery code':'Authenticator code',required:true}],'Verify and sign in',async body=>{await api(recovery?'/login/recovery':'/login/mfa',{challenge,...body});$('resultDialog').close();await boot();}),
+      button(recovery?'Use authenticator':'Use recovery code',()=>loginChallenge(challenge,!recovery))
+    ]));
   }
   function openMenu(open) { document.body.classList.toggle('sidebar-open',open);$('menuBackdrop').hidden=!open;$('menuToggle').setAttribute('aria-expanded',String(open));$('workspace').inert=open;if(open)$('menuClose').focus();else $('menuToggle').focus(); }
   function navigation() {
@@ -111,10 +122,10 @@
   }
   function createMerchant() {
     result('Add merchant',el('div',{},[
-      el('p',{text:'Create a separate owner login for this business. Share the sign-in details privately. The merchant must verify their contacts and complete onboarding before activation.'}),
-      form([{name:'businessName',label:'Business name',required:true},{name:'contactName',label:'Merchant owner name',required:true},{name:'email',label:'Owner sign-in email',type:'email',required:true},{name:'mobile',label:'Owner mobile with country code',type:'tel',required:true},{name:'category',label:'Business category',required:true},{name:'password',label:'Merchant owner password',type:'password',minLength:12,required:true,help:'At least 12 characters. Use a separate password for this merchant.'}],'Create merchant',async(data,node)=>{
+      el('p',{text:'Create an independent merchant workspace. The owner receives a one-time email invitation to choose their own password. Verification delivery must be configured; contacts and provider approval are still required.'}),
+      form([{name:'businessName',label:'Business name',required:true},{name:'contactName',label:'Merchant owner name',required:true},{name:'email',label:'Owner sign-in email',type:'email',required:true},{name:'mobile',label:'Owner mobile with country code',type:'tel',required:true},{name:'category',label:'Business category',required:true}],'Create merchant',async(data,node)=>{
         const created=await api('/merchants',data);node.reset();await refreshMerchants();
-        result('Merchant workspace created',el('div',{},[detail({business:created.businessName,ownerEmail:created.ownerEmail,status:created.status}),el('p',{text:'The merchant signs in at /platform with the owner email and password you chose. Contact verification and approval are still required.'}),el('a',{class:'btn',href:'/platform',target:'_blank',rel:'noopener',text:'Merchant sign-in page'}),button('Open merchant dashboard',()=>{$('resultDialog').close();selectMerchant(created.merchantId);},true)]));
+        result('Merchant workspace created',el('div',{},[detail({business:created.businessName,ownerEmail:created.ownerEmail,status:created.status,invitation:created.invitationSent?'Email invitation sent':'Delivery not configured; owner activation remains pending'}),el('p',{text:'An activated owner signs in at /platform. A new owner must accept their secure invitation and complete verification before payment activation.'}),el('a',{class:'btn',href:'/platform',target:'_blank',rel:'noopener',text:'Merchant sign-in page'}),button('Open merchant dashboard',()=>{$('resultDialog').close();selectMerchant(created.merchantId);},true)]));
       })
     ]));
   }
@@ -153,12 +164,12 @@
       const data=await api('/onboarding');return [panel('Verify contact details','Email and mobile verification are required before submission.',el('div',{class:'actions'},['email','mobile'].map(channel=>button(`Send ${channel} verification`,async()=>{try{await mutate('/verification/send',{channel},'Verification sent.');result('Verify contact',form([{name:'token',label:'Verification token',required:true}],'Verify',async body=>{await api('/verify',{channel,token:body.token});$('resultDialog').close();await load();}));}catch(e){message(e.message,true);}})))),panel('Verification progress','Your account remains subject to platform review.',detail(data.onboarding || data)),panel('Submit business information','Provide accurate details for verification. Do not submit passwords, bank PINs or OTPs.',form([{name:'businessName',label:'Legal business name',required:true,value:data.profile?.businessName},{name:'contactName',label:'Contact name',required:true,value:data.profile?.contactName},{name:'category',label:'Business category',required:true,value:data.profile?.category},{name:'mobile',label:'Mobile number',required:true,value:data.profile?.mobile},{name:'registrationNumber',label:'Registration number'},{name:'taxId',label:'Tax ID / GSTIN'},{name:'website',label:'Business website',type:'url'},{name:'address',label:'Business address',type:'textarea',required:true,value:data.profile?.address}],'Submit for review',async data=>{await mutate('/onboarding',{...data,submit:true});await load();}))];
     },
     async merchants() {
-      await refreshMerchants();return panel('Merchant workspaces','Add a business, share its separate owner login, then open its dashboard to manage payments and configuration.',table([['Business','profile',profile=>profile?.businessName || 'Unnamed business'],['Merchant ID','merchant_id'],['Status','status'],['Actions','merchant_id',id=>el('div',{class:'actions'},[button('Open dashboard',()=>selectMerchant(id),true),button('Access & details',async()=>{try{const record=await api(`/merchants/${encodeURIComponent(id)}`);result('Merchant access & details',el('div',{},[detail({business:record.profile?.businessName,merchantId:id,status:record.status}),el('h3',{text:'Merchant sign-in'}),el('p',{text:'This business signs in at /platform using its own owner email and password. It can only access its own records.'}),el('a',{class:'btn',href:'/platform',target:'_blank',rel:'noopener',text:'Open merchant sign-in'}),table([['Email','email'],['Role','role'],['Email verified','emailVerified',v=>v?'Yes':'No'],['Mobile verified','mobileVerified',v=>v?'Yes':'No']],record.users),button('Manage this dashboard',()=>{$('resultDialog').close();selectMerchant(id);})]));}catch(e){message(e.message,true);}}),...(can('merchants.write')?[button('Change status',()=>result('Change merchant status',form([{name:'status',label:'Status',options:['UNDER_REVIEW','APPROVED','ACTIVE','SUSPENDED','REJECTED']},{name:'reason',label:'Reason',required:true}],'Save status',async body=>{await mutate(`/merchants/${encodeURIComponent(id)}/state`,body);$('resultDialog').close();await load();})))]:[])])]],merchantOptions));
+      await refreshMerchants();return panel('Merchant workspaces','Add a business, share its separate owner login, then open its dashboard to manage payments and configuration.',table([['Business','profile',profile=>profile?.businessName || 'Unnamed business'],['Merchant ID','merchant_id'],['Status','status'],['Actions','merchant_id',id=>el('div',{class:'actions'},[button('Open dashboard',()=>selectMerchant(id),true),button('Access & details',async()=>{try{const record=await api(`/merchants/${encodeURIComponent(id)}`);result('Merchant access & details',el('div',{},[detail({business:record.profile?.businessName,merchantId:id,status:record.status}),el('h3',{text:'Merchant sign-in'}),el('p',{text:'This business signs in at /platform using its own owner email and password. It can only access its own records.'}),el('a',{class:'btn',href:'/platform',target:'_blank',rel:'noopener',text:'Open merchant sign-in'}),table([['Email','email'],['Role','role'],['Activated','active',v=>v?'Yes':'Invitation pending'],['Email verified','emailVerified',v=>v?'Yes':'No'],['Mobile verified','mobileVerified',v=>v?'Yes':'No']],record.users),...(session.user.role==='SUPER_ADMIN'&&record.users?.some(user=>user.role==='OWNER'&&!user.active)?[button('Send owner invitation',async()=>{try{await api(`/merchants/${encodeURIComponent(id)}/invite-owner`,{});message('Owner invitation sent.');$('resultDialog').close();}catch(e){message(e.message,true);}})]:[]),button('Manage this dashboard',()=>{$('resultDialog').close();selectMerchant(id);})]));}catch(e){message(e.message,true);}}),...(can('merchants.write')?[button('Change status',()=>result('Change merchant status',form([{name:'status',label:'Status',options:['UNDER_REVIEW','APPROVED','ACTIVE','SUSPENDED','REJECTED']},{name:'reason',label:'Reason',required:true}],'Save status',async body=>{await mutate(`/merchants/${encodeURIComponent(id)}/state`,body);$('resultDialog').close();await load();})))]:[])])]],merchantOptions));
     },
     async staff() {
       const data=can('staff.write')?await api('/staff'):{users:[]};
-      const roles=platform()?['OPERATIONS','FINANCE','SUPPORT','SECURITY','AUDITOR',...(session.user.role==='SUPER_ADMIN'?['SUPER_ADMIN']:[])]:['VIEWER','DEVELOPER','FINANCE','SUPPORT','ADMIN'];
-      const security=panel('Authenticator protection','Owners and privileged staff must enable MFA before sensitive actions.',el('div',{class:'actions'},[session.user.mfaEnabled?el('span',{class:'status active',text:'MFA enabled'}):button('Set up MFA',async()=>{try{const data=await api('/mfa/enroll',{});result('Set up authenticator',el('div',{},[el('p',{text:'Add this secret to your authenticator, then confirm the current code.'}),el('div',{class:'platform-secret',text:data.secret}),el('div',{class:'platform-secret',text:data.otpauthUrl}),form([{name:'code',label:'Authenticator code',required:true}],'Enable MFA',async body=>{await mutate('/mfa/confirm',body);$('resultDialog').close();session=await api('/me');await load();})]));}catch(e){message(e.message,true);}}),button('Review sessions',async()=>{try{const data=await api('/sessions');result('Your active sessions',table([['Created','created_at'],['Expires','expires_at'],['Actions','id',id=>button('Revoke session',async()=>{try{await api('/sessions/revoke',{sessionId:id});$('resultDialog').close();await boot();}catch(e){message(e.message,true);}})]],data.sessions));}catch(e){message(e.message,true);}})]));
+      const roles=platform()?['OPERATIONS','FINANCE','SUPPORT','SECURITY','AUDITOR',...(session.user.role==='SUPER_ADMIN'?['SUPER_ADMIN']:[])]:['VIEWER','DEVELOPER','FINANCE','OPERATIONS','SUPPORT','ADMIN'];
+      const security=panel('Authenticator protection','Owners and privileged staff must enable MFA before sensitive actions.',el('div',{class:'actions'},[session.user.mfaEnabled?el('span',{class:'status active',text:'MFA enabled'}):button('Set up MFA',async()=>{try{const data=await api('/mfa/enroll',{});result('Set up authenticator',el('div',{},[el('p',{text:'Add this secret to your authenticator, then confirm the current code.'}),el('div',{class:'platform-secret',text:data.secret}),el('div',{class:'platform-secret',text:data.otpauthUrl}),form([{name:'code',label:'Authenticator code',required:true}],'Enable MFA',async body=>{const confirmed=await mutate('/mfa/confirm',body);$('resultDialog').close();session=await api('/me');await load();result('Save your recovery codes',el('div',{},[el('p',{text:'Save these one-time recovery codes privately. They will not be shown again.'}),el('div',{class:'platform-secret',text:confirmed.recoveryCodes.join('\n')})]));})]));}catch(e){message(e.message,true);}}),button('Review sessions',async()=>{try{const data=await api('/sessions');result('Your active sessions',table([['Created','created_at'],['Expires','expires_at'],['Actions','id',id=>button('Revoke session',async()=>{try{await api('/sessions/revoke',{sessionId:id});$('resultDialog').close();await boot();}catch(e){message(e.message,true);}})]],data.sessions));}catch(e){message(e.message,true);}})]));
       return [security,...(can('staff.write')?[panel(platform()?'Platform team':'Merchant team',platform()?'These users have platform staff access. Merchant owners are listed under Merchants ? Access & details.':'These users can only access this merchant workspace.',table([['Email','email'],['Role','role'],['MFA enabled','mfaEnabled',v=>v?'Yes':'No'],['Actions','id',(id,row)=>id!==session.user.id&&row.role!=='OWNER'?button('Revoke access',()=>confirmAction('Revoke staff access','This revokes this teammate\'s sessions and access.',async()=>{await mutate(`/staff/${encodeURIComponent(id)}/revoke`,{});await load();})):'?']],data.users)),panel('Invite a teammate','New staff verify their email and set their own password.',form([{name:'email',label:'Email',type:'email',required:true},{name:'role',label:'Role',options:roles}],'Invite teammate',async data=>{await mutate('/staff/invite',data,'Invitation sent.');}))]:[])];
     },
     async connections() {
@@ -180,7 +191,19 @@
 
   };
   function confirmAction(title,description,action) {const error=el('p',{class:'message',role:'alert'});const confirm=button(title,async()=>{confirm.disabled=true;try{$('resultDialog').close();await action();}catch(e){message(e.message,true);error.textContent=e.message;}finally{confirm.disabled=false;}},true);result(title,el('div',{},[el('p',{text:description}),error,el('div',{class:'actions'},[button('Cancel',()=>$('resultDialog').close()),confirm])]));}
+  function connectLive(){
+    stream?.close();
+    const refresh=()=>{if(session&&!document.hidden&&!$('resultDialog').open&&['overview','transactions','operations','merchants'].includes(route))load();};
+    if(typeof EventSource==='function'){
+      stream=new EventSource(API+'/stream');
+      stream.addEventListener('invalidate',()=>{clearTimeout(liveRefreshTimer);liveRefreshTimer=setTimeout(refresh,250);});
+      stream.addEventListener('session-revoked',()=>{session=null;showAuth('login');});
+    }
+    if(livePoll!==null&&typeof clearInterval==='function')clearInterval(livePoll);
+    if(typeof setInterval==='function')livePoll=setInterval(refresh,20000);
+  }
   async function boot() {
+    if(location.hash.startsWith('#owner-invitation/')){showAuth('ownerInvite');return;}
     try{
       session=await api('/me');$('auth').hidden=true;$('console').hidden=false;
       $('accountName').textContent=session.user?.name || session.user?.email || 'Account';$('accountRole').textContent=session.user?.role || '';
@@ -189,7 +212,7 @@
         if(!$('merchantSelector')){const select=el('select',{id:'merchantSelector','aria-label':'Selected merchant workspace'});select.addEventListener('change',()=>{selectedMerchant=select.value;load();});$('tenantName').replaceChildren(el('label',{for:'merchantSelector',text:'Workspace'}),select);}
         await refreshMerchants();
       }else{selectedMerchant='';const profile=await api('/onboarding');$('tenantName').textContent=profile.profile?.businessName||'Merchant workspace';}
-      await load();
+      await load();connectLive();
     }
     catch(error){showAuth('login');if(!/401|authentication|sign.in|unauthorized/i.test(error.message))$('authError').textContent=error.message;}
   }

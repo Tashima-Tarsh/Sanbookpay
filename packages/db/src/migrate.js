@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import crypto from 'node:crypto';
-import { getCoinStoreWebhookSecret, LEGACY_DEFAULT_WEBHOOK_SECRET, hashPassword } from '@youpi/common';
+import { getCoinStoreWebhookSecret, LEGACY_DEFAULT_WEBHOOK_SECRET } from '@youpi/common';
 import { getDatabase } from './database.js';
 import { MerchantRepository } from './repositories/merchant.repository.js';
 import { ReceivingAccountRepository } from './repositories/receiving-account.repository.js';
@@ -280,20 +280,7 @@ export function runMigrations(targetDb) {
     }
   } catch {}
 
-  // Seed default super admin user (password must be changed on first login)
-  try {
-    const existingAdmin = db.queryOne('SELECT id FROM super_admin_users LIMIT 1');
-    if (!existingAdmin) {
-      const adminId = 'admin_00000000000000000000000000000001';
-      const passwordHash = hashPassword('SanbookPayAdmin_ChangeMe!');
-      db.execute(
-        `INSERT INTO super_admin_users (id, email, password_hash, full_name, role, status, mfa_enabled, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-        [adminId, 'superadmin@sanbookpay.com', passwordHash, 'Sanbook Pay Platform Owner', 'SUPER_ADMIN', 'ACTIVE', 0, new Date().toISOString(), new Date().toISOString()]
-      );
-      console.warn('[migrate] Seeded default super admin user: superadmin@sanbookpay.com / SanbookPayAdmin_ChangeMe! (CHANGE ON FIRST LOGIN)');
-    }
-  } catch {}
+  // Owner identity is provisioned from private console configuration; never seed a public password.
 
   // Seed default pricing plans
   try {

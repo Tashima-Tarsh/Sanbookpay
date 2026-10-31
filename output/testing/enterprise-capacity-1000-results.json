@@ -1,0 +1,51 @@
+{
+  "testedAt": "2026-10-31T12:28:25.119Z",
+  "environment": {
+    "node": "v24.14.1",
+    "database": "isolated in-memory SQLite",
+    "transport": "loopback HTTP",
+    "provider": "none; synthetic receiving accounts only",
+    "globalIpLimiterOverride": 20000
+  },
+  "limitations": [
+    "No live provider, bank, PostgreSQL, Redis, Render, browser or device capacity is measured.",
+    "1000 outstanding local requests measure this process only; active payable sessions and queued orders are reported separately.",
+    "Duplicate-confirmation storm calls the confirmation service, not a remote provider network."
+  ],
+  "stages": [
+    {
+      "name": "100 merchants, 1000 outstanding same-amount HTTP requests",
+      "requests": 1000,
+      "concurrency": 1000,
+      "accepted": 232,
+      "errors": 768,
+      "active": 100,
+      "queued": 132,
+      "distinctPaymentIds": 232,
+      "wrongAttributions": 0,
+      "transportErrors": {
+        "ECONNREFUSED": 768
+      },
+      "pass": false,
+      "durationMs": 1107,
+      "observedRequestsPerSecond": 903.2,
+      "p50Ms": 298,
+      "p95Ms": 969,
+      "p99Ms": 1053
+    },
+    {
+      "name": "10000 synthetic duplicate confirmation-service calls",
+      "pass": true,
+      "calls": 10000,
+      "distinctOrders": 100,
+      "postedTransactions": 100,
+      "outboxEvents": 100,
+      "duplicatesSuppressed": 9900,
+      "durationMs": 883,
+      "p50Ms": 0.05499999999983629,
+      "p95Ms": 0.12940000000025975,
+      "p99Ms": 1.209599999999682
+    }
+  ],
+  "result": "FAIL"
+}

@@ -78,7 +78,7 @@ import { registerRefundsRoutes } from './routes/refunds.routes.js';
 import { registerSplitSettlementRoutes } from './routes/split-settlement.routes.js';
 import { registerOperationsRoutes } from './routes/operations.routes.js';
 import { registerDynamoPayRoutes } from './routes/dynamopay.routes.js';
-import { registerSuperAdminRoutes, superAdminGuard } from './routes/super-admin.routes.js';
+import { registerSuperAdminRoutes } from './routes/super-admin.routes.js';
 import { registerPaymentLinkRoutes } from './routes/payment-link.routes.js';
 import { registerCallbackWalletRoutes } from './routes/callback-wallet.routes.js';
 import { getWhatsAppBerryService, WhatsAppBerryService } from './services/whatsapp-berry.service.js';
@@ -561,6 +561,7 @@ export function createPaymentApp(customDb = null, options = {}) {
     if(req.method==='POST'&&pathname==='/api/v1/payments'&&!isAdminRequest(req)){
       const mid=req.headers['x-merchant-id'],m=mid&&merchantRepo.findById(mid);
       if(!m||!safeEqual(String(req.headers['x-merchant-key']||''),m.webhookSecret||'')){HttpServer.json(res,401,{error:'Authenticate the merchant backend before creating a payment.',code:'AUTH_REQUIRED'});return true;}
+      try{platformPayments.requireActive(mid);}catch(e){HttpServer.json(res,e.statusCode||403,{error:e.message,code:e.code});return true;}
     }
     return false;
   });
@@ -583,7 +584,6 @@ export function createPaymentApp(customDb = null, options = {}) {
   registerDynamoPayRoutes(server, context);
 
   // Super Admin authentication routes
-  server.use(superAdminGuard);
   registerSuperAdminRoutes(server, context);
 
   // Payment Links & Failover routes
@@ -592,8 +592,7 @@ export function createPaymentApp(customDb = null, options = {}) {
   // Callback, Wallet, Diagnostics, Pricing routes
   registerCallbackWalletRoutes(server, context);
 
-  // Expose context for super admin guard access
-  global.__sanbook_ctx = { superAdminRepo };
+
 
   function destroy() {
     clearInterval(webhookRetryTimer);

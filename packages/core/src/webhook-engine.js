@@ -57,6 +57,11 @@ export class WebhookEngine {
     const snapshot=session.metadata?.receivingAccountSnapshot||{};
     const payloadObj = {
       event: publicOutcome,
+      merchantId:session.merchantId,
+      amountPaise:String(session.amountPaise),
+      attemptId:session.attemptId||session.metadata?.attemptId||null,
+      playerReference:session.metadata?.playerReference||null,
+      providerTransactionId:session.providerTransactionId||null,
       paymentId: session.id,
       orderId: session.orderId,
       amount: toRupeesString(session.amountPaise),

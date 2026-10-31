@@ -1,3 +1,4 @@
+import {toPaise} from '@youpi/common';
 import crypto from 'node:crypto';
 import { HttpServer } from '../server.js';
 import {
@@ -206,13 +207,9 @@ export function registerPayoutsRoutes(server, ctx) {
       return HttpServer.json(res, 404, { error: 'Beneficiary not found' });
     }
 
-    const amountPaise = typeof body.amount === 'number' 
-      ? Math.round(body.amount * 100) 
-      : Math.round(parseFloat(body.amount) * 100);
-
-    if (isNaN(amountPaise) || amountPaise <= 0) {
-      return HttpServer.json(res, 400, { error: 'Invalid payout amount. Must be positive monetary value.' });
-    }
+    let amountPaise;
+    try{amountPaise=Number(toPaise(body.amount));if(!Number.isSafeInteger(amountPaise))throw Error();}
+    catch{return HttpServer.json(res,400,{error:'Supply a positive payout amount with at most two decimals.'});}
 
     const transferId = body.transferId || `TF_${Date.now()}_${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
     const payoutRail = (body.payoutRail || (beneficiary.upi_id ? 'UPI' : 'IMPS')).toUpperCase();

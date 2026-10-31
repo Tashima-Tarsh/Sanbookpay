@@ -1,6 +1,6 @@
 # Sanbook Pay
 
-Sanbook Pay is a production-ready, multi-merchant payment orchestration SaaS platform. The Platform Owner operates Sanbook Pay as the central supplier, creating and managing hundreds or thousands of independent merchant accounts.
+Sanbook Pay is a multi-merchant payment orchestration application with unresolved production acceptance gates. The Platform Owner operates Sanbook Pay as the central supplier, creating and managing hundreds or thousands of independent merchant accounts.
 
 ## Features
 
@@ -39,3 +39,6 @@ See `docs/` for complete documentation:
 ## Runtime
 
 Node.js 22.13+. Run `npm run typecheck`, `npm run build`, `npm test` to validate.
+## Current repair status
+
+See [the attached-requirements matrix](audit/ATTACHED_REQUIREMENTS_MATRIX.md), the Cashfree integration contract and the migration/rollback guide. Green source tests do not establish live provider verification, 1,000-concurrent capacity or production readiness.

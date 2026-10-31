@@ -1,7 +1,7 @@
 import { HttpServer } from '../server.js';
 import crypto from 'node:crypto';
 import { SplitSettlementRepository, PaymentOrderRepository, LedgerRepository, SettlementRepository } from '@youpi/db';
-import { PaymentStatus } from '@youpi/common';
+import { PaymentStatus, toPaise } from '@youpi/common';
 
 /**
  * Split Settlement & Auto-Refund Routes
@@ -208,9 +208,8 @@ export function registerSplitSettlementRoutes(server, ctx) {
 
     const sessionAmountPaise = typeof session.amountPaise === 'bigint' ? Number(session.amountPaise) : session.amountPaise;
 
-    const refundAmountPaise = body.amount
-      ? (typeof body.amount === 'number' ? Math.round(body.amount * 100) : Math.round(parseFloat(body.amount) * 100))
-      : sessionAmountPaise;
+    let refundAmountPaise=sessionAmountPaise;
+    if(body.amount!==undefined){try{refundAmountPaise=Number(toPaise(body.amount));if(!Number.isSafeInteger(refundAmountPaise))throw Error();}catch{return HttpServer.json(res,400,{error:'Supply a positive refund amount with at most two decimals.'});}}
 
     if (isNaN(refundAmountPaise) || refundAmountPaise <= 0 || refundAmountPaise > sessionAmountPaise) {
       return HttpServer.json(res, 400, {

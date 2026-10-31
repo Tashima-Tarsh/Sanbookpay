@@ -1,3 +1,11 @@
+# Current security-repair release note
+
+The active owner and merchant workspace is /platform. Existing owners enter through /admin -> Manage merchants. Add merchant sends a one-time owner invitation through the configured delivery adapter. Unconfigured delivery leaves activation pending. See docs/audit/ATTACHED_REQUIREMENTS_MATRIX.md for verified scope and external gates.
+
+Preferred new integrations use scoped POST /v1/payments with a stable Idempotency-Key; order IDs can be omitted and generated on the server. The legacy amount-only link URL uses the same engine. Production POST /api/v1/collections is retired; historical collection inquiry remains available. Provider requests retain exact account/environment and immutable attempt correlation. A timeout requires reconciliation, not another receiving account.
+
+Cashfree uses the official JS v3 session checkout and requires genuine backend customer information for its Orders product. No approved Cashfree credentials, KYC or live acceptance were supplied. Local direct-UPI QR generation is not provider-certified dynamic QR. Render remains Free and is not approved for reliable financial callback workloads. Earlier infrastructure expiry dates below are historical observations and must be rechecked in Render.
+
 # Dynamo Pay configuration and integration manual
 
 ## 1. Your installation
@@ -15,7 +23,7 @@ POST /v1.0/payin/checkstatus accepts {"uniquetransactionid":"YOUR-ORDER-1001"}. 
 Set your webhook URL under Developer tools. It must be a public HTTPS endpoint. Optional IP restrictions accept exact public IPv4/IPv6 addresses, not CIDR ranges. Use the server's outbound IP. A callback URL must accept HTTP POST and acknowledge receipt with a 2xx response after durably recording the event.
 
 ## 3. Confirmations and customer fulfilment
-Order creation and the customer's Payment done button do not prove money arrived. In production, SMS, Android notifications and Gmail are supplementary evidence saved for review. Provider or independently authenticated bank confirmation is required for automatic payment success. In Transactions, open Details, choose Review bank credit, enter the 12-digit UTR and a review note, and confirm you checked the exact bank credit. This owner-only action posts the journal and queues the callback atomically. The owner can separately record a manual confirmation after checking the bank; this is labelled MERCHANT, not provider verified. Existing historical records retain their labels. A direct-UPI installation without a bank/provider feed requires this review step.
+Order creation and the customer's Payment done button do not prove money arrived. In production, SMS, Android notifications and Gmail are supplementary evidence saved for review. Provider or independently authenticated bank confirmation is required for automatic payment success. The normal checkout has no customer UTR entry, and the console does not expose a manual bank-review action. Use the original provider status inquiry for delayed confirmations. Exceptional back-office review remains a separately authenticated API operation using an actual bank reference and reason; it is never labelled provider verified. The owner can separately record a manual confirmation after checking the bank; this is labelled MERCHANT, not provider verified. Existing historical records retain their labels. A direct-UPI installation without a bank/provider feed requires this review step.
 
 For a callback, compute HMAC-SHA256 over the exact raw request bytes with your webhook signing secret. Compare against X-Gateway-Signature (sha256=<hex>) using a constant-time comparison. Do not parse and reserialize JSON before checking. Persist X-Gateway-Delivery-Id and order ID with a unique constraint; credit your business wallet once in the same transaction. Check amount, currency, order ownership, event, method and confirmationSource. COD success means order placement; it is not prepaid money. Do not deliver goods or credit a wallet based solely on a browser event.
 

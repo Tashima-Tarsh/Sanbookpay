@@ -1,32 +1,11 @@
-# Gaming Wallet Integration
+# Authenticated player wallet fulfillment
 
-## Overview
+The merchant backend authenticates the player and supplies an opaque playerReference when creating the provider order through POST /v1/payments. This value is included in the idempotency fingerprint and stored with the order. Do not infer a player from amount, browser events, IP address or a submitted UTR.
 
-Gaming merchants can link player references to payment orders. When a payment is confirmed, the player's wallet is credited exactly once.
+POST /api/v1/callbacks/wallets/credit requires a scoped dp_live/dp_test server credential with payments.create, an active merchant, paymentId, the exact stored playerReference, and a stable Idempotency-Key (the legacy idempotencyKey body field is also accepted). merchantId is never sufficient authorization. If amountPaise is supplied it must match the stored amount exactly; the credit amount comes from the confirmed order.
 
-## Flow
+Only an owned SUCCESS provider order with a claimed provider payment reference qualifies. Customer notifications, direct-UPI notes, redirects and manual merchant confirmation do not qualify. Shared/unattributed orders cannot be credited to an arbitrary player afterward through this endpoint.
 
-1. Merchant backend authenticates the player and sends an opaque player reference
-2. Sanbook Pay generates Order ID
-3. Sanbook Pay creates the provider-linked payment attempt
-4. Bank/PSP confirms payment
-5. Sanbook Pay identifies the correct order and merchant
-6. Merchant receives the player reference in a signed webhook
-7. Merchant credits the correct player once
+The transaction locks the payment on PostgreSQL, claims it once in pp_wallet_fulfillments, increments the wallet balance atomically, writes its wallet transaction and audit event. Repeated requests, even with different idempotency keys, reuse the fulfillment; a reused key for another payment is rejected. GET /api/v1/callbacks/wallets/:merchantId/:playerReference requires payments.read and matching authenticated merchant ownership.
 
-## Wallet Credit
-
-`POST /api/v1/callbacks/wallets/credit`
-Body: `{ "merchantId": "...", "playerReference": "...", "paymentId": "...", "orderId": "...", "amountPaise": 50000, "idempotencyKey": "..." }`
-
-Idempotency ensures a wallet is never credited twice for the same payment.
-
-## Wallet Balance
-
-`GET /api/v1/callbacks/wallets/:merchantId/:playerReference`
-
-## Security
-
-- Never credit wallets from browser redirects or unverified events
-- Wallet fulfillment is idempotent
-- Player reference is opaque; no sensitive player details in public Order IDs
+This is the gateway's recorded wallet. Crediting an external merchant wallet remains the merchant's job: verify the exact raw-body outgoing HMAC and atomically deduplicate the stable delivery ID and owned payment before crediting once. Successful HTTP delivery is not proof of external wallet fulfillment. Real merchant-wallet acceptance remains EXTERNAL_ACCESS_REQUIRED.

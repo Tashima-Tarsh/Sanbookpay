@@ -28,6 +28,7 @@ export function registerPlatformPayments(server,ctx,identity){
  `CREATE TABLE IF NOT EXISTS pp_rule_revisions(id TEXT PRIMARY KEY,rule_id TEXT NOT NULL,actor_id TEXT NOT NULL,snapshot TEXT NOT NULL,created_at TEXT NOT NULL)`,
  `CREATE TABLE IF NOT EXISTS pp_velocity(merchant_id TEXT NOT NULL,target TEXT NOT NULL,window_start TEXT NOT NULL,count INTEGER NOT NULL,total_paise INTEGER NOT NULL,PRIMARY KEY(merchant_id,target,window_start))`
  ];for(const sql of tables)db.execute(sql);
+ db.execute(`CREATE TABLE IF NOT EXISTS pp_payment_attempts(id TEXT PRIMARY KEY,payment_order_id TEXT NOT NULL REFERENCES payment_orders(id),connection_id TEXT NOT NULL,provider_name TEXT NOT NULL,environment TEXT NOT NULL,provider_order_id TEXT NOT NULL,status TEXT NOT NULL,route_snapshot TEXT NOT NULL,created_at TEXT NOT NULL,updated_at TEXT NOT NULL,UNIQUE(connection_id,provider_order_id))`);
  db.execute('CREATE INDEX IF NOT EXISTS pp_api_requests_tenant_time ON pp_api_requests(merchant_id,created_at)');
  function need(req,permission){if(!identity.authorize(req,permission))throw error(403,'Your role does not permit this action.','PERMISSION_DENIED');}
  function tenant(req){const requested=new URL(req.url,'http://localhost').searchParams.get('merchantId');if(req.platform?.platform){if(!identity.authorize(req,'merchants.read')||!requested||!merchantRepo.findById(requested))throw error(400,'Select an existing merchant.');return requested;}const mid=identity.tenant(req);if(requested&&requested!==mid)throw error(403,'Merchant scope denied.');return mid;}
@@ -88,7 +89,7 @@ export function registerPlatformPayments(server,ctx,identity){
  function requireActive(mid){const state=db.queryOne('SELECT status FROM pp_merchants WHERE merchant_id=?',[mid]);if(state&&state.status!=='ACTIVE')throw error(403,'This merchant is not active for new payments.','MERCHANT_NOT_ACTIVE');}
  function credential(req){const value=/^Bearer\s+(dp_(?:live|test)_[A-Za-z0-9_-]+)$/i.exec(req.headers.authorization||'')?.[1];if(!value)return null;const r=db.queryOne('SELECT * FROM pp_api_keys WHERE secret_hash=?',[hash(value)]);if(!r||r.revoked_at||(r.expires_at&&Date.parse(r.expires_at)<=Date.now()))return null;return r;}
  function guard(req,res,path){
-  const financial=/^\/v1\/(payments|transactions|refunds|balance|webhooks)(?:\/|$)/.test(path);
+  const financial=/^\/v1\/(payments|transactions|refunds|balance|webhooks)(?:\/|$)/.test(path)||path.startsWith('/api/v1/payment-links/');
   if(!financial)return false;
   const start=Date.now(),key=credential(req),ip=resolveClientIp(req);
   res.once('finish',()=>{try{db.execute('INSERT INTO pp_api_requests(id,key_id,merchant_id,method,path,status,duration_ms,client_ip,created_at) VALUES(?,?,?,?,?,?,?,?,?)',[crypto.randomUUID(),key?.id||null,key?.merchant_id||null,req.method,path.slice(0,200),res.statusCode,Date.now()-start,ip,now()]);}catch{/* response already committed; request does not change financial state here */}});
@@ -97,7 +98,7 @@ export function registerPlatformPayments(server,ctx,identity){
   const window=String(Math.floor(Date.now()/60000));
   const hits=db.transaction(()=>{db.execute('INSERT INTO pp_api_windows(key_id,window_start,hits) VALUES(?,?,1) ON CONFLICT(key_id,window_start) DO UPDATE SET hits=pp_api_windows.hits+1',[key.id,window]);return Number(db.queryOne('SELECT hits FROM pp_api_windows WHERE key_id=? AND window_start=?',[key.id,window]).hits);});
   if(hits>Number(key.rate_limit)){res.setHeader('Retry-After',String(60-new Date().getSeconds()));HttpServer.json(res,429,{error:'Merchant API rate limit reached.',code:'RATE_LIMITED'});return true;}
-  const area=path.split('/')[2],scope=area==='balance'?'reports.read':area==='webhooks'?'webhooks.manage':area==='transactions'?'transactions.read':`${area}.${req.method==='GET'?'read':'create'}`;
+  const area=path.startsWith('/api/v1/payment-links/')?'payments':path.split('/')[2],scope=area==='balance'?'reports.read':area==='webhooks'?'webhooks.manage':area==='transactions'?'transactions.read':`${area}.${req.method==='GET'||path.endsWith('/refresh-status')?'read':'create'}`;
   if(!JSON.parse(key.scopes).includes(scope)){HttpServer.json(res,403,{error:'This key does not have the required scope.',code:'INSUFFICIENT_SCOPE'});return true;}
   req.platform={merchantId:key.merchant_id,userId:key.id,role:'API_KEY',permissions:JSON.parse(key.scopes),platform:false,environment:key.environment};
   db.execute('UPDATE pp_api_keys SET last_used_at=? WHERE id=?',[now(),key.id]);return false;
@@ -106,8 +107,9 @@ export function registerPlatformPayments(server,ctx,identity){
  function response(s){const snapshot=s.metadata?.receivingAccountSnapshot;const intent=s.status==='ACTIVE'&&snapshot?buildUpiUri({payeeVpa:snapshot.upiId,payeeName:snapshot.payeeName,amountPaise:s.amountPaise,transactionRef:s.orderId}):null;const base=(process.env.DYNAMO_PUBLIC_URL||ctx.checkoutBaseUrl||'').replace(/\/$/,'');return {paymentId:s.id,orderId:s.orderId,amount:toRupeesString(s.amountPaise),amountPaise:String(s.amountPaise),currency:s.currency,status:s.status,checkoutUrl:base+'/checkout/'+s.id,intent,qrUrl:intent?base+'/checkout/'+s.id+'/qr.svg':null,confirmationSource:s.verificationTag==='MERCHANT_CONFIRMED'?'MERCHANT':null,createdAt:s.createdAt};}
  function providerResponse(p){return {paymentId:p.id,orderId:p.merchant_order_id,amount:toRupeesString(BigInt(p.amount_paise)),amountPaise:String(p.amount_paise),currency:p.currency,status:p.status,checkoutUrl:p.checkout_url,provider:p.provider_name,confirmationSource:p.status==='SUCCESS'?'PROVIDER':null,createdAt:p.created_at};}
  const createPayment=wrap(async(req,res)=>{
-  const mid=tenant(req),b=await HttpServer.parseBody(req);if(typeof b.orderId!=='string'||!/^[-A-Za-z0-9_]{1,120}$/.test(b.orderId))throw error(400,'Supply an orderId of 1–120 letters, digits, hyphens or underscores.');let paise;try{paise=toPaise(b.amount);}catch{throw error(400,'Amount must have at most two decimal places.');}if(paise<=0n||paise>BigInt(Number.MAX_SAFE_INTEGER)||b.currency&&b.currency!=='INR')throw error(400,'Supply a positive supported INR amount.');
-  const mode=b.connectionId?'PROVIDER':'UPI';const canonical={orderId:b.orderId,amountPaise:String(paise),currency:'INR',mode,connectionId:b.connectionId||null,customer:b.customer||null,returnUrl:b.returnUrl||null,payerVpa:b.payerVpa||null};
+  const mid=tenant(req),b=await HttpServer.parseBody(req);if(b.orderId===undefined){const key=req.headers['idempotency-key'];if(typeof key!=='string'||!/^[-A-Za-z0-9_:]{1,120}$/.test(key))throw error(400,'Supply a stable Idempotency-Key.');b.orderId='ORDER-'+hash(mid+':'+key).slice(0,40);}if(typeof b.orderId!=='string'||!/^[-A-Za-z0-9_]{1,120}$/.test(b.orderId))throw error(400,'Supply an orderId of 1–120 letters, digits, hyphens or underscores.');let paise;try{paise=toPaise(b.amount);}catch{throw error(400,'Amount must have at most two decimal places.');}if(paise<=0n||paise>BigInt(Number.MAX_SAFE_INTEGER)||b.currency&&b.currency!=='INR')throw error(400,'Supply a positive supported INR amount.');
+  if(b.playerReference!==undefined&&(typeof b.playerReference!=='string'||!b.playerReference.trim()||b.playerReference.length>200))throw error(400,'Invalid opaque player reference.');
+  const mode=b.connectionId?'PROVIDER':'UPI';const canonical={orderId:b.orderId,amountPaise:String(paise),currency:'INR',mode,connectionId:b.connectionId||null,customer:b.customer||null,returnUrl:b.returnUrl||null,payerVpa:b.payerVpa||null,playerReference:b.playerReference||null};
   db.transaction(()=>claim(req,canonical));
   const existing=sessionRepo.findByOrderId(mid,b.orderId),old=orders.findByMerchantAndOrderId(mid,b.orderId);
   if(existing){if(existing.amountPaise!==paise||mode!=='UPI')throw error(409,'Order ID already exists with another request.');return HttpServer.json(res,200,response(existing));}
@@ -119,67 +121,61 @@ export function registerPlatformPayments(server,ctx,identity){
    const account=accountRepo.findActiveForMerchant(mid);if(!account)throw error(503,'No active receiving account is configured.','NO_RECEIVING_ACCOUNT');
    const denied=enforcePaymentControls(ctx,mid,{RECEIVING_VPA:account.upiId,CUSTOMER_VPA:b.payerVpa,CUSTOMER:b.customer?.id});if(denied)throw error(403,denied.error,denied.code);
    const channel=validateUpiChannel(merchant,paise,account.upiId);if(channel)throw error(400,channel.error,channel.code);
-   const s=db.transaction(()=>{enforcePolicies(mid,{RECEIVING_VPA:account.upiId,CUSTOMER_VPA:b.payerVpa,CUSTOMER:b.customer?.id},Number(paise));return sessionRepo.create({merchantId:mid,receivingAccountId:account.id,orderId:b.orderId,amountPaise:paise,currency:'INR',method:'UPI',status:'QUEUED',metadata:{receivingAccountSnapshot:{id:account.id,upiId:account.upiId,payeeName:account.payeeName},platform:true}});});
+   const s=db.transaction(()=>{enforcePolicies(mid,{RECEIVING_VPA:account.upiId,CUSTOMER_VPA:b.payerVpa,CUSTOMER:b.customer?.id},Number(paise));return sessionRepo.create({merchantId:mid,receivingAccountId:account.id,orderId:b.orderId,amountPaise:paise,currency:'INR',method:'UPI',status:'QUEUED',metadata:{receivingAccountSnapshot:{id:account.id,upiId:account.upiId,payeeName:account.payeeName},platform:true,playerReference:b.playerReference||null}});});
    const queued=ctx.queueEngine.enqueueOrActivate(s.id,account.id);if(queued.expiresAt)ctx.timingEngine.startActiveTimer(s.id,queued.expiresAt);return HttpServer.json(res,201,response(sessionRepo.findById(s.id)));
   }
-  const conn=connections.findById(b.connectionId),policy=conn&&db.queryOne('SELECT * FROM pp_connection_policy WHERE connection_id=?',[conn.id]);
-  if(!conn||conn.merchant_id!==mid||!conn.is_active||!policy?.approved||!policy.enabled||conn.environment!==req.platform.environment||Number(paise)<Number(policy.min_paise)||Number(paise)>Number(policy.max_paise)||policy.open_until&&Date.parse(policy.open_until)>Date.now())throw error(503,'No approved eligible provider connection is available.','CONNECTION_UNAVAILABLE');
+  let conn=connections.findById(b.connectionId);const policy=conn&&db.queryOne('SELECT * FROM pp_connection_policy WHERE connection_id=?',[conn.id]);
+  if(!conn||conn.merchant_id!==mid||!conn.is_active||!policy?.approved||!policy.enabled||conn.environment!==req.platform.environment||Number(paise)<Number(policy.min_paise)||Number(paise)>Number(policy.max_paise))throw error(503,'No approved eligible provider connection is available.','CONNECTION_UNAVAILABLE');
+  if(policy.open_until&&Date.parse(policy.open_until)>Date.now()){
+    const previous=conn;
+    conn=db.query('SELECT c.* FROM provider_connections c JOIN pp_connection_policy p ON p.connection_id=c.id WHERE c.merchant_id=? AND c.environment=? AND c.is_active=1 AND p.approved=1 AND p.enabled=1 AND c.id<>? ORDER BY p.priority ASC,c.id',[mid,req.platform.environment,previous.id]).find(candidate=>{const p=db.queryOne('SELECT * FROM pp_connection_policy WHERE connection_id=?',[candidate.id]);return Number(paise)>=Number(p.min_paise)&&Number(paise)<=Number(p.max_paise)&&(!p.open_until||Date.parse(p.open_until)<=Date.now());});
+    if(!conn)throw error(503,'No approved healthy route is available.','CONNECTION_UNAVAILABLE');
+    identity.audit(req,'PREISSUE_ROUTE_SELECTED',b.orderId,{fromConnectionId:previous.id,toConnectionId:conn.id,reason:'Primary circuit open before any provider request or payable QR'});
+  }
   if(b.returnUrl){const u=new URL(b.returnUrl);if(u.protocol!=='https:')throw error(400,'Return URL must use HTTPS.');}
   const denied=enforcePaymentControls(ctx,mid,{PROVIDER:conn.provider_name,CUSTOMER_VPA:b.payerVpa,CUSTOMER:b.customer?.id});if(denied)throw error(403,denied.error,denied.code);
-  const order=db.transaction(()=>{enforcePolicies(mid,{PROVIDER:conn.provider_name,CUSTOMER:b.customer?.id},Number(paise));return orders.create({merchantId:mid,merchantOrderId:b.orderId,providerName:conn.provider_name,amountPaise:Number(paise),currency:'INR',status:'SUBMITTING',customerName:b.customer?.name,customerPhone:b.customer?.phone,customerEmail:b.customer?.email,metadata:{connectionId:conn.id,environment:conn.environment,failoverAttempts:[]}});});
-  async function tryCreateOnConnection(connection,orderId,amount,orderRow){
-    const provider=registry.getProvider(mid,connection.provider_name,connection.id);
-    const result=await provider.createCollection({merchantOrderId:orderId,amountPaise:Number(amount),currency:'INR',customerName:b.customer?.name,customerPhone:b.customer?.phone,customerEmail:b.customer?.email,returnUrl:b.returnUrl});
-    orders.update(orderRow.id,{status:'PENDING',providerOrderId:result.providerOrderId,paymentSessionId:result.paymentSessionId,checkoutUrl:result.checkoutUrl,providerResponse:result.rawResponse});
-    db.execute('UPDATE pp_connection_policy SET failures=0,open_until=NULL WHERE connection_id=?',[connection.id]);
-    return providerResponse(orders.findById(orderRow.id));
-  }
-  function recordFailoverAttempt(orderId,fromConnectionId,toConnectionId,reason){
-    db.execute('INSERT INTO pp_audit (id,merchant_id,user_id,action,entity_id,details,created_at) VALUES (?,?,?,?,?,?,?)',[crypto.randomUUID(),mid,req.platform?.userId||null,'FAILOVER_ATTEMPT',orderId,JSON.stringify({fromConnectionId,toConnectionId,reason,orderId}),now()]);
-    try{ctx.routingEngine?.recordFailover(orderId,String(fromConnectionId),String(toConnectionId),reason,'PROVIDER_FAILURE');}catch{}
-  }
+  const order=db.transaction(()=>{enforcePolicies(mid,{PROVIDER:conn.provider_name,CUSTOMER:b.customer?.id},Number(paise));return orders.create({merchantId:mid,merchantOrderId:b.orderId,providerName:conn.provider_name,amountPaise:Number(paise),currency:'INR',status:'SUBMITTING',customerName:b.customer?.name,customerPhone:b.customer?.phone,customerEmail:b.customer?.email,metadata:{connectionId:conn.id,environment:conn.environment,playerReference:b.playerReference||null,failoverAttempts:[]}});});
+  const attemptId=crypto.randomUUID();
+  const providerOrderId='SB-'+order.id.replaceAll('-','');
+  db.execute('INSERT INTO pp_payment_attempts(id,payment_order_id,connection_id,provider_name,environment,provider_order_id,status,route_snapshot,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)',[attemptId,order.id,conn.id,conn.provider_name,conn.environment,providerOrderId,'PROVIDER_CREATING',JSON.stringify({connectionId:conn.id,provider:conn.provider_name,environment:conn.environment,approvedAccountId:conn.approved_account_id||null,receivingVpa:conn.merchant_vpa||null}),now(),now()]);
   try{
-    const result=await tryCreateOnConnection(conn,b.orderId,paise,order);
-    return HttpServer.json(res,201,result);
-  }catch(primaryError){
-    db.execute('UPDATE pp_connection_policy SET failures=failures+1 WHERE connection_id=?',[conn.id]);
-    const failCount=Number(db.queryOne('SELECT failures FROM pp_connection_policy WHERE connection_id=?',[conn.id]).failures);
-    if(failCount>=3)db.execute('UPDATE pp_connection_policy SET open_until=? WHERE connection_id=?',[new Date(Date.now()+60000).toISOString(),conn.id]);
-    recordFailoverAttempt(b.orderId,conn.id,null,'Primary provider connection failed: '+primaryError.message);
-    const allConnections=db.query('SELECT * FROM provider_connections WHERE merchant_id=? AND is_active=1 AND environment=? ORDER BY created_at ASC',[mid,req.platform.environment]);
-    const eligibleBackups=allConnections.filter(c=>c.id!==conn.id);
-    let lastError=primaryError;
-    for(const backup of eligibleBackups){
-      const bpol=db.queryOne('SELECT * FROM pp_connection_policy WHERE connection_id=?',[backup.id]);
-      if(!bpol?.approved||!bpol.enabled)continue;
-      if(Number(paise)<Number(bpol.min_paise)||Number(paise)>Number(bpol.max_paise)||bpol.open_until&&Date.parse(bpol.open_until)>Date.now())continue;
-      const bdenied=enforcePaymentControls(ctx,mid,{PROVIDER:backup.provider_name,CUSTOMER_VPA:b.payerVpa,CUSTOMER:b.customer?.id});if(bdenied)continue;
-      try{
-        const switched=db.transaction(()=>{orders.update(order.id,{providerName:backup.provider_name,metadata:{...order.metadata,failoverAttempts:[...(order.metadata?.failoverAttempts||[]),{from:conn.id,to:backup.id,reason:'Primary failed',at:now()}]}});return orders.findById(order.id);});
-        const result=await tryCreateOnConnection(backup,b.orderId,paise,switched);
-        recordFailoverAttempt(b.orderId,conn.id,backup.id,'Automatic failover after primary failure');
-        return HttpServer.json(res,201,result);
-      }catch(backupError){
-        db.execute('UPDATE pp_connection_policy SET failures=failures+1 WHERE connection_id=?',[backup.id]);
-        const bfc=Number(db.queryOne('SELECT failures FROM pp_connection_policy WHERE connection_id=?',[backup.id]).failures);
-        if(bfc>=3)db.execute('UPDATE pp_connection_policy SET open_until=? WHERE connection_id=?',[new Date(Date.now()+60000).toISOString(),backup.id]);
-        recordFailoverAttempt(b.orderId,conn.id,backup.id,'Backup provider connection failed: '+backupError.message);
-        lastError=backupError;
-        continue;
-      }
-    }
-    orders.update(order.id,{status:'RECONCILIATION_REQUIRED',providerResponse:{error:'All eligible provider routes failed. Last error: '+lastError.message}});
-    HttpServer.json(res,502,{error:'All provider routes failed; retry only the same order ID.',paymentId:order.id,status:'RECONCILIATION_REQUIRED',failoverAttempted:true});
+    const provider=registry.getProvider(mid,conn.provider_name,conn.id);
+    const result=await provider.createCollection({merchantOrderId:providerOrderId,amountPaise:Number(paise),currency:'INR',customerId:b.customer?.id,customerName:b.customer?.name,customerPhone:b.customer?.phone,customerEmail:b.customer?.email,returnUrl:b.returnUrl,notifyUrl:(process.env.DYNAMO_PUBLIC_URL||ctx.checkoutBaseUrl||'')+'/api/v1/webhooks/cashfree/collections',idempotencyKey:attemptId});
+    db.transaction(()=>{
+      db.execute('UPDATE pp_payment_attempts SET status=?,updated_at=? WHERE id=?',['PAYABLE',now(),attemptId]);
+      orders.update(order.id,{status:'PENDING',providerOrderId:result.providerOrderId,paymentSessionId:result.paymentSessionId,checkoutUrl:result.checkoutUrl||((process.env.DYNAMO_PUBLIC_URL||ctx.checkoutBaseUrl||'')+'/api/v1/provider-checkout/'+order.id),providerResponse:result.rawResponse,metadata:{...JSON.parse(order.metadata||'{}'),connectionId:conn.id,attemptId,environment:conn.environment,playerReference:b.playerReference||null}});
+      db.execute('UPDATE pp_connection_policy SET failures=0,open_until=NULL WHERE connection_id=?',[conn.id]);
+    });
+    return HttpServer.json(res,201,{...providerResponse(orders.findById(order.id)),attemptId});
+  }catch(providerError){
+    // A timeout/5xx can follow an accepted order: retain correlation and original route.
+    const knownRejected=providerError.definitiveRejection===true;
+    db.transaction(()=>{
+      db.execute('UPDATE pp_payment_attempts SET status=?,updated_at=? WHERE id=?',[knownRejected?'FAILED':'UNKNOWN',now(),attemptId]);
+      orders.update(order.id,{status:knownRejected?'FAILED':'RECONCILIATION_REQUIRED',providerOrderId,providerResponse:{errorCode:providerError.code||'PROVIDER_CREATE_UNCERTAIN'},metadata:{...JSON.parse(order.metadata||'{}'),connectionId:conn.id,attemptId,playerReference:b.playerReference||null}});
+      db.execute('UPDATE pp_connection_policy SET failures=failures+1 WHERE connection_id=?',[conn.id]);
+      identity.audit(req,knownRejected?'PROVIDER_CREATE_REJECTED':'PROVIDER_CREATE_UNKNOWN',order.id,{attemptId,connectionId:conn.id});
+    });
+    return HttpServer.json(res,knownRejected?422:502,{error:knownRejected?'Provider rejected this attempt.':'Provider outcome is uncertain. Reconcile the original attempt; its route has been preserved.',paymentId:order.id,attemptId,status:knownRejected?'FAILED':'RECONCILIATION_REQUIRED'});
   }
  });
  server.post('/v1/payments',createPayment);
  post('/payments','payments.create',(req,res)=>{req.platform.environment='PRODUCTION';return createPayment(req,res);});
+ const refreshPayment=wrap(async(req,res,p)=>{
+  const mid=tenant(req),order=orders.findById(p.id);if(!order||order.merchant_id!==mid)throw error(404,'Payment not found.');
+  const target=server.routes.find(r=>r.method==='POST'&&r.regex.test('/api/v1/collections/'+p.id+'/refresh-status'));
+  if(!target)throw error(503,'Provider inquiry service unavailable.');
+  const previous=req.headers['x-merchant-id'];req.headers['x-merchant-id']=mid;
+  try{return await target.handler(req,res,p);}finally{if(previous===undefined)delete req.headers['x-merchant-id'];else req.headers['x-merchant-id']=previous;}
+ });
+ server.post('/v1/payments/:id/refresh-status',refreshPayment);
+ post('/payments/:id/refresh-status','payments.read',refreshPayment);
  server.get('/v1/payments/:id',wrap((req,res,p)=>{const mid=tenant(req),s=sessionRepo.findById(p.id);if(s?.merchantId===mid)return HttpServer.json(res,200,response(s));const o=orders.findById(p.id);if(o?.merchant_id===mid)return HttpServer.json(res,200,providerResponse(o));throw error(404,'Payment not found.');}));
  server.get('/v1/balance',wrap((req,res)=>{const mid=tenant(req);ledger.ensureAccounts(mid);HttpServer.json(res,200,{currency:'INR',accounts:db.query('SELECT account_code,balance_paise FROM ledger_accounts WHERE merchant_id=?',[mid]).map(r=>({code:r.account_code,balancePaise:String(r.balance_paise)}))});}));
  get('/balance','reports.read',(req,res)=>{const mid=tenant(req);ledger.ensureAccounts(mid);HttpServer.json(res,200,{currency:'INR',accounts:db.query('SELECT account_code,balance_paise FROM ledger_accounts WHERE merchant_id=?',[mid]).map(r=>({code:r.account_code,balancePaise:String(r.balance_paise)}))});});
  server.get('/v1/transactions',wrap((req,res)=>{const mid=tenant(req),u=new URL(req.url,'http://localhost'),page=Math.max(1,Math.min(100000,Number(u.searchParams.get('page'))||1)),limit=Math.max(1,Math.min(100,Number(u.searchParams.get('limit'))||25));const sessions=db.query('SELECT id FROM payment_sessions WHERE merchant_id=? ORDER BY created_at DESC LIMIT ? OFFSET ?',[mid,limit,(page-1)*limit]);HttpServer.json(res,200,{page,limit,payments:sessions.map(r=>response(sessionRepo.findById(r.id)))});}));
  const webhookGet=wrap((req,res)=>{const m=merchantRepo.findById(tenant(req));HttpServer.json(res,200,{url:m.webhookUrl,signatureHeader:'X-Gateway-Signature',deliveryIdHeader:'X-Gateway-Delivery-Id',maxAttempts:5});});
- const webhookPost=wrap(async(req,res)=>{const b=await HttpServer.parseBody(req);if(!b.url)throw error(400,'Supply a webhook URL.');await validateOutboundWebhookUrl(b.url);merchantRepo.update(tenant(req),{webhookUrl:b.url});identity.audit(req,'WEBHOOK_UPDATED',tenant(req),{});HttpServer.json(res,200,{url:b.url});});
+ const webhookPost=wrap(async(req,res)=>{const b=await HttpServer.parseBody(req);if(!b.url)throw error(400,'Supply a webhook URL.');const check=validateOutboundWebhookUrl(b.url);if(!check.valid||check.url.protocol!=='https:')throw error(400,check.error||'Webhook must use public HTTPS.');merchantRepo.update(tenant(req),{webhookUrl:b.url});identity.audit(req,'WEBHOOK_UPDATED',tenant(req),{});HttpServer.json(res,200,{url:b.url});});
  server.get('/v1/webhooks',webhookGet);server.post('/v1/webhooks',webhookPost);
  post('/webhook-secret/rotate','webhooks.manage',(req,res)=>{const secret=crypto.randomBytes(32).toString('hex');merchantRepo.update(tenant(req),{webhookSecret:secret});identity.audit(req,'WEBHOOK_SECRET_ROTATED',tenant(req),{});HttpServer.json(res,201,{secret});});
  get('/webhook-deliveries','webhooks.manage',(req,res)=>{const mid=tenant(req);HttpServer.json(res,200,{deliveries:['webhook_deliveries','provider_webhook_deliveries'].flatMap(table=>db.query(`SELECT id,event_type,attempt_count,is_successful,response_status,next_retry_at FROM ${table} WHERE merchant_id=? ORDER BY created_at DESC LIMIT 100`,[mid]).map(r=>({...r,source:table})))});});
