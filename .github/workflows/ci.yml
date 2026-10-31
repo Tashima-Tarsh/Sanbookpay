@@ -26,6 +26,9 @@ jobs:
       - name: Type check
         run: npm run typecheck
 
+      - name: Scan tracked files for credentials
+        run: node scripts/scan-secrets.js
+
       - name: Validate JavaScript runtime
         run: npm run build
 

@@ -1,3 +1,4 @@
+import {enforcePaymentControls} from '../payment-controls.js';
 /**
  * DYNAMO PAY — NATIVE API ROUTES
  * Dynamo Pay-branded payment collection endpoints:
@@ -143,7 +144,7 @@ export function registerDynamoPayRoutes(server, ctx) {
     const receivables = Number(ledgerRepo.getAccount(merchantId, 'MERCHANT_RECEIVABLES')?.balance_paise || 0);
     const clearing = Number(ledgerRepo.getAccount(merchantId, 'PROVIDER_CLEARING')?.balance_paise || 0);
     const lien = Number(ledgerRepo.getAccount(merchantId, 'PAYOUTS_IN_TRANSIT')?.balance_paise || 0);
-    const unsettled = Math.max(0, receivables + clearing - settled);
+    const unsettled = Math.max(0, clearing);
     const loan = Math.max(0, -Math.min(0, Number(ledgerRepo.getAccount(merchantId, 'FEES')?.balance_paise || 0)));
     return {
       settledwallet: Math.max(0, settled),
@@ -203,6 +204,8 @@ export function registerDynamoPayRoutes(server, ctx) {
       return HttpServer.json(res, 500, { error: 'No active UPI receiving account configured', code: 'NO_RECEIVING_ACCOUNT', platform: 'dynamo-pay' });
     }
 
+    const ruleError=enforcePaymentControls(ctx,merchant.merchantId,{RECEIVING_VPA:receivingAccount.upiId,CUSTOMER_VPA:body.payerVpa,CUSTOMER:body.customerId});
+    if(ruleError)return HttpServer.json(res,403,ruleError);
     const channelError=validateUpiChannel(merchantRepo.findById(merchant.merchantId),amountPaise,receivingAccount.upiId);
     if(channelError)return HttpServer.json(res,400,channelError);
     const session = ctx.sessionRepo.create({

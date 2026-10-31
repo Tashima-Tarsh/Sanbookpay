@@ -1,6 +1,6 @@
 {
-  "testedAt": "2026-10-30T23:49:54.634Z",
-  "total": 183,
+  "testedAt": "2026-10-31T08:01:57.323Z",
+  "total": 189,
   "duplicateRegistrations": 0,
   "scope": "Route inventory and invalid/anonymous smoke, not successful-path business coverage for every endpoint.",
   "results": [
@@ -8,7 +8,7 @@
       "method": "GET",
       "path": "/health",
       "status": 200,
-      "durationMs": 28,
+      "durationMs": 27,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
@@ -19,24 +19,45 @@
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
+      "method": "GET",
+      "path": "/api/v1/admin/console/payment-rules",
+      "status": 401,
+      "durationMs": 2,
+      "mode": "Anonymous / empty-body / nonexistent-ID smoke"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/console/payment-rules",
+      "status": 401,
+      "durationMs": 6,
+      "mode": "Anonymous / empty-body / nonexistent-ID smoke"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/console/payment-rules/missing-test-id/state",
+      "status": 401,
+      "durationMs": 2,
+      "mode": "Anonymous / empty-body / nonexistent-ID smoke"
+    },
+    {
       "method": "POST",
       "path": "/api/v1/payments",
       "status": 400,
-      "durationMs": 6,
+      "durationMs": 3,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
       "method": "GET",
       "path": "/api/v1/payments/missing-test-id",
       "status": 404,
-      "durationMs": 3,
+      "durationMs": 2,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
       "method": "GET",
       "path": "/api/v1/payments/missing-test-id/cod",
       "status": 404,
-      "durationMs": 3,
+      "durationMs": 2,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
@@ -50,28 +71,28 @@
       "method": "GET",
       "path": "/api/v1/payments/missing-test-id/receipt",
       "status": 404,
-      "durationMs": 2,
+      "durationMs": 3,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
       "method": "GET",
       "path": "/api/v1/checkout/missing-test-id/state",
       "status": 404,
-      "durationMs": 4,
+      "durationMs": 2,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
       "method": "GET",
       "path": "/api/v1/checkout/server-health",
       "status": 200,
-      "durationMs": 10,
+      "durationMs": 7,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
       "method": "POST",
       "path": "/api/v1/checkout/missing-test-id/bind-customer",
       "status": 400,
-      "durationMs": 2,
+      "durationMs": 3,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
@@ -85,14 +106,14 @@
       "method": "POST",
       "path": "/api/v1/checkout/missing-test-id/payment-done",
       "status": 404,
-      "durationMs": 3,
+      "durationMs": 2,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
       "method": "POST",
       "path": "/api/v1/checkout/missing-test-id/verify-utr",
       "status": 404,
-      "durationMs": 3,
+      "durationMs": 2,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
@@ -120,14 +141,14 @@
       "method": "POST",
       "path": "/api/v1/checkout/missing-test-id/card-pay",
       "status": 404,
-      "durationMs": 2,
+      "durationMs": 3,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
       "method": "POST",
       "path": "/api/v1/checkout/missing-test-id/netbanking-pay",
       "status": 404,
-      "durationMs": 2,
+      "durationMs": 3,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
@@ -154,29 +175,29 @@
     {
       "method": "POST",
       "path": "/api/v1/checkout/missing-test-id/simulate-observation",
-      "status": 403,
-      "durationMs": 2,
+      "status": 401,
+      "durationMs": 1,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
       "method": "POST",
       "path": "/api/v1/checkout/missing-test-id/end-and-restart-payment",
       "status": 404,
-      "durationMs": 3,
+      "durationMs": 2,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
       "method": "POST",
       "path": "/api/v1/checkout/missing-test-id/end-session-and-create-new",
       "status": 404,
-      "durationMs": 2,
+      "durationMs": 1,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
       "method": "GET",
       "path": "/api/v1/checkout/missing-test-id/stream",
       "status": 404,
-      "durationMs": 2,
+      "durationMs": 1,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
@@ -197,7 +218,7 @@
       "method": "POST",
       "path": "/api/v1/pollers/events",
       "status": 401,
-      "durationMs": 1,
+      "durationMs": 2,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
@@ -218,7 +239,7 @@
       "method": "POST",
       "path": "/api/v1/pollers/android/events",
       "status": 400,
-      "durationMs": 1,
+      "durationMs": 2,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
@@ -231,21 +252,21 @@
     {
       "method": "POST",
       "path": "/api/v1/pollers/android/heartbeat",
-      "status": 200,
+      "status": 401,
       "durationMs": 1,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
       "method": "POST",
       "path": "/api/v1/pollers/heartbeat",
-      "status": 200,
+      "status": 401,
       "durationMs": 1,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
       "method": "POST",
       "path": "/api/v1/observers/heartbeat",
-      "status": 200,
+      "status": 401,
       "durationMs": 1,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
@@ -267,56 +288,56 @@
       "method": "DELETE",
       "path": "/api/v1/admin/sms-gateway/devices/missing-test-id",
       "status": 401,
-      "durationMs": 3,
+      "durationMs": 4,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
       "method": "GET",
       "path": "/api/v1/admin/sms-gateway/download-apk",
       "status": 200,
-      "durationMs": 9,
+      "durationMs": 13,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
       "method": "GET",
       "path": "/youpi-sms-gateway.apk",
       "status": 200,
-      "durationMs": 10,
+      "durationMs": 12,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
       "method": "GET",
       "path": "/api/v1/admin/queue",
       "status": 401,
-      "durationMs": 2,
+      "durationMs": 1,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
       "method": "GET",
       "path": "/api/v1/admin/observers",
       "status": 401,
-      "durationMs": 2,
+      "durationMs": 1,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
       "method": "GET",
       "path": "/api/v1/admin/payments",
       "status": 401,
-      "durationMs": 2,
+      "durationMs": 1,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
       "method": "GET",
       "path": "/api/v1/admin/tickets",
       "status": 401,
-      "durationMs": 2,
+      "durationMs": 1,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
       "method": "POST",
       "path": "/api/v1/admin/tickets/missing-test-id/resolve",
       "status": 401,
-      "durationMs": 2,
+      "durationMs": 1,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
@@ -351,7 +372,7 @@
       "method": "POST",
       "path": "/api/v1/admin/upi-accounts",
       "status": 401,
-      "durationMs": 2,
+      "durationMs": 1,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
@@ -386,7 +407,7 @@
       "method": "GET",
       "path": "/api/v1/admin/all-settings",
       "status": 401,
-      "durationMs": 3,
+      "durationMs": 2,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
@@ -449,21 +470,21 @@
       "method": "POST",
       "path": "/api/v1/admin/whatsapp/pairing-code",
       "status": 401,
-      "durationMs": 2,
+      "durationMs": 1,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
       "method": "POST",
       "path": "/api/v1/admin/whatsapp/disconnect",
       "status": 401,
-      "durationMs": 2,
+      "durationMs": 1,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
       "method": "POST",
       "path": "/api/v1/admin/whatsapp/test-message",
       "status": 401,
-      "durationMs": 2,
+      "durationMs": 1,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
@@ -477,7 +498,7 @@
       "method": "GET",
       "path": "/api/v1/admin/counter-pending",
       "status": 401,
-      "durationMs": 2,
+      "durationMs": 1,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
@@ -505,21 +526,21 @@
       "method": "GET",
       "path": "/api/v1/admin/gmail/credentials",
       "status": 401,
-      "durationMs": 2,
+      "durationMs": 1,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
       "method": "GET",
       "path": "/api/v1/admin/gmail/oauth/start",
       "status": 401,
-      "durationMs": 2,
+      "durationMs": 1,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
       "method": "POST",
       "path": "/api/v1/admin/gmail/disconnect",
       "status": 401,
-      "durationMs": 2,
+      "durationMs": 1,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
@@ -540,20 +561,20 @@
       "method": "POST",
       "path": "/api/v1/admin/gmail/test",
       "status": 401,
-      "durationMs": 2,
+      "durationMs": 3,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
       "method": "GET",
       "path": "/api/v1/admin/dev/false-narrative",
       "status": 401,
-      "durationMs": 2,
+      "durationMs": 1,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
       "method": "POST",
       "path": "/api/v1/admin/dev/false-narrative",
-      "status": 403,
+      "status": 401,
       "durationMs": 1,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
@@ -567,14 +588,14 @@
     {
       "method": "POST",
       "path": "/api/v1/admin/dev/test-mode",
-      "status": 403,
+      "status": 401,
       "durationMs": 1,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
       "method": "POST",
       "path": "/api/v1/admin/dev/test-mode/inject",
-      "status": 403,
+      "status": 401,
       "durationMs": 1,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
@@ -602,7 +623,7 @@
     {
       "method": "POST",
       "path": "/api/v1/admin/dev/simulator/inject",
-      "status": 403,
+      "status": 401,
       "durationMs": 1,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
@@ -638,7 +659,7 @@
       "method": "POST",
       "path": "/api/v1/admin/security/manual-ban",
       "status": 401,
-      "durationMs": 2,
+      "durationMs": 1,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
@@ -663,6 +684,27 @@
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
+      "method": "POST",
+      "path": "/api/v1/admin/console/payments/missing-test-id/confirm-reviewed",
+      "status": 401,
+      "durationMs": 1,
+      "mode": "Anonymous / empty-body / nonexistent-ID smoke"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/console/stream",
+      "status": 401,
+      "durationMs": 1,
+      "mode": "Anonymous / empty-body / nonexistent-ID smoke"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/console/operations",
+      "status": 401,
+      "durationMs": 1,
+      "mode": "Anonymous / empty-body / nonexistent-ID smoke"
+    },
+    {
       "method": "GET",
       "path": "/api/v1/admin/console/upi-channel",
       "status": 401,
@@ -673,7 +715,7 @@
       "method": "POST",
       "path": "/api/v1/admin/console/upi-channel",
       "status": 401,
-      "durationMs": 2,
+      "durationMs": 1,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
@@ -722,7 +764,7 @@
       "method": "POST",
       "path": "/api/v1/admin/console/allocations/missing-test-id/transfer",
       "status": 401,
-      "durationMs": 2,
+      "durationMs": 1,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
@@ -778,42 +820,42 @@
       "method": "POST",
       "path": "/api/v1/customer/login",
       "status": 400,
-      "durationMs": 2,
+      "durationMs": 1,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
       "method": "GET",
       "path": "/api/v1/customer/me",
       "status": 401,
-      "durationMs": 4,
+      "durationMs": 1,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
       "method": "POST",
       "path": "/api/v1/customer/logout",
       "status": 200,
-      "durationMs": 3,
+      "durationMs": 2,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
       "method": "POST",
       "path": "/api/v1/customer/switch-account",
       "status": 400,
-      "durationMs": 3,
+      "durationMs": 1,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
       "method": "GET",
       "path": "/api/v1/customer/payments",
       "status": 404,
-      "durationMs": 2,
+      "durationMs": 1,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
       "method": "POST",
       "path": "/api/v1/customer/tickets",
       "status": 404,
-      "durationMs": 2,
+      "durationMs": 1,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
@@ -827,14 +869,14 @@
       "method": "POST",
       "path": "/api/v1/customer/tickets/missing-test-id/messages",
       "status": 404,
-      "durationMs": 2,
+      "durationMs": 1,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
       "method": "GET",
       "path": "/api/v1/customer/tickets/missing-test-id/stream",
       "status": 404,
-      "durationMs": 2,
+      "durationMs": 1,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
@@ -855,14 +897,14 @@
       "method": "GET",
       "path": "/api/v1/devices/missing-test-id",
       "status": 404,
-      "durationMs": 2,
+      "durationMs": 1,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
       "method": "GET",
       "path": "/api/v1/devices/customer/missing-test-id",
       "status": 200,
-      "durationMs": 2,
+      "durationMs": 1,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
@@ -897,7 +939,7 @@
       "method": "POST",
       "path": "/api/v1/collections/missing-test-id/refresh-status",
       "status": 401,
-      "durationMs": 2,
+      "durationMs": 1,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
@@ -1016,28 +1058,28 @@
       "method": "POST",
       "path": "/api/v1/banking/connections/missing-test-id/disconnect",
       "status": 401,
-      "durationMs": 2,
+      "durationMs": 1,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
       "method": "GET",
       "path": "/api/v1/banking/balance",
       "status": 401,
-      "durationMs": 2,
+      "durationMs": 1,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
       "method": "POST",
       "path": "/api/v1/webhooks/cashfree/collections",
       "status": 400,
-      "durationMs": 3,
+      "durationMs": 2,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
       "method": "POST",
       "path": "/api/v1/webhooks/cashfree/payouts",
       "status": 400,
-      "durationMs": 3,
+      "durationMs": 2,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
@@ -1058,14 +1100,14 @@
       "method": "POST",
       "path": "/api/v1/settlements/trigger",
       "status": 401,
-      "durationMs": 2,
+      "durationMs": 1,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
       "method": "GET",
       "path": "/api/v1/settlements/missing-test-id",
       "status": 401,
-      "durationMs": 2,
+      "durationMs": 1,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
@@ -1079,112 +1121,112 @@
       "method": "GET",
       "path": "/api/v1/ledger/journal",
       "status": 401,
-      "durationMs": 2,
+      "durationMs": 1,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
       "method": "GET",
       "path": "/api/v1/ledger/trial-balance",
       "status": 401,
-      "durationMs": 3,
+      "durationMs": 1,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
       "method": "GET",
       "path": "/api/v1/reconciliation/runs",
       "status": 401,
-      "durationMs": 2,
+      "durationMs": 1,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
       "method": "GET",
       "path": "/api/v1/reconciliation/exceptions",
       "status": 401,
-      "durationMs": 2,
+      "durationMs": 1,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
       "method": "POST",
       "path": "/api/v1/reconciliation/run",
       "status": 401,
-      "durationMs": 2,
+      "durationMs": 1,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
       "method": "POST",
       "path": "/api/v1/reconciliation/exceptions/missing-test-id/resolve",
       "status": 401,
-      "durationMs": 2,
+      "durationMs": 1,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
       "method": "GET",
       "path": "/api/v1/reports/missing-test-id",
       "status": 200,
-      "durationMs": 3,
+      "durationMs": 2,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
       "method": "POST",
       "path": "/api/v1/refunds",
       "status": 401,
-      "durationMs": 2,
+      "durationMs": 1,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
       "method": "GET",
       "path": "/api/v1/refunds/missing-test-id",
       "status": 401,
-      "durationMs": 2,
+      "durationMs": 1,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
       "method": "GET",
       "path": "/api/v1/refunds",
       "status": 401,
-      "durationMs": 4,
+      "durationMs": 1,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
       "method": "POST",
       "path": "/api/v1/split-settlements/configure",
       "status": 401,
-      "durationMs": 2,
+      "durationMs": 1,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
       "method": "GET",
       "path": "/api/v1/split-settlements/rules",
       "status": 401,
-      "durationMs": 3,
+      "durationMs": 1,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
       "method": "GET",
       "path": "/api/v1/split-settlements/entries",
       "status": 401,
-      "durationMs": 2,
+      "durationMs": 1,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
       "method": "GET",
       "path": "/api/v1/split-settlements/overview",
       "status": 401,
-      "durationMs": 2,
+      "durationMs": 1,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
       "method": "POST",
       "path": "/api/v1/split-settlements/settle",
       "status": 401,
-      "durationMs": 3,
+      "durationMs": 1,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
       "method": "POST",
       "path": "/api/v1/checkout/missing-test-id/auto-refund",
       "status": 404,
-      "durationMs": 3,
+      "durationMs": 2,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
@@ -1219,70 +1261,70 @@
       "method": "POST",
       "path": "/v1.0/collect/upi",
       "status": 401,
-      "durationMs": 3,
+      "durationMs": 1,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
       "method": "POST",
       "path": "/v1/dynamo/checkstatus",
       "status": 401,
-      "durationMs": 6,
+      "durationMs": 1,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
       "method": "POST",
       "path": "/v1.0/payin/checkstatus",
       "status": 401,
-      "durationMs": 7,
+      "durationMs": 1,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
       "method": "POST",
       "path": "/v1/dynamo/ifsc/missing-test-id",
       "status": 401,
-      "durationMs": 6,
+      "durationMs": 2,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
       "method": "POST",
       "path": "/v1.0/ifsc/missing-test-id",
       "status": 401,
-      "durationMs": 4,
+      "durationMs": 1,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
       "method": "POST",
       "path": "/v1/dynamo/wallet",
       "status": 401,
-      "durationMs": 6,
+      "durationMs": 1,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
       "method": "POST",
       "path": "/v1.0/wallet",
       "status": 401,
-      "durationMs": 2,
+      "durationMs": 1,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
       "method": "POST",
       "path": "/v1/dynamo/merchant/webhook",
       "status": 401,
-      "durationMs": 8,
+      "durationMs": 2,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
       "method": "POST",
       "path": "/v1.0/merchant/webhook",
       "status": 401,
-      "durationMs": 2,
+      "durationMs": 1,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     },
     {
       "method": "GET",
       "path": "/v1/dynamo/merchant/retry-policy",
       "status": 401,
-      "durationMs": 2,
+      "durationMs": 1,
       "mode": "Anonymous / empty-body / nonexistent-ID smoke"
     }
   ]

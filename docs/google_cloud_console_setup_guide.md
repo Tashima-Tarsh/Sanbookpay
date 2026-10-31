@@ -1,3 +1,5 @@
+> Current setup and confirmation policy: [Operations manual](OPERATIONS-MANUAL.md). Credential names and storage: [Configuration inventory](CONFIGURATION-CREDENTIALS.md). Historical examples below may describe earlier runtimes or unconfigured services.
+
 # Google Cloud Console & Gmail Direct API Setup Guide for YouPI PG
 
 This guide provides step-by-step instructions to configure your Google Cloud Console project, enable the Gmail API, configure OAuth 2.0 credentials, and obtain a persistent **Refresh Token** to connect your Gmail account directly to the YouPI PG Merchant Admin panel.

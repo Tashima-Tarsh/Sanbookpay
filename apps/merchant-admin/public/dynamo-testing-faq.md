@@ -9,9 +9,9 @@ A practical account of what was checked, what was fixed, and how the payment que
 
 Executed check | Result
 
-42 automated suites / 332 tests | PASS
+45 automated suites / 359 tests | PASS
 
-183 registered API routes; anonymous / invalid-input smoke | PASS — no 5xx or transport failures
+189 registered API routes; anonymous / invalid-input smoke | PASS — no 5xx or transport failures
 
 Capacity and data-integrity assertions | PASS
 
@@ -31,7 +31,7 @@ The API previously grouped proxied visitors under the loopback address. It now a
 
 Payment confirmation stays tied to evidence
 
-A customer clicking Payment done or typing a UTR does not prove receipt. Missing confirmation stays pending for reconciliation. A matching saved bank observation can complete the payment later. Tests cover delayed credits, incorrect references, ambiguous equal-amount credits and protecting newer orders from an older merchant-confirmed receipt.
+A customer clicking Payment done or typing a UTR does not prove receipt. Missing confirmation stays pending for reconciliation. Production SMS/Gmail/Android observations are supplementary evidence. A provider confirmation or explicit owner bank review is required to mark the payment paid. Tests cover delayed credits, incorrect references, ambiguous equal-amount credits and protecting newer orders from an older merchant-confirmed receipt.
 
 Callbacks recover predictably
 
@@ -57,7 +57,7 @@ Can separate merchants work in parallel? | 10 active checkouts across 10 merchan
 
 Was the database consistent? | Foreign-key check: PASS.
 
-The short order-creation burst measured 244.79 requests/second, with p50 92 ms, p95 149 ms and p99 157 ms. The benchmark raised its own rate limit to 10,000; that does not change the deployed limit.
+The short order-creation burst measured 133.09 requests/second, with p50 156 ms, p95 297 ms and p99 316 ms. The benchmark raised its own rate limit to 10,000; that does not change the deployed limit.
 
 Duplicate-request handling and queue completion checks were successful. Capacity figures reflect a local test using simulated bank confirmations. See the saved technical results for the complete test conditions.
 
@@ -69,7 +69,7 @@ The configured default is 1,000 API requests per IP in a 60-second fixed window.
 
 Does that mean 1,000 successful UPI payments per minute?
 
-No. Request allowance and completed payments measure different things. Real completion depends on the payer, bank, active checkout slot and arrival of a valid receiving-bank observation. The present tests establish scheduling and reconciliation behaviour, not a bank-confirmed payments-per-second maximum.
+No. Request allowance and completed payments measure different things. Real completion depends on the payer, bank, active checkout slot and authoritative provider confirmation or explicit owner bank review. The present tests establish scheduling and reconciliation behaviour, not a bank-confirmed payments-per-second maximum.
 
 What should the customer server do when a request fails?
 
@@ -125,7 +125,7 @@ Full route list and response codes | output/testing/route-test-results.csv
 
 Customer request and signature examples | Dynamo-Pay-Integration-Manual.pdf
 
-Environment: v24.14.1, Windows, 11th Gen Intel(R) Core(TM) i5-1145G7 @ 2.60GHz, 8 logical CPUs, 16 GiB RAM. Capacity transport was HTTP loopback with isolated on-disk SQLite WAL. Test execution time: 130.93 seconds for the regression runner.
+Environment: v24.14.1, Windows, 11th Gen Intel(R) Core(TM) i5-1145G7 @ 2.60GHz, 8 logical CPUs, 16 GiB RAM. Capacity transport was HTTP loopback with isolated on-disk SQLite WAL. Test execution time: 178.17 seconds for the regression runner.
 
 What the route inventory means
 

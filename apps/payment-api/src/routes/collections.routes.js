@@ -1,3 +1,4 @@
+import {enforcePaymentControls} from '../payment-controls.js';
 import { confirmProviderCollection, publishProviderCollection } from '../services/provider-confirmation.js';
 import { HttpServer } from '../server.js';
 import { PaymentOrderRepository, LedgerRepository, IdempotencyRepository } from '@youpi/db';
@@ -79,6 +80,8 @@ export function registerCollectionsRoutes(server, ctx) {
 
     const startInitiation = Date.now();
     const providerName = (body.provider || 'CASHFREE').toUpperCase();
+    const ruleError=enforcePaymentControls(ctx,merchantId,{PROVIDER:providerName,CUSTOMER_VPA:body.customer?.vpa,CUSTOMER:body.customerId});
+    if(ruleError)return HttpServer.json(res,403,ruleError);
     let providerOrder;
 
     try {

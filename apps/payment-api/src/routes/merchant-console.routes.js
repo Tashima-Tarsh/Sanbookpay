@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import { upiChannelSettings } from '../upi-channel.js';
 import { HttpServer } from '../server.js';
 import { isValidVpa, resolveSecret } from '@youpi/common';
-import { SplitSettlementRepository } from '@youpi/db';
+import { SplitSettlementRepository, LedgerRepository } from '@youpi/db';
 
 export function allocateRecipients(amountPaise, recipients) {
   if (!Number.isSafeInteger(amountPaise) || amountPaise < 0) throw new Error('Invalid amount');
@@ -21,6 +21,36 @@ export function registerMerchantConsoleRoutes(server, ctx) {
   db.execute(`CREATE TABLE IF NOT EXISTS console_split_transfers (payment_id TEXT NOT NULL REFERENCES console_split_allocations(payment_id), recipient_vpa TEXT NOT NULL, bank_reference TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY(payment_id,recipient_vpa))`);
   const merchant = req => (req.headers['x-merchant-id'] ? merchantRepo.findById(req.headers['x-merchant-id']) : null) || merchantRepo.getDefault();
   const root = '/api/v1/admin/console';
+  db.execute('CREATE TABLE IF NOT EXISTS manual_payment_references (merchant_id TEXT NOT NULL REFERENCES merchants(id),bank_reference TEXT NOT NULL,payment_id TEXT NOT NULL REFERENCES payment_sessions(id),PRIMARY KEY(merchant_id,bank_reference))');
+  server.post(root+'/payments/:id/confirm-reviewed',async(req,res,params)=>{
+    const body=await HttpServer.parseBody(req),m=merchant(req);
+    if(body.bankReviewed!==true||!/^\d{12}$/.test(body.bankReference||'')||typeof body.reason!=='string'||body.reason.trim().length<10)return HttpServer.json(res,400,{error:'Confirm that the bank credit was reviewed, provide its 12-digit reference and a review note of at least 10 characters.'});
+    let result;
+    try{result=db.transaction(()=>{
+      const row=db.queryOne(`SELECT * FROM payment_sessions WHERE id=? AND merchant_id=?${db.dialect==='postgres'?' FOR UPDATE':''}`,[params.id,m.id]);
+      if(!row||row.method!=='UPI')throw Error('UPI payment not found for this merchant.');
+      if(row.status==='SUCCESS')return {changed:false};
+      if(!['ACTIVE','PROCESSING','VERIFICATION_PENDING','EXPIRED','FAILED'].includes(row.status))throw Error('This payment is not available for bank review.');
+      const reused=db.queryOne('SELECT payment_id FROM manual_payment_references WHERE merchant_id=? AND bank_reference=?',[m.id,body.bankReference]);
+      const observed=db.queryOne('SELECT attributed_payment_id FROM payment_observations WHERE bank_reference_number=? AND attributed_payment_id IS NOT NULL AND attributed_payment_id<>?',[body.bankReference,row.id]);
+      const historical=db.queryOne("SELECT id FROM payment_sessions WHERE merchant_id=? AND id<>? AND status='SUCCESS' AND json_extract(metadata,'$.reportedUtr')=?",[m.id,row.id,body.bankReference]);
+      const providerReference=db.queryOne("SELECT id FROM payment_orders WHERE merchant_id=? AND status='SUCCESS' AND bank_reference=? AND (payment_session_id IS NULL OR payment_session_id<>?)",[m.id,body.bankReference,row.id]);
+      if(observed||historical||providerReference||(reused&&reused.payment_id!==row.id))throw Error('This bank reference is already assigned to another payment.');
+      if(!reused)db.execute('INSERT INTO manual_payment_references(merchant_id,bank_reference,payment_id) VALUES(?,?,?)',[m.id,body.bankReference,row.id]);
+      const metadata={...JSON.parse(row.metadata||'{}'),reportedUtr:body.bankReference,bankReviewNote:body.reason.trim().slice(0,1000)};
+      db.execute("UPDATE payment_sessions SET status='SUCCESS',verification_tag='MERCHANT_CONFIRMED',completed_at=?,metadata=?,updated_at=? WHERE id=?",[new Date().toISOString(),JSON.stringify(metadata),new Date().toISOString(),row.id]);
+      new LedgerRepository(db).recordDoubleEntry(m.id,'MANUAL_COLLECTION',row.id,'Merchant bank review: '+body.reason.trim().slice(0,200),'BANK_CASH','MERCHANT_RECEIVABLES',Number(row.amount_paise));
+      ctx.auditRepo.log({merchantId:m.id,entityType:'PAYMENT_SESSION',entityId:row.id,action:'MERCHANT_BANK_REVIEW_CONFIRMED',actorType:'ADMIN',details:{bankReference:body.bankReference,reason:metadata.bankReviewNote,amountPaise:Number(row.amount_paise)}});
+      const session=ctx.sessionRepo.findById(row.id);
+      const queued=ctx.webhookEngine.enqueue('SUCCESS',{...session,confirmationSource:'MERCHANT',bankReference:body.bankReference});
+      return {changed:true,deliveryId:queued.deliveryId};
+    });}catch(error){return HttpServer.json(res,409,{error:error.message});}
+    if(result.changed){
+      ctx.eventEmitter.emit('PAYMENT.SUCCESS',{paymentId:params.id,webhookQueued:true});
+      if(result.deliveryId)ctx.webhookEngine.retryPending(result.deliveryId).catch(error=>console.error('[Reviewed payment callback]',error.message));
+    }
+    HttpServer.json(res,200,{paymentId:params.id,status:'SUCCESS',confirmationSource:'MERCHANT',changed:result.changed});
+  });
   server.get(root+'/stream',(req,res)=>{
     server.initSse(`console_${merchant(req).id}`,res);
     const expiry=setTimeout(()=>res.end(),300000);expiry.unref?.();res.on('close',()=>clearTimeout(expiry));

@@ -1,3 +1,5 @@
+import crypto from 'node:crypto';
+import {androidSourceHash} from '../packages/common/src/android-release.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execSync } from 'node:child_process';
@@ -7,19 +9,18 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const REPO_ROOT = path.resolve(__dirname, '..');
 
-console.log('🚀 Starting certified Android APK compilation for YouPI SMS Gateway...');
+console.log('Starting Android observer compilation; device acceptance testing is separate.');
 
 // Resolve Toolchain Paths
-const JDK_DIR = 'C:\\Program Files\\Microsoft\\jdk-17.0.20.101-hotspot\\bin';
-const JAVAC = path.join(JDK_DIR, 'javac.exe');
-const KEYTOOL = path.join(JDK_DIR, 'keytool.exe');
-
-const CLT_BUILD_TOOLS = 'C:\\Users\\gaura\\scoop\\apps\\android-clt\\current\\build-tools\\34.0.0';
-const AAPT = path.join(CLT_BUILD_TOOLS, 'aapt.exe');
-const D8 = path.join(CLT_BUILD_TOOLS, 'd8.bat');
-const ZIPALIGN = path.join(CLT_BUILD_TOOLS, 'zipalign.exe');
-const APKSIGNER = path.join(CLT_BUILD_TOOLS, 'apksigner.bat');
-const ANDROID_JAR = 'C:\\Users\\gaura\\scoop\\apps\\android-clt\\current\\platforms\\android-34\\android.jar';
+const JDK_DIR=path.join(process.env.JAVA_HOME||'', 'bin');
+const SDK=process.env.ANDROID_HOME||process.env.ANDROID_SDK_ROOT;
+if(!SDK||!process.env.JAVA_HOME)throw Error('Set JAVA_HOME and ANDROID_HOME to your installed JDK 17 and Android SDK.');
+const JAVAC=path.join(JDK_DIR,'javac.exe');
+const CLT_BUILD_TOOLS=path.join(SDK,'build-tools',process.env.ANDROID_BUILD_TOOLS_VERSION||'34.0.0');
+const AAPT=path.join(CLT_BUILD_TOOLS,'aapt.exe'),D8=path.join(CLT_BUILD_TOOLS,'d8.bat'),ZIPALIGN=path.join(CLT_BUILD_TOOLS,'zipalign.exe'),APKSIGNER=path.join(CLT_BUILD_TOOLS,'apksigner.bat');
+const ANDROID_JAR=path.join(SDK,'platforms','android-34','android.jar');
+const keystorePath=process.env.DYNAMO_ANDROID_KEYSTORE;
+if(!keystorePath||!fs.existsSync(keystorePath)||!process.env.DYNAMO_ANDROID_KEYSTORE_PASSWORD||!process.env.DYNAMO_ANDROID_KEY_ALIAS)throw Error('Provide the existing private Android keystore, password and key alias. Signing identity is never regenerated.');
 
 const APP_DIR = path.resolve(REPO_ROOT, 'apps/android-observer-app/app');
 const MANIFEST = path.resolve(APP_DIR, 'src/main/AndroidManifest.xml');
@@ -27,6 +28,7 @@ const RES_DIR = path.resolve(APP_DIR, 'src/main/res');
 const JAVA_DIR = path.resolve(APP_DIR, 'src/main/java/com/youpi/observer');
 
 const WORK_DIR = path.resolve(REPO_ROOT, '.tmp_apk_build');
+if(!WORK_DIR.startsWith(REPO_ROOT+path.sep)||path.basename(WORK_DIR)!=='.tmp_apk_build')throw Error('Unsafe Android build directory');
 if (fs.existsSync(WORK_DIR)) {
   fs.rmSync(WORK_DIR, { recursive: true, force: true });
 }
@@ -105,18 +107,9 @@ try {
 
   // 5. Generate Keystore & Sign APK with apksigner (v1, v2, and v3 signatures)
   console.log('🔏 [5/6] Signing APK with Android v2 + v3 cryptographic certificate...');
-  const keystorePath = path.join(WORK_DIR, 'release.keystore');
-  const ksPass = 'youpipg123';
-  const alias = 'youpi_gateway';
-
-  execSync(`"${KEYTOOL}" -genkeypair -v -keystore "${keystorePath}" -alias "${alias}" -keyalg RSA -keysize 2048 -validity 10000 -storepass "${ksPass}" -keypass "${ksPass}" -dname "CN=YouPI SMS Gateway, OU=Merchant Payments, O=YouPI PG, L=Mumbai, ST=MH, C=IN"`, {
-    stdio: 'pipe'
-  });
-
-  const signedApk = path.join(WORK_DIR, 'signed.apk');
-  execSync(`cmd.exe /c ""${APKSIGNER}" sign --ks "${keystorePath}" --ks-pass pass:${ksPass} --key-pass pass:${ksPass} --ks-key-alias "${alias}" --out "${signedApk}" "${alignedApk}""`, {
-    stdio: 'inherit'
-  });
+  const signedApk=path.join(WORK_DIR,'signed.apk');
+  // apksigner reads passwords from its inherited environment, not command arguments.
+  execSync(`cmd.exe /c ""${APKSIGNER}" sign --ks "${keystorePath}" --ks-pass env:DYNAMO_ANDROID_KEYSTORE_PASSWORD --key-pass env:DYNAMO_ANDROID_KEYSTORE_PASSWORD --ks-key-alias "${process.env.DYNAMO_ANDROID_KEY_ALIAS}" --out "${signedApk}" "${alignedApk}""`,{stdio:'pipe'});
 
   // Verify APK signature
   const verifyOutput = execSync(`cmd.exe /c ""${APKSIGNER}" verify --verbose "${signedApk}""`, {
@@ -137,6 +130,7 @@ try {
     const dir = path.dirname(t);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(t, apkBuffer);
+    fs.writeFileSync(t+'.release.json',JSON.stringify({sourceHash:androidSourceHash(REPO_ROOT),apkHash:crypto.createHash('sha256').update(apkBuffer).digest('hex'),builtAt:new Date().toISOString()},null,2));
     console.log(`   🎉 Saved signed installable APK: ${t} (${apkBuffer.length.toLocaleString()} bytes)`);
   }
 

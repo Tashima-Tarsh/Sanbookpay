@@ -1,3 +1,4 @@
+import {resolveSecret} from '@youpi/common';
 import { HttpServer } from '../server.js';
 import { ProviderConnectionRepository } from '@youpi/db';
 import { encrypt } from '@youpi/common';
@@ -11,7 +12,7 @@ export function registerBankingRoutes(server, ctx) {
   const db = ctx.db;
   const connRepo = new ProviderConnectionRepository(db);
   const providerRegistry = new ProviderRegistry({ db });
-  const masterKey = process.env.ENCRYPTION_MASTER_KEY || '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+  const masterKey = resolveSecret('encryption_master_key','ENCRYPTION_MASTER_KEY');
 
   function getMerchantId(req) {
     const key = req.headers['x-api-key'] || req.headers['authorization']?.replace(/^Bearer\s+/i, '');

@@ -136,3 +136,6 @@
 #console .topbar .right{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:4px 16px;font-size:12px}
 #console .topbar #liveStatus{display:inline}
 @media(max-width:640px){#console .topbar{flex-wrap:wrap;gap:4px}#console .topbar .right{flex-basis:100%;max-width:100%;padding-left:54px;justify-content:flex-start;font-size:11px}#console .topbar #updated{display:none}}
+
+#bankReviewDialog .review-check>span{display:flex;align-items:flex-start;gap:10px;line-height:1.6;min-height:44px}
+#bankReviewChecked{width:18px;height:18px;min-height:18px;flex:0 0 18px;margin:3px 0 0}

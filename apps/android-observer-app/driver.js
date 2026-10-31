@@ -127,13 +127,16 @@ export class AndroidObserverDriver {
     if (!this.deviceId) throw new Error('Cannot send heartbeat: device not paired.');
     const url = `${this.apiBaseUrl}/api/v1/pollers/android/heartbeat`;
 
+    const timestamp=Date.now().toString(),raw=JSON.stringify({deviceId:this.deviceId,timestamp:Number(timestamp)});
     const res = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Device-Id': this.deviceId
+        'X-Device-Id': this.deviceId,
+        'X-Timestamp':timestamp,
+        'X-Signature':generateHmac(raw+':'+timestamp,this.signingKey)
       },
-      body: JSON.stringify({ deviceId: this.deviceId, timestamp: Date.now() })
+      body: raw
     });
 
     return await res.json();

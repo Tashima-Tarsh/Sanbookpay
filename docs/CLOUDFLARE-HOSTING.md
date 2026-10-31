@@ -1,3 +1,5 @@
+> Historical reference: use the [current operations manual](OPERATIONS-MANUAL.md) and [acceptance report](PRODUCTION_ACCEPTANCE_REPORT.md) for this review candidate. Older capability, hosting and automatic-verification statements below are not the current release contract.
+
 # Dynamo Pay on Cloudflare
 
 The current repository runs Node.js services with an on-disk SQLite database. It is not yet a deployable Cloudflare Worker. Connecting it to Workers Builds alone will not migrate those services or the database.

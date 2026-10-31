@@ -1,3 +1,4 @@
+import {ProviderRegistry} from '@youpi/core';
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { Database, runMigrations } from '@youpi/db';
@@ -257,7 +258,8 @@ describe('SANBOOK PAY — Production Financial Platform Test Suite', () => {
       createdPayoutId = data.payoutId;
     });
 
-    it('checker approves the payout instruction', async () => {
+    it('checker approves the payout instruction', async t => {
+      t.mock.method(ProviderRegistry.prototype,'getProvider',()=>({createPayout:async()=>({status:'PROCESSING',providerTransferId:'isolated-approval-test',utr:null})}));
       const res = await authFetch(`${baseUrl}/api/v1/payouts/${createdPayoutId}/approve`, {
         method: 'POST',
         headers: {

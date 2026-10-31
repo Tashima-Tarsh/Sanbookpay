@@ -369,7 +369,7 @@ export class PaymentVerificationPipeline {
       // Universal Bank Identifier: Email domain ends with .bank.in (e.g. alerts@hdfc.bank.in, example@example.bank.in)
       const isBankDomain = emailDomain.endsWith('.bank.in') || emailDomain === 'bank.in';
       // In automated test suite or local dev, allow TEST sender and legacy test fixture domains
-      const isValidDomain = isBankDomain || sender === 'TEST' || cleanEmail === 'TEST' || sender === 'gmail-browser-automator' || emailDomain.endsWith('.youpi.local') || emailDomain === 'hdfcbank.net';
+      const isValidDomain = isBankDomain || emailDomain === 'hdfcbank.net' || (process.env.NODE_ENV==='test' && (sender==='TEST'||cleanEmail==='TEST'||emailDomain.endsWith('.youpi.local'))) || sender==='gmail-browser-automator';
 
       if (!isValidDomain) {
         if (!isAttributableToCustomer) {

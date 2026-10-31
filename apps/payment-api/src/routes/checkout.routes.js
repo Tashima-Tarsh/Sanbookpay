@@ -1448,6 +1448,7 @@ export function registerCheckoutRoutes(server, ctx) {
 
   // POST /api/v1/checkout/:id/card-pay (Online Card Payment Processing)
   server.post('/api/v1/checkout/:id/card-pay', async (req, res, params) => {
+    if(process.env.NODE_ENV !== 'test') return HttpServer.json(res,503,{error:'This payment method requires an approved provider checkout. No payment has been processed.',code:'PAYMENT_METHOD_NOT_CONFIGURED'});
     const session = ctx.sessionRepo.findById(params.id);
     if (!session) {
       HttpServer.json(res, 404, { error: `Payment session not found: ${params.id}` });
@@ -1573,6 +1574,7 @@ export function registerCheckoutRoutes(server, ctx) {
 
   // POST /api/v1/checkout/:id/netbanking-pay (Online NetBanking Payment Processing)
   server.post('/api/v1/checkout/:id/netbanking-pay', async (req, res, params) => {
+    if(process.env.NODE_ENV !== 'test') return HttpServer.json(res,503,{error:'This payment method requires an approved provider checkout. No payment has been processed.',code:'PAYMENT_METHOD_NOT_CONFIGURED'});
     const session = ctx.sessionRepo.findById(params.id);
     if (!session) {
       HttpServer.json(res, 404, { error: `Payment session not found: ${params.id}` });

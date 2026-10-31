@@ -1,6 +1,9 @@
 Method,Path,HTTP status,Scope
 GET,/health,200,Anonymous / empty-body / nonexistent-ID smoke
 GET,/api/v1/health,200,Anonymous / empty-body / nonexistent-ID smoke
+GET,/api/v1/admin/console/payment-rules,401,Anonymous / empty-body / nonexistent-ID smoke
+POST,/api/v1/admin/console/payment-rules,401,Anonymous / empty-body / nonexistent-ID smoke
+POST,/api/v1/admin/console/payment-rules/missing-test-id/state,401,Anonymous / empty-body / nonexistent-ID smoke
 POST,/api/v1/payments,400,Anonymous / empty-body / nonexistent-ID smoke
 GET,/api/v1/payments/missing-test-id,404,Anonymous / empty-body / nonexistent-ID smoke
 GET,/api/v1/payments/missing-test-id/cod,404,Anonymous / empty-body / nonexistent-ID smoke
@@ -20,7 +23,7 @@ POST,/api/v1/checkout/missing-test-id/netbanking-pay,404,Anonymous / empty-body 
 GET,/api/v1/checkout/missing-test-id/cod,404,Anonymous / empty-body / nonexistent-ID smoke
 POST,/api/v1/checkout/missing-test-id/expire,404,Anonymous / empty-body / nonexistent-ID smoke
 POST,/api/v1/checkout/missing-test-id/trigger-hook,404,Anonymous / empty-body / nonexistent-ID smoke
-POST,/api/v1/checkout/missing-test-id/simulate-observation,403,Anonymous / empty-body / nonexistent-ID smoke
+POST,/api/v1/checkout/missing-test-id/simulate-observation,401,Anonymous / empty-body / nonexistent-ID smoke
 POST,/api/v1/checkout/missing-test-id/end-and-restart-payment,404,Anonymous / empty-body / nonexistent-ID smoke
 POST,/api/v1/checkout/missing-test-id/end-session-and-create-new,404,Anonymous / empty-body / nonexistent-ID smoke
 GET,/api/v1/checkout/missing-test-id/stream,404,Anonymous / empty-body / nonexistent-ID smoke
@@ -31,9 +34,9 @@ POST,/api/v1/pollers/android/pair,401,Anonymous / empty-body / nonexistent-ID sm
 POST,/api/v1/observers/sms/pair,401,Anonymous / empty-body / nonexistent-ID smoke
 POST,/api/v1/pollers/android/events,400,Anonymous / empty-body / nonexistent-ID smoke
 POST,/api/v1/observers/sms,400,Anonymous / empty-body / nonexistent-ID smoke
-POST,/api/v1/pollers/android/heartbeat,200,Anonymous / empty-body / nonexistent-ID smoke
-POST,/api/v1/pollers/heartbeat,200,Anonymous / empty-body / nonexistent-ID smoke
-POST,/api/v1/observers/heartbeat,200,Anonymous / empty-body / nonexistent-ID smoke
+POST,/api/v1/pollers/android/heartbeat,401,Anonymous / empty-body / nonexistent-ID smoke
+POST,/api/v1/pollers/heartbeat,401,Anonymous / empty-body / nonexistent-ID smoke
+POST,/api/v1/observers/heartbeat,401,Anonymous / empty-body / nonexistent-ID smoke
 GET,/api/v1/admin/sms-gateway/pair-qr,401,Anonymous / empty-body / nonexistent-ID smoke
 GET,/api/v1/admin/sms-gateway/devices,401,Anonymous / empty-body / nonexistent-ID smoke
 DELETE,/api/v1/admin/sms-gateway/devices/missing-test-id,401,Anonymous / empty-body / nonexistent-ID smoke
@@ -77,14 +80,14 @@ POST,/api/v1/admin/gmail/credentials,401,Anonymous / empty-body / nonexistent-ID
 POST,/api/v1/admin/gmail/start-observer,401,Anonymous / empty-body / nonexistent-ID smoke
 POST,/api/v1/admin/gmail/test,401,Anonymous / empty-body / nonexistent-ID smoke
 GET,/api/v1/admin/dev/false-narrative,401,Anonymous / empty-body / nonexistent-ID smoke
-POST,/api/v1/admin/dev/false-narrative,403,Anonymous / empty-body / nonexistent-ID smoke
+POST,/api/v1/admin/dev/false-narrative,401,Anonymous / empty-body / nonexistent-ID smoke
 GET,/api/v1/admin/dev/test-mode,401,Anonymous / empty-body / nonexistent-ID smoke
-POST,/api/v1/admin/dev/test-mode,403,Anonymous / empty-body / nonexistent-ID smoke
-POST,/api/v1/admin/dev/test-mode/inject,403,Anonymous / empty-body / nonexistent-ID smoke
+POST,/api/v1/admin/dev/test-mode,401,Anonymous / empty-body / nonexistent-ID smoke
+POST,/api/v1/admin/dev/test-mode/inject,401,Anonymous / empty-body / nonexistent-ID smoke
 GET,/api/v1/admin/dev/test-mode/audit,401,Anonymous / empty-body / nonexistent-ID smoke
 GET,/api/v1/admin/dev/simulator/customers,401,Anonymous / empty-body / nonexistent-ID smoke
 GET,/api/v1/admin/dev/simulator/customers/missing-test-id/sessions,401,Anonymous / empty-body / nonexistent-ID smoke
-POST,/api/v1/admin/dev/simulator/inject,403,Anonymous / empty-body / nonexistent-ID smoke
+POST,/api/v1/admin/dev/simulator/inject,401,Anonymous / empty-body / nonexistent-ID smoke
 GET,/api/v1/admin/dev/simulator/history,401,Anonymous / empty-body / nonexistent-ID smoke
 GET,/api/v1/admin/security/banned-users,401,Anonymous / empty-body / nonexistent-ID smoke
 GET,/api/v1/admin/security/banned-users/missing-test-id,401,Anonymous / empty-body / nonexistent-ID smoke
@@ -93,6 +96,9 @@ POST,/api/v1/admin/security/manual-ban,401,Anonymous / empty-body / nonexistent-
 GET,/api/v1/admin/security/events,401,Anonymous / empty-body / nonexistent-ID smoke
 GET,/api/v1/admin/security/history,401,Anonymous / empty-body / nonexistent-ID smoke
 GET,/api/v1/admin/customers,401,Anonymous / empty-body / nonexistent-ID smoke
+POST,/api/v1/admin/console/payments/missing-test-id/confirm-reviewed,401,Anonymous / empty-body / nonexistent-ID smoke
+GET,/api/v1/admin/console/stream,401,Anonymous / empty-body / nonexistent-ID smoke
+GET,/api/v1/admin/console/operations,401,Anonymous / empty-body / nonexistent-ID smoke
 GET,/api/v1/admin/console/upi-channel,401,Anonymous / empty-body / nonexistent-ID smoke
 POST,/api/v1/admin/console/upi-channel,401,Anonymous / empty-body / nonexistent-ID smoke
 GET,/api/v1/admin/console/summary,401,Anonymous / empty-body / nonexistent-ID smoke

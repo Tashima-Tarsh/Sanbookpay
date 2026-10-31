@@ -218,7 +218,7 @@ export function registerPayoutsRoutes(server, ctx) {
     const payoutRail = (body.payoutRail || (beneficiary.upi_id ? 'UPI' : 'IMPS')).toUpperCase();
 
     // Check maker-checker requirement
-    const requireApproval = body.requireApproval !== false;
+    const requireApproval = process.env.NODE_ENV==='production' || body.requireApproval !== false;
     const initialStatus = requireApproval ? 'APPROVAL_REQUIRED' : 'SUBMITTED';
 
     const startInitiation = Date.now();
@@ -388,6 +388,9 @@ export function registerPayoutsRoutes(server, ctx) {
 
     const approverId = body.approverId || 'ADMIN';
     const decision = body.decision || 'APPROVED';
+    if(!['APPROVED','REJECTED'].includes(decision))return HttpServer.json(res,400,{error:'Decision must be APPROVED or REJECTED.'});
+    const claimed=db.execute("UPDATE payouts SET status='APPROVAL_PROCESSING' WHERE id=? AND status='APPROVAL_REQUIRED'",[payout.id]);
+    if(!claimed.changes)return HttpServer.json(res,409,{error:'Payout approval is already being processed.'});
 
     payoutRepo.recordApproval({
       payoutId: payout.id,
@@ -402,6 +405,10 @@ export function registerPayoutsRoutes(server, ctx) {
       return HttpServer.json(res, 200, { status: 'REJECTED', message: 'Payout rejected by checker' });
     }
 
+    // Reserve the journal before contacting the bank; a lost response requires reconciliation.
+    try {
+      ledgerRepo.recordDoubleEntry(merchantId,'PAYOUT',payout.id,'Approved payout reserved','PAYOUTS_IN_TRANSIT','PAYOUT_FUNDING',Number(payout.amount_paise));
+    }catch(error){payoutRepo.update(payout.id,{status:'APPROVAL_REQUIRED'});return HttpServer.json(res,409,{error:'Could not reserve the payout journal. No provider transfer was requested.'});}
     // If approved, submit to provider
     try {
       const provider = providerRegistry.getProvider(merchantId, payout.provider_name || 'CASHFREE');
@@ -413,23 +420,28 @@ export function registerPayoutsRoutes(server, ctx) {
         remarks: payout.remarks
       });
 
-      payoutRepo.update(payout.id, {
+      const saved=db.transaction(()=>{
+        const latest=db.queryOne(`SELECT * FROM payouts WHERE id=?${db.dialect==='postgres'?' FOR UPDATE':''}`,[payout.id]);
+        if(['SUCCESS','FAILED','REJECTED'].includes(latest.status))return latest;
+        if(payoutRes.status==='SUCCESS')ledgerRepo.recordDoubleEntry(merchantId,'PAYOUT',payout.id,'Provider confirmed approved payout','BANK_CASH','PAYOUTS_IN_TRANSIT',Number(payout.amount_paise));
+      return payoutRepo.update(payout.id, {
         status: payoutRes.status,
         providerTransferId: payoutRes.providerTransferId,
         utr: payoutRes.utr,
         approvedBy: approverId,
         submittedAt: new Date().toISOString()
       });
+      });
 
       return HttpServer.json(res, 200, {
-        status: payoutRes.status,
-        utr: payoutRes.utr,
+        status: saved.status,
+        utr: saved.utr,
         message: 'Payout approved and submitted to banking provider'
       });
     } catch (err) {
-      payoutRepo.update(payout.id, {
-        status: 'SUBMISSION_FAILED',
-        failureReason: err.message
+      if(payoutRepo.findById(payout.id).status!=='SUCCESS')payoutRepo.update(payout.id, {
+        status: 'RECONCILIATION_REQUIRED',
+        failureReason: 'Provider response is uncertain; reconcile the original transfer ID.'
       });
       return HttpServer.json(res, 502, {
         error: `Failed to submit approved payout to provider: ${err.message}`
@@ -451,6 +463,7 @@ export function registerPayoutsRoutes(server, ctx) {
       const provider = providerRegistry.getProvider(merchantId, payout.provider_name || 'CASHFREE');
       const statusRes = await provider.getPayoutStatus(payout.transfer_id);
 
+      if(payout.status==='SUCCESS' && statusRes.status!=='SUCCESS')return HttpServer.json(res,409,{error:'Provider status conflicts with the confirmed payout. Reconciliation required.',status:'SUCCESS'});
       if (statusRes.status && statusRes.status !== payout.status) {
         payoutRepo.update(payout.id, {
           status: statusRes.status,

@@ -46,7 +46,7 @@ export class GmailPoller {
    */
   constructor(options = {}) {
     this.apiBaseUrl = options.apiBaseUrl || process.env.PAYMENT_API_INTERNAL_URL || `http://127.0.0.1:${process.env.PAYMENT_API_PORT || 6100}`;
-    this.receivingAccountId = options.receivingAccountId || '00000000-0000-0000-0000-000000000002';
+    this.receivingAccountId = options.receivingAccountId || process.env.GMAIL_RECEIVING_ACCOUNT_ID || '00000000-0000-0000-0000-000000000002';
     this.pollIntervalMs = options.pollIntervalMs || Number(process.env.GMAIL_POLL_INTERVAL_MS || 5000);
     this.observerClient = new PaymentObserverClient({
       apiBaseUrl: this.apiBaseUrl,
@@ -128,18 +128,7 @@ export class GmailPoller {
     }
   }
 
-  async resolveActiveReceivingAccount() {
-    try {
-      const res = await fetch(`${this.apiBaseUrl}/api/v1/pollers/active-window`, { signal: AbortSignal.timeout(1000) });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.sessions && data.sessions.length > 0) {
-          return data.sessions[0].receivingAccountId;
-        }
-      }
-    } catch {}
-    return null;
-  }
+  async resolveActiveReceivingAccount() { return this.receivingAccountId; }
 
   /**
    * Ingests an email directly (e.g. from webhook, push notification, or manual poll).
@@ -151,13 +140,9 @@ export class GmailPoller {
       parsed = BankEmailParser.parse(email);
     } catch {}
 
-    let targetAccountId = this.receivingAccountId;
-    try {
-      const activeAcct = await this.resolveActiveReceivingAccount();
-      if (activeAcct) targetAccountId = activeAcct;
-    } catch {}
+    const targetAccountId = this.receivingAccountId;
 
-    const sender = email.from || email.sender || 'alerts@retail.bank.in';
+    const sender = email.from || email.sender || '';
     const rawContent = `${email.subject || ''}\n${email.body || ''}`.trim();
 
     try {
@@ -214,6 +199,7 @@ export class GmailPoller {
   }
 
   async pollCycle() {
+    if(this.polling)return;this.polling=true;
     const generation=this.credentialsGeneration;
     this.lastPollAt = new Date();
 
@@ -221,22 +207,16 @@ export class GmailPoller {
       const accessToken = await this.getAccessToken();
       if (!accessToken || generation!==this.credentialsGeneration) return;
 
-      const query = encodeURIComponent('subject:(credit OR credited OR received OR upi OR deposit OR alert)');
-      const listRes = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=10&q=${query}`, {
-        headers: { 'Authorization': `Bearer ${accessToken}` },
-        signal: AbortSignal.timeout(8000)
-      });
-
-      if (!listRes.ok) {
-        if (listRes.status === 401) {
-          this.cachedAccessToken = null;
-        }
-        return;
-      }
-
-      const listData = await listRes.json();
-      if(generation!==this.credentialsGeneration)return;
-      const messages = listData.messages || [];
+      const query = encodeURIComponent('newer_than:7d subject:(credit OR credited OR received OR upi OR deposit OR alert)');
+      const messages=[];let pageToken=null;
+      do {
+        const url=`https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=100&q=${query}${pageToken?'&pageToken='+encodeURIComponent(pageToken):''}`;
+        const listRes=await fetch(url,{headers:{Authorization:`Bearer ${accessToken}`},signal:AbortSignal.timeout(8000)});
+        if(!listRes.ok){if(listRes.status===401)this.cachedAccessToken=null;return;}
+        const listData=await listRes.json();if(generation!==this.credentialsGeneration)return;
+        messages.push(...(listData.messages||[]));pageToken=listData.nextPageToken;
+      }while(pageToken);
+      messages.reverse();
 
       for (const m of messages) {
         if(generation!==this.credentialsGeneration)return;
@@ -277,6 +257,6 @@ export class GmailPoller {
       }
     } catch (err) {
       console.warn('[Gmail Observer] pollCycle error:', err.message);
-    }
+    }finally{this.polling=false;}
   }
 }

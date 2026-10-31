@@ -3,7 +3,7 @@
   "info": {
     "title": "Dynamo Pay Customer API",
     "version": "1.0.0",
-    "description": "Merchant backend API. See /developers for webhook verification, queues, reconciliation and deployment limits. Channel defaults INR 200?20,000 when saved."
+    "description": "Merchant backend API. See /developers for webhook verification, queues, reconciliation and deployment limits. Channel defaults INR 200?20,000 when saved. Production SMS/Gmail observations are supplementary evidence. Bank/provider confirmation or explicit owner review is required for paid status. See /developers/guide.md."
   },
   "servers": [
     {

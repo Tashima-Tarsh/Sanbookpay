@@ -106,15 +106,19 @@ export class PaymentObserverClient {
    * Submits Android heartbeat.
    * @param {string} deviceId
    */
-  async submitHeartbeat(deviceId) {
+  async submitHeartbeat(deviceId, signingKey) {
+    if(!signingKey)throw new Error('A paired device signing key is required for heartbeat');
+    const raw=JSON.stringify({deviceId}),timestamp=Date.now().toString();
     const url = `${this.apiBaseUrl}/api/v1/pollers/android/heartbeat`;
     const res = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Device-Id': deviceId
+        'X-Device-Id': deviceId,
+        'X-Timestamp':timestamp,
+        'X-Signature':generateHmac(raw+':'+timestamp,signingKey)
       },
-      body: JSON.stringify({ deviceId })
+      body: raw
     });
     return await res.json();
   }

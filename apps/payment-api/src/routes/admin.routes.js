@@ -1528,14 +1528,6 @@ export function registerAdminRoutes(server, ctx) {
 
     ctx.merchantRepo.update(merchantId, { branding: newBranding });
 
-    // Sync to all merchants for consistency
-    for (const m of ctx.merchantRepo.findAll()) {
-      if (m.id !== merchantId) {
-        ctx.merchantRepo.update(m.id, {
-          branding: { ...m.branding, gmailConfig: updatedGmail }
-        });
-      }
-    }
 
     // Stop poller in observer service
     try {
@@ -1583,14 +1575,6 @@ export function registerAdminRoutes(server, ctx) {
 
     ctx.merchantRepo.update(merchantId, { branding: newBranding });
 
-    // Sync to all merchants for consistency
-    for (const m of ctx.merchantRepo.findAll()) {
-      if (m.id !== merchantId) {
-        ctx.merchantRepo.update(m.id, {
-          branding: { ...m.branding, gmailConfig: updatedGmail }
-        });
-      }
-    }
 
     HttpServer.json(res, 200, {
       success: true,

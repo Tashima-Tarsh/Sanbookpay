@@ -1,5 +1,5 @@
 {
-  "testedAt": "2026-10-30T23:46:24.527Z",
+  "testedAt": "2026-10-31T07:53:29.508Z",
   "environment": {
     "node": "v24.14.1",
     "os": "win32",
@@ -14,7 +14,7 @@
       "name": "Receiving account storage",
       "storedAccounts": 1001,
       "activeAccounts": 1,
-      "durationMs": 1313,
+      "durationMs": 1602,
       "pass": true
     },
     {
@@ -25,11 +25,11 @@
       "active": 1,
       "queued": 199,
       "errors": 0,
-      "durationMs": 817,
-      "requestsPerSecond": 244.79,
-      "p50Ms": 92,
-      "p95Ms": 149,
-      "p99Ms": 157,
+      "durationMs": 1503,
+      "requestsPerSecond": 133.09,
+      "p50Ms": 156,
+      "p95Ms": 297,
+      "p99Ms": 316,
       "rateLimitOverriddenForBenchmark": 10000,
       "pass": true
     },
@@ -44,7 +44,7 @@
       "name": "Sequential bank confirmation and queue drain",
       "confirmed": 200,
       "remainingQueued": 0,
-      "durationMs": 24809,
+      "durationMs": 27942,
       "simulatedBank": true,
       "pass": true
     },

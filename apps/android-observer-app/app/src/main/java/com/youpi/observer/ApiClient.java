@@ -6,6 +6,7 @@ import android.os.Build;
 import android.util.Log;
 
 import org.json.JSONObject;
+import org.json.JSONArray;
 
 import java.io.BufferedReader;
 import java.io.InputStream;
@@ -90,24 +91,57 @@ public class ApiClient {
         String endpoint = baseUrl + "/api/v1/observers/sms";
 
         try {
-            String tsStr = String.valueOf(timestamp > 0 ? timestamp : System.currentTimeMillis());
+            String tsStr = String.valueOf(System.currentTimeMillis());
             JSONObject json = new JSONObject();
             json.put("deviceId", deviceId);
             json.put("sender", sender != null ? sender : "UNKNOWN");
             json.put("body", body != null ? body : "");
-            json.put("timestamp", Long.parseLong(tsStr));
+            json.put("timestamp", timestamp > 0 ? timestamp : System.currentTimeMillis());
+            json.put("observedAt", timestamp > 0 ? timestamp : System.currentTimeMillis());
 
             String bodyString = json.toString();
             String sigPayload = bodyString + ":" + tsStr;
             String signature = calculateHmacSha256(sigPayload, signingKey);
 
-            String response = postJson(endpoint, bodyString, deviceId, tsStr, signature);
+            String response = enqueueObservation(endpoint, bodyString);
             Log.i(TAG, "SMS dispatched to YouPI Gateway: " + (response != null ? "OK" : "FAILED"));
             return response != null;
         } catch (Exception e) {
             Log.e(TAG, "sendSms error: " + e.getMessage(), e);
         }
         return false;
+    }
+
+    private static final Object QUEUE_LOCK = new Object();
+
+    private String enqueueObservation(String endpoint, String payload) {
+        synchronized (QUEUE_LOCK) {
+            try {
+                JSONArray queue = new JSONArray(prefs.getString("pending_observations", "[]"));
+                if (queue.length() >= 1000) { Log.e(TAG, "Observer queue full; reconnect before accepting more observations"); return null; }
+                JSONObject entry = new JSONObject(); entry.put("endpoint", endpoint); entry.put("payload", payload);
+                queue.put(entry);
+                if (!prefs.edit().putString("pending_observations", queue.toString()).commit()) return null;
+                flushPendingObservations();
+                return "queued";
+            } catch (Exception e) { Log.e(TAG, "Unable to persist observation"); return null; }
+        }
+    }
+
+    public void flushPendingObservations() {
+        synchronized (QUEUE_LOCK) {
+            try {
+                JSONArray queue = new JSONArray(prefs.getString("pending_observations", "[]"));
+                while (queue.length() > 0 && isPaired()) {
+                    JSONObject entry = queue.getJSONObject(0);
+                    String raw = entry.getString("payload"), ts = String.valueOf(System.currentTimeMillis());
+                    String signature = calculateHmacSha256(raw + ":" + ts, prefs.getString("signing_key", null));
+                    if (postJson(entry.getString("endpoint"), raw, prefs.getString("device_id", null), ts, signature) == null) break;
+                    queue.remove(0);
+                    if (!prefs.edit().putString("pending_observations", queue.toString()).commit()) break;
+                }
+            } catch (Exception e) { Log.e(TAG, "Pending observations remain queued"); }
+        }
     }
 
     public boolean sendHeartbeat() {
@@ -121,10 +155,12 @@ public class ApiClient {
             JSONObject json = new JSONObject();
             json.put("deviceId", deviceId);
             json.put("timestamp", System.currentTimeMillis());
-            json.put("batteryPercent", 100);
-            json.put("isCharging", true);
 
-            String response = postJson(endpoint, json.toString(), deviceId, null, null);
+
+            String ts = String.valueOf(System.currentTimeMillis());
+            String raw = json.toString();
+            String signature = calculateHmacSha256(raw + ":" + ts, prefs.getString("signing_key", null));
+            String response = postJson(endpoint, raw, deviceId, ts, signature);
             return response != null;
         } catch (Exception e) {
             Log.e(TAG, "Heartbeat error: " + e.getMessage());
@@ -159,7 +195,7 @@ public class ApiClient {
             String sigPayload = bodyString + ":" + tsStr;
             String signature = calculateHmacSha256(sigPayload, signingKey);
 
-            String response = postJson(endpoint, bodyString, deviceId, tsStr, signature);
+            String response = enqueueObservation(endpoint, bodyString);
             return response != null;
         } catch (Exception e) {
             Log.e(TAG, "sendObservation error: " + e.getMessage());
@@ -168,7 +204,7 @@ public class ApiClient {
     }
 
     public void unpair() {
-        prefs.edit().remove("device_id").remove("signing_key").apply();
+        prefs.edit().remove("device_id").remove("signing_key").remove("pending_observations").apply();
     }
 
     private String postJson(String urlString, String jsonBody, String deviceId, String timestamp, String signature) {

@@ -1,241 +1,33 @@
-# SANBOOK PAY
+# Dynamo Pay
 
-### Sovereign Enterprise Payment Gateway & Disbursement Infrastructure
+Dynamo Pay is a merchant payment console, hosted UPI checkout and payment observation service. The active hosted entry point is `npm run start:hosted`, which runs the payment API, checkout, merchant console and Gmail observer behind one HTTPS origin. The demo store is disabled on the hosted gateway.
 
-Sanbook Pay is an institutional-grade, self-hosted payment infrastructure platform engineered for direct-to-bank UPI collections, authorized real-time payouts, double-entry financial ledgering, and automated banking reconciliation.
+Start with the [configuration and integration manual](docs/OPERATIONS-MANUAL.md), [credential inventory](docs/CONFIGURATION-CREDENTIALS.md) and [current acceptance report](docs/PRODUCTION_ACCEPTANCE_REPORT.md). Public merchant API: `apps/merchant-admin/public/dynamo-openapi.json`. Operator/legacy API: `openapi.yaml`.
 
----
+## Supported behaviour
 
-## Key Capabilities
+- Hosted QR/UPI checkout, authenticated merchant create/status/IFSC/wallet endpoints, order-ID replay and per-account queues.
+- Merchant dashboard with mobile navigation, live SSE invalidation and polling recovery.
+- UPI channel enable/disable, amount limits and receiving-VPA allowlist.
+- Merchant-scoped allow/block/watch acceptance rules with expiry, audit history and reversible state changes.
+- Signed provider collection callbacks, amount/currency/reference validation, atomic journal/outbox writes and durable callback retries.
+- SMS/Gmail/Android observations stored as supplementary production evidence. They do not independently prove settlement.
+- Explicit owner bank-review confirmation with actual reference, reason, audit, journal and callback reservation.
+- Refund reservation, manual transfer records, split fee/GST and recipient allocation workflows.
+- Public setup PDF and protected owner credential/operations PDF; no real keys in public documentation.
 
-### 1. Payment Collections & Multi-Method Checkout
-- **Amazon & Razorpay-Style Checkout Experience**: Unified multi-rail modal and hosted checkout (`/checkout/:id`) supporting:
-  - **Dynamic Single-Use UPI QR & Deep Links**: Intent triggers for Google Pay, PhonePe, Paytm, BHIM, and CRED.
-  - **Online Credit & Debit Cards**: Instant processing for Visa, MasterCard, and RuPay with live card brand detection and Luhn validation.
-  - **Direct NetBanking**: Instant bank redirection across leading Indian institutions (HDFC, SBI, ICICI, Axis, Kotak, PNB).
-  - **Cash on Delivery (COD)**: E-commerce order placement state machine with cash collection on delivery.
-  - **EMI / Pay Later**: Structured payment scheduling.
-- **Auto-Customer Generation & PII Masking**: Automatic customer identity provisioning with PCI-DSS / privacy-compliant data masking (`+91 98*** ***10`, `m***t@example.com`).
-- **Automated Digital Bill Receipts (SMS & Email)**: Automated dispatch of compliant digital tax receipts upon payment completion, accessible via public web viewer or JSON API.
-- **Provider Gateway Integration**: Primary production integration with Cashfree Payment Gateway and an extensible direct bank interface (HDFC, ICICI, Axis, SBI, Kotak).
-- **Sub-60s Settlement Loop**: Real-time payment observation engine with millisecond transaction lifecycle tracking.
-- **Selling Modes**: Supports Online E-Commerce, COD, and Physical Counter POS Desk modalities.
+## What requires external activation
 
-### 2. Outbound Disbursements & Payouts
-- **Multi-Rail Transfers**: Instant real-money disbursements across IMPS, NEFT, RTGS, and UPI rails.
-- **Penny-Drop Account Verification**: Automated beneficiary account name inquiry and validation prior to disbursement.
-- **Two-Step Authorization Controls**: Strict policy controls requiring operator authorization before real funds are released.
-- **Idempotency Guarantees**: Cryptographic request deduplication ensuring zero duplicate transfers.
+Approved provider/bank credentials, bank agreements, OAuth consent, a current signed Android APK and real-device acceptance are separate requirements. Legacy local card/netbanking simulators do not process production money. Unconfigured automatic settlement returns an explicit unavailable response. Direct UPI without an authoritative confirmation feed requires owner bank review. The disabled demo wallet is not a production gaming-wallet service; customer systems implement durable callback deduplication and wallet posting.
 
-### 3. Financial Ledger & Automated Reconciliation
-- **Integer Paise Accounting**: 100% fixed-point integer mathematics preventing floating-point rounding errors.
-- **Double-Entry Journal Balancing**: Enforces fundamental accounting invariants (`sum(debits) === sum(credits)`) across all transactions.
-- **Standard Chart of Accounts**: Pre-configured accounts for operating cash, undeposited collections, clearing escrows, fees, and liabilities.
-- **Three-Way Reconciliation**: Continuous cross-verification of internal orders, provider settlement batches, and banking statement UTRs.
-- **Exception Reporting & Auditing**: Automated variance detection with real-time alerts and downloadable reconciliation reports.
+## Runtime and development
 
-### 4. Enterprise Security Architecture
-- **No Mock Successes**: Strict architectural invariant prohibiting arbitrary success transitions. Status changes require verified banking observations or signed provider events.
-- **AES-256-GCM Credential Vault**: All bank credentials, API secrets, and private tokens are encrypted at rest with authenticated encryption.
-- **Raw-Body Webhook Verification**: Constant-time HMAC-SHA256 verification computed strictly over unparsed request bytes to guarantee signature integrity.
-- **Audit Event Trail**: Immutable, append-only transaction lifecycle logging with millisecond timestamping.
+Use Node.js 22.13 or newer (the Render deployment pins 22.23.4). Install with `npm ci --include=dev`. Run `npm run typecheck`, `npm run build`, `npm test`, and `node scripts/scan-secrets.js`. Build validates native JavaScript; historical TypeScript sources are not the active runtime.
 
----
+Set private configuration from `.env.example`. With `DATABASE_URL`, the app uses PostgreSQL through a synchronous repository adapter backed by an I/O worker. Without it, local installations use SQLite WAL. Do not run reset/cleanup scripts on a live database. Test PostgreSQL only in an isolated temporary schema with a privately supplied `DYNAMO_POSTGRES_TEST_URL`.
 
-## System Architecture
+`npm run start:hosted` exposes one public port and keeps component ports on loopback. Render Free sleeps while idle and the free database expires; see `docs/RENDER-TRIAL.md`. No uptime, instant bank notification or thousand-payment concurrency guarantee is claimed.
 
-```
-                       ┌────────────────────────────┐
-                       │     Merchant Client /      │
-                       │    Customer Application    │
-                       └─────────────┬──────────────┘
-                                     │
-                        [ HTTPS / Ingress Proxy ]
-                                     │
-           ┌─────────────────────────┼─────────────────────────┐
-           ▼                         ▼                         ▼
-  ┌─────────────────┐       ┌─────────────────┐       ┌─────────────────┐
-  │ Checkout Portal │       │   Payment API   │       │ Merchant Admin  │
-  │  (Dynamic QR /  │       │  (Core Engine / │       │ (Console UI /   │
-  │   One-Script)   │       │ State Machine)  │       │ Bank Wizard)    │
-  └────────┬────────┘       └────────┬────────┘       └────────┬────────┘
-           │                         │                         │
-           └─────────────────────────┼─────────────────────────┘
-                                     │
-                 ┌───────────────────┴───────────────────┐
-                 ▼                                       ▼
-     ┌───────────────────────┐               ┌───────────────────────┐
-     │  PostgreSQL 16        │               │  Redis 7              │
-     │  (Financial Ledger /  │               │  (Idempotency Locks / │
-     │   Audit History)      │               │   Event Broker)       │
-     └───────────────────────┘               └───────────────────────┘
-                 ▲                                       ▲
-                 │                                       │
-     ┌───────────┴───────────┐               ┌───────────┴───────────┐
-     │ Cashfree PG /         │               │ Cashfree Payouts /    │
-     │ Direct Bank Ingress   │               │ Penny-Drop Engine     │
-     └───────────────────────┘               └───────────────────────┘
-```
+## Release discipline
 
----
-
-## Platform Microservices & Port Topology
-
-| Component | Default Port | Protocol | Responsibility |
-| :--- | :--- | :--- | :--- |
-| **Ingress Proxy (Caddy / Nginx)** | `80`, `443` | HTTP/HTTPS | TLS termination, gzip/zstd compression, security headers |
-| **Payment Core REST API** | `6100` | HTTP | Payment orders, state machines, payouts, ledger, provider adapters |
-| **Merchant Console** | `6001` | HTTP | Administrative dashboard, bank connection wizard, financial ledger |
-| **Checkout Portal** | `7000` | HTTP | Dynamic SVG QR generation, one-script modal delivery, API proxy |
-| **PostgreSQL Database** | `5432` | TCP | ACID relational storage, double-entry ledger in integer paise |
-| **Redis Cache** | `6379` | TCP | Distributed locking, idempotency cache, queue supervisor |
-
----
-
-## Universal Integration Methods
-
-### Method 1: Single-Script Modal Integration
-Embed the lightweight client script in any web application:
-
-```html
-<script src="/youpi.js" data-youpi-key="YOUR_MERCHANT_KEY"></script>
-
-<!-- Tag any button to trigger the payment checkout modal -->
-<button 
-  data-youpi-pay 
-  data-order-id="ORDER-1001" 
-  data-amount="499"
-  data-currency="INR"
-  data-customer-name="Customer Name"
-  data-customer-phone="9876543210">
-  Pay Now
-</button>
-```
-
-### Method 2: Programmatic JavaScript API
-For React, Vue, Next.js, and Single-Page Applications:
-
-```javascript
-Youpi.pay({
-  order_id: "ORDER-1001",
-  amount: 499.00,
-  currency: "INR",
-  customer: {
-    name: "Customer Name",
-    phone: "9876543210",
-    email: "customer@example.com"
-  },
-  handler: function(response) {
-    console.log("Payment Confirmed:", response);
-    // response: { status: "SUCCESS", order_id, amount_received, utr, payment_mode }
-  },
-  onClose: function() {
-    console.log("Checkout dismissed");
-  }
-});
-```
-
-### Method 3: Backend REST API
-Initialize payment collections programmatically via the backend API:
-
-```http
-POST /api/v1/collections HTTP/1.1
-Host: api.gateway.internal
-Content-Type: application/json
-X-Merchant-Key: <MERCHANT_API_KEY>
-Idempotency-Key: <UNIQUE_IDEMPOTENCY_TOKEN>
-
-{
-  "orderId": "ORD-2026-001",
-  "amount": 499.00,
-  "currency": "INR",
-  "customerName": "Customer Name",
-  "customerPhone": "9876543210",
-  "method": "UPI"
-}
-```
-
----
-
-## Webhook Verification Specification
-
-All payment confirmations dispatch an authoritative, signed HTTP POST request to the merchant's configured webhook endpoint.
-
-Merchants must verify the cryptographic signature over the unparsed request body before fulfilling digital goods:
-
-```javascript
-import crypto from 'node:crypto';
-
-app.post('/api/webhook', express.raw({ type: 'application/json' }), (req, res) => {
-  const signature = req.headers['x-gateway-signature'] || '';
-  const secret = process.env.MERCHANT_WEBHOOK_SECRET;
-  const expected = 'sha256=' + crypto.createHmac('sha256', secret).update(req.body).digest('hex');
-
-  if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) {
-    return res.status(401).json({ error: 'Signature mismatch' });
-  }
-
-  const payload = JSON.parse(req.body.toString('utf8'));
-  if (payload.event === 'SUCCESS' && payload.method === 'UPI') {
-    // Authoritatively mark order as paid
-    db.orders.markPaid(payload.orderId, { utr: payload.utr });
-  }
-
-  res.status(200).json({ received: true });
-});
-```
-
----
-
-## Deployment Architectures
-
-### 1. Local Production Execution
-```bash
-# Install workspace dependencies
-npm install
-
-# Apply database schemas and chart of accounts
-npm run db:setup
-
-# Execute regression verification suite (35/35 passing)
-npm test
-
-# Launch production services
-npm start
-```
-
-### 2. Containerized Production Stack (Docker Compose)
-A production configuration is provided in `docker-compose.production.yml` orchestrating PostgreSQL 16, Redis 7, Payment API, Merchant Admin, Checkout Portal, and Caddy TLS termination.
-
-```bash
-docker compose -f docker-compose.production.yml up -d --build
-```
-
-### 3. Cloud Deployment (Kubernetes / IBM Cloud Code Engine)
-Production manifests are available in `deploy/ibm-cloud/`:
-- `code-engine-app.yaml`: Managed serverless container deployment.
-- `k8s-sanbook-pay.yaml`: Standard Kubernetes Deployments, Services, ConfigMaps, and Ingress with Let's Encrypt TLS.
-
----
-
-## Authoritative Documentation Hub
-
-Comprehensive engineering guides are available in the `docs/` directory:
-
-| Document | Purpose |
-| :--- | :--- |
-| **[docs/PRODUCTION_SETUP.md](docs/PRODUCTION_SETUP.md)** | Infrastructure requirements, port mapping, and production configuration |
-| **[docs/BANK_CONNECTION_SETUP.md](docs/BANK_CONNECTION_SETUP.md)** | Bank connection wizard, Cashfree integration, and direct bank interfaces |
-| **[docs/REAL_COLLECTION_API.md](docs/REAL_COLLECTION_API.md)** | Authenticated collections, idempotency, order queries, and polling contracts |
-| **[docs/REAL_PAYOUT_API.md](docs/REAL_PAYOUT_API.md)** | Outbound disbursements, penny-drop validation, and two-step approvals |
-| **[docs/SETTLEMENT_RECONCILIATION.md](docs/SETTLEMENT_RECONCILIATION.md)** | Chart of accounts, double-entry rules, and 3-way automated reconciliation |
-| **[docs/SECURITY_AUDIT.md](docs/SECURITY_AUDIT.md)** | AES-256-GCM encryption, HMAC verification, and threat mitigation |
-| **[docs/LIVE_TRANSACTION_VERIFICATION.md](docs/LIVE_TRANSACTION_VERIFICATION.md)** | Operator runbook for live transaction testing and verification |
-| **[docs/PRODUCTION_ACCEPTANCE_REPORT.md](docs/PRODUCTION_ACCEPTANCE_REPORT.md)** | Engineering verification report and 20-point compliance matrix |
-
----
-
-## License
-
-Commercial Enterprise License. Proprietary and confidential.
-All rights reserved.
+Keep the current forest-green console and mobile checkout design. Preserve records, existing encryption keys and unrelated work. Work on a review branch; merge/deploy production only with explicit approval. The acceptance report identifies remaining external and infrastructure gates. Never commit `data/.secrets`, backups, keystores or private PDFs.

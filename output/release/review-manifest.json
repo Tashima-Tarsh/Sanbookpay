@@ -1,0 +1,37 @@
+{
+  "preparedAt": "2026-10-31T08:11:32.797843+00:00",
+  "baselineCommit": "a4da32493ce3b4b140deb0681b6f548acc15c636",
+  "reviewBranch": "fix/payment-hardening-and-operations",
+  "reviewTag": "dynamo-pay-review-2026-10-31",
+  "productionDeploymentApproved": false,
+  "regression": {
+    "suites": 45,
+    "passedSuites": 45,
+    "tests": 359
+  },
+  "postgresAcceptance": {
+    "isolatedSchema": true,
+    "passed": 2,
+    "failed": 0
+  },
+  "routeSmoke": {
+    "routes": 189,
+    "errors": 0
+  },
+  "browser": {
+    "desktopWidth": 1440,
+    "mobileWidth": 390,
+    "views": 10,
+    "paymentConfirmationsSubmitted": 0
+  },
+  "capacityEvidence": "output/testing/capacity-results.json",
+  "publicArtifacts": {
+    "apps/merchant-admin/public/dynamo-pay-manual.pdf": "1da703b348993c8e1048adf66f8929ab4cdf1f91ee4f3e3aaf5433d1d58bf9cc",
+    "apps/merchant-admin/public/dynamo-developer-quick-guide.pdf": "1da703b348993c8e1048adf66f8929ab4cdf1f91ee4f3e3aaf5433d1d58bf9cc",
+    "apps/merchant-admin/public/dynamo-pay-testing.pdf": "8031a196268782fe3f577b941c77de320d68feeee4bb4d015c08396aa0a5de30"
+  },
+  "privateArtifactsCommitted": false,
+  "nativeAndroidBuildAccepted": false,
+  "liveBankTransfersTested": false,
+  "readinessDetails": "docs/PRODUCTION_ACCEPTANCE_REPORT.md"
+}
