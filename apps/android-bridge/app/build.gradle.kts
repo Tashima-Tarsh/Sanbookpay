@@ -40,5 +40,4 @@ dependencies {
     implementation("androidx.work:work-runtime-ktx:2.9.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("org.json:json:20231013")
-    implementation("com.journeyapps:zxing-android-embedded:4.3.0")
 }
