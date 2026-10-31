@@ -1,10 +1,13 @@
 import {registerPaymentControls} from './payment-controls.js';
+import {registerPlatformIdentity} from './platform/identity.js';
+import {registerPlatformPayments} from './platform/payments.js';
+import {registerPlatformOperations} from './platform/operations.js';
 import fs from 'node:fs';
 import { registerMerchantConsoleRoutes } from './routes/merchant-console.routes.js';
 import { EventEmitter } from 'node:events';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { PaymentStatus } from '@youpi/common';
+import { PaymentStatus, safeEqual } from '@youpi/common';
 import { DynamoPayQueue } from '@youpi/common';
 import { DynamoPayWebhooks } from '@youpi/common';
 import { DynamoPayGmailVerification } from '@youpi/common';
@@ -50,7 +53,7 @@ import {
   PaymentVerificationPipeline
 } from '@youpi/core';
 import { HttpServer } from './server.js';
-import { authGuard } from './auth-guard.js';
+import { authGuard, isAdminRequest } from './auth-guard.js';
 import { registerPaymentRoutes } from './routes/payments.routes.js';
 import { registerCheckoutRoutes } from './routes/checkout.routes.js';
 import { registerPollerRoutes } from './routes/pollers.routes.js';
@@ -511,6 +514,24 @@ export function createPaymentApp(customDb = null, options = {}) {
     dynamoSMS
   };
 
+  const platformIdentity=registerPlatformIdentity(server,context);
+  const platformPayments=registerPlatformPayments(server,context,platformIdentity);
+  context.platformIdentity=platformIdentity;
+  context.platformPayments=platformPayments;
+  context.canActivateMerchant=id=>Boolean(db.queryOne("SELECT c.id FROM provider_connections c JOIN pp_connection_policy p ON p.connection_id=c.id WHERE c.merchant_id=? AND c.environment='PRODUCTION' AND p.approved=1 AND p.enabled=1 AND c.is_active=1",[id]));
+  // Existing merchants retain their current operational state; registration never creates this grant.
+  for(const legacy of merchantRepo.findAll())if(!db.queryOne('SELECT merchant_id FROM pp_merchants WHERE merchant_id=?',[legacy.id]))db.execute('INSERT INTO pp_merchants(merchant_id,status,profile,created_at,updated_at) VALUES(?,?,?,?,?)',[legacy.id,'ACTIVE',JSON.stringify({businessName:legacy.businessName,legacyInstallation:true}),legacy.createdAt?.toISOString?.()||new Date().toISOString(),new Date().toISOString()]);
+  server.use(platformPayments.guard);
+  server.use(platformIdentity.guard);
+  registerPlatformOperations(server,context,platformIdentity);
+  server.use((req,res,pathname)=>{
+    if(process.env.NODE_ENV==='test')return false;
+    if(req.method==='POST'&&pathname==='/api/v1/payments'&&!isAdminRequest(req)){
+      const mid=req.headers['x-merchant-id'],m=mid&&merchantRepo.findById(mid);
+      if(!m||!safeEqual(String(req.headers['x-merchant-key']||''),m.webhookSecret||'')){HttpServer.json(res,401,{error:'Authenticate the merchant backend before creating a payment.',code:'AUTH_REQUIRED'});return true;}
+    }
+    return false;
+  });
   registerPaymentControls(server,context);
   registerPaymentRoutes(server, context);
   registerCheckoutRoutes(server, context);

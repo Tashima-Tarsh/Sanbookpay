@@ -120,7 +120,7 @@ test('production payment boundaries, observer isolation and refund reservations'
   const rule={ruleType:'BLOCK',targetType:'RECEIVING_VPA',target:account.upiId,reason:'Temporarily reviewing this bank account'};
   assert.equal((await post(root,rule)).status,401);
   const saved=await post(root,rule,authHeaders());assert.equal(saved.status,201);const block=await saved.json();
-  const make=()=>post('/api/v1/payments',{orderId:'RULE-TEST-'+crypto.randomUUID(),amount:'201.00'});
+  const make=()=>post('/api/v1/payments',{orderId:'RULE-TEST-'+crypto.randomUUID(),amount:'201.00',merchantId:merchant.id},{'x-merchant-id':merchant.id,'x-merchant-key':merchant.webhookSecret});
   assert.equal((await make()).status,403);
   assert.equal((await post(root,{...rule,ruleType:'ALLOW'},authHeaders())).status,201);
   assert.equal((await make()).status,403);

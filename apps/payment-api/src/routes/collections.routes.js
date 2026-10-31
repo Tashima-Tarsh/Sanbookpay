@@ -98,13 +98,13 @@ export function registerCollectionsRoutes(server, ctx) {
         notifyUrl: body.notifyUrl
       });
     } catch (err) {
-      // If live provider credentials are missing/unconfigured, create local order marked PENDING
-      providerOrder = {
-        providerOrderId: `prov_${Date.now()}`,
-        paymentSessionId: `sess_${Date.now()}`,
-        checkoutUrl: null,
-        rawResponse: { error: err.message, status: 'PENDING_PROVIDER_SETUP' }
-      };
+      // Never create a fabricated provider order. The merchant can retry the same
+      // idempotency key after configuring the approved provider connection.
+      return HttpServer.json(res, 503, {
+        error: 'The approved payment provider is unavailable or not configured.',
+        code: 'PROVIDER_UNAVAILABLE',
+        retryable: true
+      });
     }
 
     const initiationDuration = Date.now() - startInitiation;

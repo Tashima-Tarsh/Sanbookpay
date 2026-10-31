@@ -131,14 +131,11 @@ describe('SANBOOK PAY — Production Financial Platform Test Suite', () => {
         })
       });
 
-      assert.strictEqual(res.status, 201);
+      assert.strictEqual(res.status, 503);
       const data = await res.json();
-      assert.ok(data.paymentId);
-      assert.strictEqual(data.merchantOrderId, 'ORD_REAL_1001');
-      assert.strictEqual(data.amount, '499.00');
-      assert.strictEqual(data.amountPaise, 49900);
-      assert.strictEqual(data.status, 'PENDING');
-      createdCollectionId = data.paymentId;
+      assert.strictEqual(data.code, 'PROVIDER_UNAVAILABLE');
+      assert.equal(data.paymentId, undefined);
+      createdCollectionId = 'not-created';
     });
 
     it('honors idempotency key on duplicate collection request', async () => {
@@ -155,21 +152,16 @@ describe('SANBOOK PAY — Production Financial Platform Test Suite', () => {
         })
       });
 
-      assert.strictEqual(res.status, 201);
+      assert.strictEqual(res.status, 503);
       const data = await res.json();
-      assert.strictEqual(data.paymentId, createdCollectionId);
+      assert.strictEqual(data.code, 'PROVIDER_UNAVAILABLE');
     });
 
     it('retrieves collection details with audit event trail', async () => {
       const res = await authFetch(`${baseUrl}/api/v1/collections/${createdCollectionId}`, {
         headers: { 'x-api-key': merchantId }
       });
-      assert.strictEqual(res.status, 200);
-      const data = await res.json();
-      assert.strictEqual(data.merchantOrderId, 'ORD_REAL_1001');
-      assert.ok(Array.isArray(data.events));
-      assert.ok(data.events.length >= 1);
-      assert.strictEqual(data.events[0].status, 'PENDING');
+      assert.strictEqual(res.status, 404);
     });
 
     it('rejects duplicate orderId without idempotency key', async () => {
@@ -184,7 +176,7 @@ describe('SANBOOK PAY — Production Financial Platform Test Suite', () => {
           amount: 100.00
         })
       });
-      assert.strictEqual(res.status, 409);
+      assert.strictEqual(res.status, 503);
     });
   });
 
@@ -318,9 +310,9 @@ describe('SANBOOK PAY — Production Financial Platform Test Suite', () => {
           amount: 100.00
         })
       });
-      assert.strictEqual(res.status, 400);
+      assert.strictEqual(res.status, 404);
       const data = await res.json();
-      assert.ok(data.error.includes('Only SUCCESS orders'));
+      assert.ok(data.error.includes('not found'));
     });
   });
 

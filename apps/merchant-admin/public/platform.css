@@ -1,0 +1,38 @@
+/* Extend the existing console; its tokens and components remain authoritative. */
+:root{--dp-font:'Segoe UI',sans-serif}
+::selection{background:#c6df8b;color:#182c28}
+input,textarea{caret-color:#284d44}
+*{scrollbar-color:#9cadA4 #f4f5f7;scrollbar-width:thin}
+.skip-link{position:fixed;left:12px;top:-80px;background:#fff;padding:12px;z-index:100}
+.skip-link:focus{top:12px}
+#console .nav-label{margin-top:16px}
+#console .nav-footer .nav{margin-top:12px}
+#console .brand{flex-shrink:0}
+#view{min-height:240px}
+.platform-form{max-width:820px}
+.platform-form .grid{margin-bottom:20px}
+.platform-form .field{margin-bottom:17px}
+.platform-form .field input[type=checkbox]{width:20px;min-height:20px;align-self:start}
+.platform-form .field small{font-size:12px}
+.platform-form .actions{margin-top:8px}
+.platform-stack{display:flex;flex-direction:column;gap:12px}
+.platform-tabs{margin:18px 0 22px;display:flex;flex-wrap:wrap;gap:8px}
+.platform-secret{overflow-wrap:anywhere;white-space:pre-wrap;user-select:all;font-family:Consolas,monospace;background:#edf2e7;color:#1c3527;padding:16px;border-radius:6px;margin:14px 0}
+.platform-detail{margin:0}
+.platform-detail dt{color:var(--muted);font-size:12px;margin-top:15px}
+.platform-detail dd{margin:5px 0 0;overflow-wrap:anywhere;line-height:1.7}
+.platform-empty{padding:32px 24px}
+.platform-empty h2{margin-bottom:10px}
+.platform-empty p{margin-bottom:16px}
+.platform-help{margin:14px 0 22px}
+#auth .brand{color:#284d44;font-family:'Segoe UI',sans-serif}
+#auth .btn{margin-top:0}
+#authForm .btn{margin-top:23px}
+#authLinks{margin-top:18px}
+#resultDialog{max-height:calc(100dvh - 32px);overflow:auto}
+#resultBody .field{margin-bottom:16px}
+#statusMessage.error{color:#942737;background:#fcebed}
+#console .dp-table td .actions{gap:6px}
+#console .dp-table td{white-space:normal}
+@media(max-width:960px){#console .menu-close{width:auto;font-size:12px}#console .topbar .right{display:flex}#console .topbar .right>span{display:none}#console .topbar .right .btn{font-size:11px;padding:9px}.platform-form{max-width:100%}}
+@media(max-width:640px){#console .page-head>.actions{display:flex}.platform-secret{font-size:12px}.platform-tabs .btn{flex:1}#console .dp-table td[data-label="Actions"]{grid-column:1/-1}}

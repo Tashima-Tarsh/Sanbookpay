@@ -105,16 +105,17 @@ export class AdminServer {
         const page=fs.readFileSync(path.join(__dirname,'../public/dynamo-downloads.html'),'utf8').replaceAll('{{AUTHENTICATED}}',authenticated?'true':'false');
         res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store',...BASE_SECURITY_HEADERS});res.end(page);return;
       }
-      if (pathname === '/downloads/manual.pdf' || pathname === '/downloads/developer-guide.pdf' || pathname === '/downloads/private-credentials.pdf') {
+      if (pathname === '/downloads/manual.pdf' || pathname === '/downloads/developer-guide.pdf' || pathname === '/downloads/merchant-admin-manual.pdf' || pathname === '/downloads/private-credentials.pdf') {
         if (req.method !== 'GET') return reply(405, {error:'Method not allowed'});
         const privateDocument=pathname === '/downloads/private-credentials.pdf';
         if(privateDocument && !authenticated){res.writeHead(302,{'Location':'/downloads','Cache-Control':'no-store',...BASE_SECURITY_HEADERS});res.end();return;}
         const developerGuide=pathname === '/downloads/developer-guide.pdf';
-        const file=privateDocument?this.privateCredentialsPath:path.join(__dirname,'../public',developerGuide?'dynamo-developer-quick-guide.pdf':'dynamo-pay-manual.pdf');
+        const combinedGuide=pathname === '/downloads/merchant-admin-manual.pdf';
+        const file=privateDocument?this.privateCredentialsPath:path.join(__dirname,'../public',developerGuide?'dynamo-developer-quick-guide.pdf':combinedGuide?'dynamo-pay-merchant-admin-manual.pdf':'dynamo-pay-manual.pdf');
         try {
           const data=privateDocument&&this.db.dialect==='postgres'?this.db.queryOne("SELECT contents FROM hosted_files WHERE path='.secrets/Dynamo-Pay-Private-Credentials.pdf'")?.contents:await fs.promises.readFile(file);
           if(!data)return reply(404,{error:'This document is unavailable. Contact your account administrator.'});
-          res.writeHead(200,{'Content-Type':'application/pdf','Content-Disposition':`attachment; filename="${privateDocument?'Dynamo-Pay-Private-Credentials.pdf':developerGuide?'Dynamo-Pay-Developer-Quick-Guide.pdf':'Dynamo-Pay-User-Manual.pdf'}"`,'Cache-Control':'no-store','Pragma':'no-cache',...BASE_SECURITY_HEADERS});res.end(data);
+          res.writeHead(200,{'Content-Type':'application/pdf','Content-Disposition':`attachment; filename="${privateDocument?'Dynamo-Pay-Private-Credentials.pdf':developerGuide?'Dynamo-Pay-Developer-Quick-Guide.pdf':combinedGuide?'Dynamo-Pay-Merchant-and-Admin-Manual.pdf':'Dynamo-Pay-User-Manual.pdf'}"`,'Cache-Control':'no-store','Pragma':'no-cache',...BASE_SECURITY_HEADERS});res.end(data);
         }catch(error){reply(error.code==='ENOENT'?404:503,{error:'This document is unavailable. Contact your account administrator.'});}
         return;
       }
@@ -312,6 +313,12 @@ export class AdminServer {
       }
 
       // Dashboard View: GET / or GET /admin
+      if (pathname === '/platform') {
+        const html = fs.readFileSync(path.join(__dirname, '../public/platform.html'), 'utf8');
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache', ...BASE_SECURITY_HEADERS });
+        res.end(html);
+        return;
+      }
       if (pathname === '/' || pathname === '/admin') {
         const html = this.renderHtml();
         res.writeHead(200, {

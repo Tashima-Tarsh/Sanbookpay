@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Dynamo Pay · Platform</title>
+  <link rel="stylesheet" href="/dynamo-console.css">
+  <link rel="stylesheet" href="/platform.css">
+  <script src="/platform.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#workspace">Skip to content</a>
+  <section id="auth" class="login-screen" aria-label="Platform sign in" hidden>
+    <div class="login-box">
+      <div class="brand">Dynamo Pay</div>
+      <h1 id="authTitle">Sign in to your workspace</h1>
+      <p id="authIntro">Manage your business, payments and team securely.</p>
+      <form id="authForm"></form>
+      <p id="authError" class="message" role="alert"></p>
+      <div id="authLinks" class="actions"></div>
+      <p class="help"><a href="/downloads">Manuals &amp; downloads</a> · <a href="/admin">Owner console</a></p>
+    </div>
+  </section>
+  <div id="console" class="dp-admin" hidden>
+    <button class="menu-backdrop" id="menuBackdrop" aria-label="Close navigation" hidden></button>
+    <aside class="dp-sidebar" id="sidebar" aria-label="Workspace navigation">
+      <button class="menu-close" id="menuClose" aria-label="Close navigation">Close</button>
+      <div class="brand"><svg viewBox="0 0 30 40" fill="currentColor" aria-hidden="true"><path d="M18 0 1 23h12l-1 17 17-25H17z"/></svg><div>Dynamo Pay<small id="workspaceType">Merchant workspace</small></div></div>
+      <nav id="navigation" aria-label="Main navigation"></nav>
+      <div class="nav-footer"><div class="account"><span class="avatar">DP</span><div><span id="accountName"></span><small id="accountRole"></small></div></div><button class="nav" id="signOut">Sign out</button></div>
+    </aside>
+    <main class="dp-main" id="workspace" tabindex="-1">
+      <header class="topbar"><div class="actions"><button class="btn menu-toggle" id="menuToggle" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">Menu</button><span>Dynamo Pay / <strong id="breadcrumb">Overview</strong></span></div><div class="right"><span id="tenantName"></span><button class="btn small" id="refresh">Refresh data</button></div></header>
+      <div class="content"><div class="page-head"><div><h1 id="pageTitle"></h1><p id="pageDescription"></p></div><div class="actions" id="pageActions"></div></div><p id="statusMessage" class="notice" role="status" hidden></p><div id="view" aria-live="polite"></div><footer><span>Dynamo Pay</span><a href="/downloads">Manuals &amp; downloads</a></footer></div>
+    </main>
+  </div>
+  <dialog id="resultDialog" aria-labelledby="resultTitle"><h2 id="resultTitle"></h2><div id="resultBody"></div><div class="actions"><button class="btn primary" id="closeResult">Done</button></div></dialog>
+</body>
+</html>
