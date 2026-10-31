@@ -65,6 +65,13 @@ export class AttributionEngine {
    * }}
    */
   processObservation(normalizedObs) {
+    // Notifications are evidence, not an independently authenticated bank settlement.
+    if(process.env.NODE_ENV==='production') {
+      const prior=this.obsRepo.findByFingerprint(normalizedObs.fingerprintHash);
+      const saved=prior||this.obsRepo.create(normalizedObs);
+      if(!prior)this.auditRepo?.log({entityType:'PAYMENT_OBSERVATION',entityId:saved.id,action:'SUPPLEMENTARY_EVIDENCE_RECORDED',actorType:'OBSERVER',details:{source:normalizedObs.source,requires:'PROVIDER_OR_BANK_CONFIRMATION'}});
+      return {attributed:false,duplicate:Boolean(prior),lateMatch:false,observationId:saved.id,outcomeStatus:'VERIFICATION_PENDING'};
+    }
     // Tier 1: Check fingerprint for deduplication
     const existing = this.obsRepo.findByFingerprint(normalizedObs.fingerprintHash);
     const retrySavedBankRecord=existing && !existing.attributedPaymentId && ['UNATTRIBUTED','LATE_UNMATCHED'].includes(existing.attributionStatus) && BANK_SOURCES.includes(existing.source) && normalizedObs.bankReferenceNumber && this.sessionRepo.db.queryOne(`SELECT COUNT(*) AS n FROM payment_sessions WHERE status IN ('ACTIVE','PROCESSING','VERIFICATION_PENDING') AND receiving_account_id=? AND amount_paise=? AND json_extract(metadata,'$.reportedUtr')=?`,[normalizedObs.receivingAccountId,Number(normalizedObs.amountPaise),normalizedObs.bankReferenceNumber]).n===1;

@@ -126,7 +126,7 @@ export function registerProviderWebhooksRoutes(server, ctx) {
     const merchantId = payout.merchant_id;
     const provider = providerRegistry.getProvider(merchantId, 'CASHFREE');
 
-    const isValid = provider.verifyCollectionWebhook({ rawBody, headers: req.headers });
+    const isValid = provider.verifyPayoutWebhook({ rawBody, headers: req.headers });
     if (!isValid) {
       return HttpServer.json(res, 401, { error: 'Invalid Cashfree payout webhook signature' });
     }

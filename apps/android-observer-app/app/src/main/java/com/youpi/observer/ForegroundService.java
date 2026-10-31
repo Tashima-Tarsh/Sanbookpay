@@ -54,6 +54,7 @@ public class ForegroundService extends Service {
                     new Thread(new Runnable() {
                         @Override
                         public void run() {
+                            apiClient.flushPendingObservations();
                             apiClient.sendHeartbeat();
                         }
                     }).start();

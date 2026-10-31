@@ -1,4 +1,4 @@
-import { decrypt } from '@youpi/common';
+import { decrypt, resolveSecret } from '@youpi/common';
 import { CashfreeProvider } from './cashfree-provider.js';
 import { DirectBankProvider } from './direct-bank-provider.js';
 
@@ -14,7 +14,7 @@ export class ProviderRegistry {
    */
   constructor(options = {}) {
     this.db = options.db;
-    this.masterKey = options.masterKey || process.env.ENCRYPTION_MASTER_KEY || '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+    this.masterKey = options.masterKey || resolveSecret('encryption_master_key','ENCRYPTION_MASTER_KEY');
     this._cache = new Map();
   }
 
@@ -27,9 +27,10 @@ export class ProviderRegistry {
       if (cipher.includes(':')) {
         return decrypt(cipher, this.masterKey);
       }
-      return cipher; // unencrypted fallback for test environments
+      if(process.env.NODE_ENV==='test')return cipher;
+      throw Error('Provider credentials must be encrypted before production use');
     } catch {
-      return cipher;
+      throw Error('Provider credential decryption failed; preserve the original encryption key and review configuration');
     }
   }
 

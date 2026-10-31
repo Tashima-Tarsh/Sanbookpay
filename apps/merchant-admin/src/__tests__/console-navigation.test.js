@@ -18,6 +18,7 @@ test('every sidebar destination shows one matching content view and API settings
   const nav=names.map(name=>Object.assign(element('nav-'+name),{dataset:{page:name}}));
   const views=names.map(name=>element('page-'+name));
   const data={
+    'v1/admin/console/payment-rules':{rules:[]},
     'v1/admin/console/operations':{callbacks:{total:0,delivered:0,pending:0,exhausted:0},unmatchedObservations:0,providerConfirmation:{samples:0,averageMs:null}},
     'v1/admin/console/summary':{total:1,paid:1,failed:0,pending:0,cod:0,collectedPaise:400},
     'v1/admin/console/payments':{payments:[{id:'receipt-4',orderId:'ORDER-REAL',amountPaise:400,status:'SUCCESS',method:'UPI',source:'SESSION',createdAt:new Date().toISOString()}]},'v1/admin/console/refunds':{refunds:[{id:'refund-4',payment_id:'receipt-4',amount_paise:400,status:'PENDING_MANUAL',reason:'Return'}]},'v1/refunds':{refunds:[]},

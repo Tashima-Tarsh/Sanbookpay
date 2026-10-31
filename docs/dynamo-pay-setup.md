@@ -1,3 +1,5 @@
+> Historical reference: use the [current operations manual](OPERATIONS-MANUAL.md) and [acceptance report](PRODUCTION_ACCEPTANCE_REPORT.md) for this review candidate. Older capability, hosting and automatic-verification statements below are not the current release contract.
+
 # Dynamo Pay local gateway
 
 Run `npm install`, then `npm run start:tunnel` from the repository root. The launcher starts Payment API (6100), checkout (7000), merchant admin (6001), Gmail observer (6003), and the shared gateway (8080). The demo store is disabled. Supply the official Cloudflare `cloudflared.exe` in the repository root; this local executable is intentionally excluded from Git.

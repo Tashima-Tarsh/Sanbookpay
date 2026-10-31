@@ -483,25 +483,7 @@ public class MainActivity extends Activity {
     }
 
     private void sendTestSms() {
-        if (!apiClient.isPaired()) {
-            Toast.makeText(this, "Pair device first before sending test SMS.", Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-                String testSender = "HDFCBK";
-                String testBody = "Dear Customer, INR 500.00 credited to your A/C ending 4321 via UPI Ref 999888777666 on 01-OCT-26.";
-                final boolean ok = apiClient.sendSms(testSender, testBody, System.currentTimeMillis());
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        Toast.makeText(MainActivity.this, ok ? "Test Bank SMS Sent to Gateway!" : "Failed to send test SMS.", Toast.LENGTH_SHORT).show();
-                    }
-                });
-            }
-        }).start();
+        Toast.makeText(this, "Use the connection test. Synthetic bank messages are disabled.", Toast.LENGTH_LONG).show();
     }
 
     // UI Helper factories

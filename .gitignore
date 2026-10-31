@@ -53,3 +53,11 @@ Thumbs.db
 # Local Cloudflare tunnel executable
 /cloudflared.exe
 *.tsbuildinfo
+
+# Android toolchain, release signing material and isolated capacity databases
+.gradle/
+.tmp_apk_build/
+*.keystore
+*.jks
+**/local.properties
+/tmp/capacity-*.sqlite*

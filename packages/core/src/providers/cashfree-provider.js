@@ -39,6 +39,12 @@ export class CashfreeProvider extends PaymentProvider {
       ...(options.headers || {})
     };
 
+    if(url.startsWith(this.payoutBaseUrl) && !url.endsWith('/authorize')) {
+      const authorization=await this._request(this.payoutBaseUrl+'/authorize',{method:'POST'});
+      const token=authorization.data?.data?.token;
+      if(!authorization.ok||!token)return {ok:false,status:authorization.status,data:null,error:'Payout authorization failed'};
+      headers.Authorization=`Bearer ${token}`;
+    }
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), options.timeoutMs || 15000);
 
@@ -134,6 +140,7 @@ export class CashfreeProvider extends PaymentProvider {
    * Creates a payment collection order in Cashfree.
    */
   async createCollection(order) {
+    if(!/^[0-9]{10}$/.test(String(order.customerPhone||'')))throw Error('A real 10-digit customer phone is required by the provider');
     const amountRupees = Number((order.amountPaise / 100).toFixed(2));
     const payload = {
       order_id: order.merchantOrderId,
@@ -141,9 +148,9 @@ export class CashfreeProvider extends PaymentProvider {
       order_currency: order.currency || 'INR',
       customer_details: {
         customer_id: order.customerPhone || order.customerEmail || `cust_${Date.now()}`,
-        customer_phone: order.customerPhone || '9999999999',
+        customer_phone: order.customerPhone,
         customer_name: order.customerName || 'Customer',
-        customer_email: order.customerEmail || 'customer@sanbookpay.com'
+        customer_email: order.customerEmail || undefined
       },
       order_meta: {
         return_url: order.returnUrl || undefined,
@@ -161,6 +168,7 @@ export class CashfreeProvider extends PaymentProvider {
     }
 
     const data = res.data;
+    if(!data.order_id || (!data.payment_session_id&&!data.payment_link))throw Error('Provider did not return a valid payable collection order');
     const checkoutUrl = data.payment_link || (data.payment_session_id ? `https://payments.cashfree.com/order/#${data.payment_session_id}` : null);
 
     return {
@@ -228,6 +236,13 @@ export class CashfreeProvider extends PaymentProvider {
    * Verifies Cashfree Webhook Signature.
    * Cashfree computes HMAC-SHA256 over: `${timestamp}${rawBody}` using the client secret, base64 encoded.
    */
+  verifyPayoutWebhook({rawBody,headers}) {
+    const signature=headers['x-cf-signature'];
+    if(typeof signature!=='string'||!this.clientSecret)return false;
+    const expected=crypto.createHmac('sha256',this.clientSecret).update(rawBody).digest('hex');
+    return signature.length===expected.length && crypto.timingSafeEqual(Buffer.from(signature),Buffer.from(expected));
+  }
+
   verifyCollectionWebhook({ rawBody, headers }) {
     const signature = headers['x-webhook-signature'] || headers['X-Webhook-Signature'];
     const timestamp = headers['x-webhook-timestamp'] || headers['X-Webhook-Timestamp'];
@@ -352,9 +367,10 @@ export class CashfreeProvider extends PaymentProvider {
       REJECTED: 'REJECTED'
     };
 
+    if(!statusMap[data.status])throw Error('Provider payout response has no recognized transfer status; reconciliation required');
     return {
       providerTransferId: data.referenceId ? String(data.referenceId) : payout.transferId,
-      status: statusMap[data.status] || 'PROCESSING',
+      status: statusMap[data.status],
       utr: data.utr || null,
       rawResponse: res.data
     };

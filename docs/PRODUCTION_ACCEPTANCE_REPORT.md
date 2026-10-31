@@ -1,108 +1,49 @@
-# Sanbook Pay — Final Production Acceptance Engineering Report
+# Dynamo Pay acceptance and code-freeze report
 
-**Project**: SANBOOK PAY (formerly YOUPI PG V2)  
-**Version**: 2.1.0-PRODUCTION  
-**Date**: October 19, 2026  
-**Engineering Release Status**: **APPROVED FOR PRODUCTION**
+Date: 31 October 2026. Review baseline: GitHub main and Render commit `a4da32493ce3b4b140deb0681b6f548acc15c636`. Local source was checked against both before implementation. This report supersedes the older production approval claims.
 
----
+## Release status
 
-## 1. Executive Summary
+A source review candidate is prepared on `fix/payment-hardening-and-operations`. Production deployment, bank activation and credential rotation are not performed by this freeze. A passing synthetic test is not a bank settlement certification. No production financial records were reset or amended in this work.
 
-The transformation of **YOUPI PG V2** into **SANBOOK PAY** is complete.
-The platform has been re-architected into a sovereign, production-grade financial payment platform supporting authentic real-money UPI collections, Cashfree Payment Gateway and Payout integrations, double-entry financial ledgering in integer paise, automated multi-source reconciliation, and enterprise security controls.
+## Repairs and verification
 
-Every independent task has been implemented directly in the repository with zero mock functions, zero hardcoded UTRs, and zero simulated financial success paths in production.
+| Area | Implemented result | Evidence |
+|---|---|---|
+| Payment success | Legacy card/netbanking simulation blocked outside tests; automatic fake settlements removed | production-hardening.test.js |
+| Provider confirmation | Existing atomic collection state/journal/callback path retained; payout signature separated from PG contract; payout bearer authorization added | payment-confirmation-regression.test.js; provider signature checks |
+| Observer trust | Production notifications retained as supplementary evidence; rejected source/parser results do not fall through | production-hardening.test.js |
+| Exact parsing | Rs. currency prefixes no longer let an earlier account number win amount extraction | SMS observer and verification suites |
+| Tenant isolation | Gmail credentials no longer copied/cleared across all merchants; inbox explicitly bound, not global latest order | source review and observer suites |
+| Android transport | Signed heartbeats, device/account ownership check, persisted retry queue in Java source; synthetic SMS test disabled | API heartbeat/isolation tests; native acceptance still required |
+| Android packaging | Java/Kotlin duplicate-class build path resolved by Java Gradle path; owner signing identity required; stale APK downloads rejected using source/APK manifest hashes | runtime helper checks; native compiler/device not available |
+| Financial review | Owner-only bank review records actual reference, reason, audit, journal and callback atomically; duplicate review cannot repost | production-hardening.test.js |
+| Refunds | Cumulative reservations include manual requests; durable reservation before provider call; uncertain response requires reconciliation | production-hardening.test.js |
+| Payouts | Production approval required; atomic approval claim before provider request; journal reserved; uncertain result is not silently failed/retried | financial platform and hardening suites |
+| Wallet | Provider clearing is no longer cancelled out by the opposite receivable entry in the unsettled projection | source review; recorded ledger balance only, not live bank balance |
+| Acceptance rules | Merchant-scoped allow/block/watch targets, expiry, state control and audited matches; block precedes allow | production-hardening.test.js and browser controls |
+| Dashboard | Existing visual identity kept; rules and bank review reuse existing forms/dialogs/tables | desktop/mobile browser review, all ten views |
+| Secrets | Known encryption-key fallback removed; decrypt failures fail closed; Compose secrets required; tracked-file scan in CI | typecheck, secret scan and financial tests |
+| Manuals | Public setup/API/observer guide and private owner configuration PDF rebuilt; historical generators delegate to current source | rendered PDF review, page bounds and public-secret comparison |
 
----
+## Recorded tests
 
-## 2. 20-Point Mandatory Objective Acceptance Matrix
+The repository regression runner passed all 45 suites and 359 tests as recorded in `output/testing/regression-results.json` (the external PostgreSQL test is skipped unless its private URL is supplied). Managed PostgreSQL acceptance was also run separately in an isolated schema and passed both checks, including nested rollback, collection confirmation/outbox, queueing and synthetic observation matching. Tests create no real bank payment.
 
-| # | Objective Requirement | Verification Status | Implementation & Verification Evidence |
-| :---: | :--- | :---: | :--- |
-| **1** | Genuine UPI payment collections | **VERIFIED** | `packages/core/src/providers/cashfree-provider.js` & `apps/payment-api/src/routes/collections.routes.js` |
-| **2** | Genuine bank/payment confirmation | **VERIFIED** | Cashfree Webhooks with HMAC-SHA256 over raw body + REST sync polling |
-| **3** | Actual authorized payouts to bank & UPI | **VERIFIED** | `apps/payment-api/src/routes/payouts.routes.js` with IMPS/NEFT/UPI rails |
-| **4** | Refunds and payment reversals | **VERIFIED** | `apps/payment-api/src/routes/refunds.routes.js` & `packages/db/src/repositories/refund.repository.js` |
-| **5** | Real bank settlement tracking | **VERIFIED** | `settlement_batches` tracking gross, fees, tax, net, and bank credit reference |
-| **6** | Automatic reconciliation against bank records | **VERIFIED** | `packages/db/src/repositories/reconciliation.repository.js` automated 3-way matching |
-| **7** | Authenticated payment collection APIs | **VERIFIED** | Full REST suite under `/api/v1/collections` with idempotency & token guard |
-| **8** | Authenticated payout APIs | **VERIFIED** | Full REST suite under `/api/v1/payouts` with beneficiary registry |
-| **9** | Webhooks for payment & payout status | **VERIFIED** | `apps/payment-api/src/routes/provider-webhooks.routes.js` signed delivery |
-| **10** | Real-time transaction monitoring | **VERIFIED** | Merchant Console Overview & Collections tables with live metrics |
-| **11** | Bank/provider connections from admin wizard | **VERIFIED** | Merchant Console `BANKING → CONNECTIONS` interactive wizard |
-| **12** | Production authentication, security & audit | **VERIFIED** | AES-256-GCM encryption at rest, immutable `payment_order_events` audit trail |
-| **13** | PostgreSQL financial transaction storage | **VERIFIED** | 23 financial tables (12-34) in `packages/db/src/schema.sql` (and SQLite mirror) |
-| **14** | Docker-based production deployment | **VERIFIED** | `docker-compose.production.yml` with 6 production services |
-| **15** | Local production execution on Windows | **VERIFIED** | Clean startup via Node.js native runtime (`npm start`, `npm run dev`) |
-| **16** | Production HTTPS connectivity for callbacks | **VERIFIED** | Caddy reverse proxy config (`deploy/caddy/Caddyfile`) with automatic TLS |
-| **17** | Documented path to IBM Cloud deployment | **VERIFIED** | `deploy/ibm-cloud/` manifests for Code Engine and Kubernetes |
-| **18** | 60-second latency target for confirmation | **VERIFIED** | P50/P95/P99 latency tracking & `operations_metrics` table; SLA target met |
-| **19** | Accurate settlement timing on bank records | **VERIFIED** | `settlement_batches` records actual provider payout timestamps & UTRs |
-| **20** | End-to-end live verification runbook | **VERIFIED** | `docs/LIVE_TRANSACTION_VERIFICATION.md` detailing step-by-step verification |
+The local SQLite capacity test stored 1,001 receiving accounts while enforcing one active account. A burst of 200 requests at concurrency 25 accepted one active checkout and 199 queued requests, with p95 creation 297 ms in that run. Repeated order requests reused one transaction. Ten separate merchants had ten active checkouts. The benchmark used a temporary database, loopback transport, an increased request limiter and synthetic bank observations. It recovered ten transport errors using the same order IDs. This is not a hosted throughput or zero-failure guarantee. Full evidence is in `output/testing/capacity-results.json`.
 
----
+Desktop/mobile checks cover all ten console views, live stream connection, API loads, overflow and browser exceptions. Added controls were exercised against an isolated copy of the database. Private PDF values remain only in ignored storage; public manuals were checked against the owner's private credentials. No live banking action was submitted.
 
-## 3. Automated Test Suite Results
+## Remaining acceptance gates and scope limits
 
-```
-============================================================
-🧪 YOUPI PG V2 — FULL REGRESSION TEST RUNNER
-Running 34 curated test suites...
-============================================================
+1. A current native Android APK must be compiled, signed with the original owner keystore and installed/tested on the receiving phone. This environment has no Android SDK/JDK/Gradle toolchain or release keystore configured. JavaScript Android tests are not native-device proof. The older bundled APK is deliberately unavailable in production until it matches current source.
+2. Google consent and actual inbox credentials must be connected by the owner; validate genuine bank email and offline/reconnect behaviour. Current runtime supports one explicitly bound inbox per observer service, not independent tenant inbox orchestration.
+3. Approved bank/provider accounts, permitted merchant category, real credit/payout/refund and bank settlement reconciliation require controlled live acceptance. The direct bank H2H adapter is not activated by entering a VPA. A customer gaming wallet must implement its own durable callback deduplication; the disabled demo wallet is not production accounting.
+4. Owner/admin and observer credentials are implemented. A separate multi-operator role system, disputes case management, distributed event replay, provider circuit-breaker control plane, authenticated payer-VPA identity and automatic bank-statement reconciliation are not certified features of this candidate. They require separate implementation/acceptance before selling them as complete.
+5. The per-IP limiter is per process. Render edge/client-IP forwarding and any customer IP allowlist must be verified on the target deployment; local spoof-header tests do not certify every external proxy chain. The local benchmark does not prove 1,000 concurrent active payable checkouts, QR p95 100 ms, verified-event-to-UI p95 1 second, or wallet p95 2 seconds on the host. Those remain measured deployment targets, not guarantees.
+6. Docker files were inspected and unsafe secret defaults removed; Docker startup was not executed because the engine is unavailable. The optional Redis/Svix paths are not the active durable outbox and were not certified through real service restarts.
+7. Render Free can sleep; its database expires on 30 November 2026. No paid hosting or HA change was made. Backup/restore and an always-on hosting decision remain operational gates.
 
-[1/34] Testing packages/common/src/__tests__/common.test.js... ✅ PASS (0.30s)
-[2/34] Testing packages/db/src/__tests__/customer-reset.test.js... ✅ PASS (0.20s)
-[3/34] Testing packages/db/src/__tests__/auth-matrix.test.js... ✅ PASS (11.10s)
-[4/34] Testing packages/db/src/__tests__/db.test.js... ✅ PASS (0.40s)
-[5/34] Testing packages/core/src/__tests__/core.test.js... ✅ PASS (0.31s)
-[6/34] Testing packages/core/src/__tests__/queue-timing.test.js... ✅ PASS (0.34s)
-[7/34] Testing packages/core/src/__tests__/webhook-engine.test.js... ✅ PASS (0.28s)
-[8/34] Testing packages/merchant-sdk/src/__tests__/merchant-sdk.test.js... ✅ PASS (0.39s)
-[9/34] Testing packages/merchant-sdk/src/__tests__/sanbook-pay-sdk.test.js... ✅ PASS (0.21s)
-[10/34] Testing packages/merchant-sdk/src/__tests__/youpi-universal-integration.test.js... ✅ PASS (1.95s)
-[11/34] Testing apps/checkout-portal/src/__tests__/checkout-portal.test.js... ✅ PASS (0.66s)
-[12/34] Testing apps/coin-wallet-store/src/__tests__/coin-wallet-store.test.js... ✅ PASS (0.72s)
-[13/34] Testing apps/merchant-admin/src/__tests__/merchant-admin.test.js... ✅ PASS (0.43s)
-[14/34] Testing apps/payment-help/src/__tests__/payment-help.test.js... ✅ PASS (0.52s)
-[15/34] Testing apps/gmail-observer/src/__tests__/gmail-observer.test.js... ✅ PASS (0.77s)
-[16/34] Testing apps/sms-observer/src/__tests__/sms-observer.test.js... ✅ PASS (0.57s)
-[17/34] Testing apps/android-observer-app/__tests__/android-observer.test.js... ✅ PASS (0.55s)
-[18/34] Testing apps/control-center/src/__tests__/control-center.test.js... ✅ PASS (0.35s)
-[19/34] Testing apps/payment-api/src/__tests__/payment-api.test.js... ✅ PASS (6.35s)
-[20/34] Testing apps/payment-api/src/__tests__/auth-guard.test.js... ✅ PASS (0.38s)
-[21/34] Testing apps/payment-api/src/__tests__/counter-payments.test.js... ✅ PASS (0.41s)
-[22/34] Testing apps/payment-api/src/__tests__/selling-modes-and-cod.test.js... ✅ PASS (0.49s)
-[23/34] Testing apps/payment-api/src/__tests__/developer-payment-simulator.test.js... ✅ PASS (0.60s)
-[24/34] Testing apps/payment-api/src/__tests__/developer-test-mode.test.js... ✅ PASS (0.73s)
-[25/34] Testing apps/payment-api/src/__tests__/device-binding-duplicate-session.test.js... ✅ PASS (0.68s)
-[26/34] Testing apps/payment-api/src/__tests__/fraud-ban-pipeline.test.js... ✅ PASS (0.83s)
-[27/34] Testing apps/payment-api/src/__tests__/sms-gmail-verification-levels.test.js... ✅ PASS (3.71s)
-[28/34] Testing apps/payment-api/src/__tests__/upi-server-health-and-pc-ui.test.js... ✅ PASS (0.34s)
-[29/34] Testing apps/payment-api/src/__tests__/whatsapp-berry-auth.test.js... ✅ PASS (3.66s)
-[30/34] Testing apps/payment-api/src/__tests__/whitelabel-branding.test.js... ✅ PASS (0.47s)
-[31/34] Testing apps/payment-api/src/__tests__/cod-parallel-timer-decoupling.test.js... ✅ PASS (0.53s)
-[32/34] Testing apps/payment-api/src/__tests__/sanbook-pay-production.test.js... ✅ PASS (1.04s)
-[33/34] Testing scripts/chaos-concurrency.test.js... ✅ PASS (0.46s)
-[34/34] Testing scripts/production-infrastructure.test.js... ✅ PASS (0.40s)
+## Freeze procedure
 
-============================================================
-🎉 ALL 34 TEST SUITES PASSED CLEANLY (Total: 41.11s)
-============================================================
-```
-
-- Total Suites: **34**
-- Passed: **34** (100%)
-- Failed: **0** (0%)
-- Regressions: **None**
-
----
-
-## 4. Production Activation Requirements
-
-To execute live real-money operations:
-1. Supply Cashfree Production API credentials via the Console (`http://localhost:6001#banking`).
-2. Provide operator written authorization before releasing outbound payouts.
-3. Configure webhook endpoint URL in the Cashfree dashboard as documented in `docs/BANK_CONNECTION_SETUP.md`.
-4. Run live verification transactions as specified in `docs/LIVE_TRANSACTION_VERIFICATION.md`.
-
+Commit the accepted source and public PDFs, retain private PDFs and secret backups outside Git, and create an annotated review tag pointing to the tested commit. Record PDF SHA-256 hashes in the release manifest. Open a review PR; do not merge to main or deploy production without approval. Recheck GitHub main and live commit before any deployment so new work is not overwritten. An annotated source tag freezes that source snapshot; it does not disable future development or turn untested external integrations into completed features.

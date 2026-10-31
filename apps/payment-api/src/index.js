@@ -1,3 +1,4 @@
+import {registerPaymentControls} from './payment-controls.js';
 import fs from 'node:fs';
 import { registerMerchantConsoleRoutes } from './routes/merchant-console.routes.js';
 import { EventEmitter } from 'node:events';
@@ -215,7 +216,7 @@ export function createPaymentApp(customDb = null, options = {}) {
         verificationTag: data.verificationTag || session.verificationTag,
         sources: data.sources || session.verificationSources
       });
-      webhookEngine.dispatch('SUCCESS', session).catch(() => {});
+      if(!data.webhookQueued)webhookEngine.dispatch('SUCCESS', session).catch(() => {});
       try {
         const customer = session.customerId ? customerRepo.findById(session.customerId) : null;
         const merchant = (session.merchantId ? merchantRepo.findById(session.merchantId) : null) || defaultMerchant;
@@ -510,6 +511,7 @@ export function createPaymentApp(customDb = null, options = {}) {
     dynamoSMS
   };
 
+  registerPaymentControls(server,context);
   registerPaymentRoutes(server, context);
   registerCheckoutRoutes(server, context);
   registerPollerRoutes(server, context);

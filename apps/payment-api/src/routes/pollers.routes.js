@@ -1,3 +1,4 @@
+import {isCurrentAndroidRelease} from '@youpi/common';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -88,6 +89,7 @@ export function registerPollerRoutes(server, ctx) {
       const pipeResult = ctx.pipeline.process({
         source: body.source,
         rawText,
+        receivedAt:body.observedAt||body.timestamp,
         sender,
         receivingAccountId: body.receivingAccountId,
         paymentSessionId: body.paymentSessionId,
@@ -108,17 +110,22 @@ export function registerPollerRoutes(server, ctx) {
         return;
       }
 
+      if(['REJECTED','SUSPICIOUS'].includes(pipeResult.status)) return HttpServer.json(res,200,{accepted:false,status:pipeResult.status,reason:pipeResult.failingCondition||'OBSERVATION_NOT_VERIFIED',pipeline:pipeResult});
+
+      if(pipeResult.status==='UNRESOLVED'&&pipeResult.stages?.stage6?.details?.observationId)return HttpServer.json(res,200,{accepted:true,status:'VERIFICATION_PENDING',observationId:pipeResult.stages.stage6.details.observationId,attribution:{attributed:false,outcomeStatus:'VERIFICATION_PENDING'},pipeline:pipeResult});
+
       if (pipeResult.status === 'VERIFIED') {
         HttpServer.json(res, 200, {
           accepted: true,
           observationId: pipeResult.messageId || pipeResult.stages?.stage6?.details?.observationId,
-          attribution: pipeResult.stages?.stage6?.details || pipeResult,
+          attribution: { ...pipeResult.stages?.stage6?.details, attributed:true, paymentSessionId:pipeResult.stages?.stage6?.details?.attributedSessionId, outcomeStatus:pipeResult.stages?.stage6?.outcomeStatus },
           pipeline: pipeResult
         });
         return;
       }
     }
 
+    if(!rawText && process.env.NODE_ENV!=='test') return HttpServer.json(res,400,{accepted:false,error:'Raw bank evidence is required.'});
     try {
       let amountPaise = body.amountPaise ? BigInt(body.amountPaise) : undefined;
       let bankRef = body.bankReferenceNumber || body.utr;
@@ -138,7 +145,7 @@ export function registerPollerRoutes(server, ctx) {
       }
 
       const normalized = ObservationNormalizer.normalize({
-        source: body.source,
+        source: body.source==='SMS'?'SMS_GATEWAY':body.source==='EMAIL'?'GMAIL':body.source,
         receivingAccountId: body.receivingAccountId,
         rawPayload: body.rawPayload || body,
         amountPaise,
@@ -285,6 +292,9 @@ export function registerPollerRoutes(server, ctx) {
       receivingAccountId = activeAccount?.id || '00000000-0000-0000-0000-000000000002';
     }
 
+    const boundAccount=ctx.db.queryOne('SELECT merchant_id FROM payment_receiving_accounts WHERE id=?',[receivingAccountId]);
+    if(!boundAccount || boundAccount.merchant_id!==device.merchant_id) return HttpServer.json(res,403,{error:'Receiving account does not belong to this device merchant.'});
+
     // Extract amount and details: either pre-parsed or from raw bank SMS
     let amountPaise = body.amountPaise ? BigInt(body.amountPaise) : undefined;
     let bankRef = body.bankReferenceNumber || body.utr;
@@ -317,6 +327,7 @@ export function registerPollerRoutes(server, ctx) {
     if (ctx.pipeline && rawText) {
       const pipeResult = ctx.pipeline.process({
         source: 'SMS',
+        receivedAt:body.observedAt||body.timestamp,
         rawText,
         sender: body.sender || req.headers['x-sender'],
         receivingAccountId,
@@ -337,17 +348,21 @@ export function registerPollerRoutes(server, ctx) {
         return;
       }
 
+      if(['REJECTED','SUSPICIOUS'].includes(pipeResult.status)) return HttpServer.json(res,200,{accepted:false,status:pipeResult.status,reason:pipeResult.failingCondition||'OBSERVATION_NOT_VERIFIED',pipeline:pipeResult});
+
       if (pipeResult.status === 'VERIFIED') {
         ctx.db.execute("UPDATE android_devices SET last_observation_at = datetime('now') WHERE id = ?", [deviceId]);
         HttpServer.json(res, 200, {
           accepted: true,
           observationId: pipeResult.messageId || pipeResult.stages?.stage6?.details?.observationId,
-          attribution: pipeResult.stages?.stage6?.details || pipeResult,
+          attribution: { ...pipeResult.stages?.stage6?.details, attributed:true, paymentSessionId:pipeResult.stages?.stage6?.details?.attributedSessionId, outcomeStatus:pipeResult.stages?.stage6?.outcomeStatus },
           pipeline: pipeResult
         });
         return;
       }
     }
+
+    if(!rawText && process.env.NODE_ENV!=='test') return HttpServer.json(res,400,{accepted:false,error:'Raw bank evidence is required.'});
 
     // Transport Only Contract (Part D): The Android observer forwards all raw SMS.
     // If no monetary amount is extracted (e.g. personal, promotional, non-bank SMS),
@@ -396,12 +411,13 @@ export function registerPollerRoutes(server, ctx) {
 
   // --- ANDROID HEARTBEAT HANDLER ---
   const handleAndroidHeartbeat = async (req, res) => {
-    const body = await HttpServer.parseBody(req);
-    const deviceId = req.headers['x-device-id'] || body.deviceId;
-
-    if (deviceId) {
-      ctx.db.execute('UPDATE android_devices SET last_heartbeat_at = datetime(\'now\') WHERE id = ?', [deviceId]);
-    }
+    const raw=await HttpServer.parseRawBody(req);
+    let body;try{body=JSON.parse(raw);}catch{return HttpServer.json(res,400,{error:'Invalid JSON'});}
+    const deviceId=req.headers['x-device-id']||body.deviceId;
+    const device=deviceId?ctx.db.queryOne('SELECT * FROM android_devices WHERE id=? AND is_active=1',[deviceId]):null;
+    const timestamp=req.headers['x-timestamp'],signature=req.headers['x-signature'];
+    if(!device||!timestamp||!signature||!Number.isFinite(Number(timestamp))||Math.abs(Date.now()-Number(timestamp))>60000||!verifyHmac(`${raw}:${timestamp}`,device.signing_key_hash,signature))return HttpServer.json(res,401,{error:'A paired device signature and current timestamp are required.'});
+    ctx.db.execute("UPDATE android_devices SET last_heartbeat_at=datetime('now') WHERE id=?",[deviceId]);
 
     HttpServer.json(res, 200, {
       status: 'HEARTBEAT_ACK',
@@ -549,15 +565,7 @@ export function registerPollerRoutes(server, ctx) {
       }
     }
 
-    if (!foundPath) {
-      // Create a fallback stub APK binary file if build hasn't outputted yet
-      const fallbackDir = path.resolve(__dirname, '../../public');
-      if (!fs.existsSync(fallbackDir)) fs.mkdirSync(fallbackDir, { recursive: true });
-      foundPath = path.join(fallbackDir, 'youpi-sms-gateway.apk');
-      if (!fs.existsSync(foundPath)) {
-        fs.writeFileSync(foundPath, Buffer.from('PK\x03\x04YOUPI_SMS_GATEWAY_STANDALONE_APK_PACKAGE'));
-      }
-    }
+    if(!foundPath || (process.env.NODE_ENV==='production' && !isCurrentAndroidRelease(foundPath,path.resolve(__dirname,'../../../..'))))return HttpServer.json(res,503,{error:'A current signed Android release has not been built and verified. The old APK is not distributed as the updated observer.',code:'ANDROID_BUILD_REQUIRED'});
 
     const stat = fs.statSync(foundPath);
     res.writeHead(200, {

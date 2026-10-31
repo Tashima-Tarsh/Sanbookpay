@@ -1,3 +1,5 @@
+> Current setup and confirmation policy: [Operations manual](OPERATIONS-MANUAL.md). Credential names and storage: [Configuration inventory](CONFIGURATION-CREDENTIALS.md). Historical examples below may describe earlier runtimes or unconfigured services.
+
 # Sanbook Pay — Production Setup & Architecture Guide
 
 ## 1. Overview

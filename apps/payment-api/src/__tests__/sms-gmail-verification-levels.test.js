@@ -162,7 +162,7 @@ describe('2-Level Verification (SMS Gateway + Gmail) & Queue Management Tests', 
     const smsPayload = {
       deviceId: pairData.deviceId,
       sender: 'HDFCBK',
-      body: 'Dear Customer, A/C *4321 credited by Rs 450.00 on 30-Sep-26 by UPI/9876543210/REF99887766 - HDFC Bank',
+      body: 'Dear Customer, A/C *4321 credited by Rs 450.00 on 30-Sep-26 by UPI Ref 630414503474 - HDFC Bank',
       timestamp
     };
     const bodyStr = JSON.stringify(smsPayload);

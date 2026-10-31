@@ -1,3 +1,5 @@
+> Historical reference: use the [current operations manual](OPERATIONS-MANUAL.md) and [acceptance report](PRODUCTION_ACCEPTANCE_REPORT.md) for this review candidate. Older capability, hosting and automatic-verification statements below are not the current release contract.
+
 # YOUPI PG V2 — Deployment & Installation Guide
 
 This document describes how to deploy and run the clean distributable **YOUPI PG V2** package.

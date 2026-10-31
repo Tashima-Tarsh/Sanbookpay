@@ -9,7 +9,7 @@ services:
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-sanbook_pay}
       POSTGRES_USER: ${POSTGRES_USER:-sanbook_admin}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sanbook_secure_vault_2026}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD privately}
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./packages/db/src/schema.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
@@ -28,13 +28,13 @@ services:
     image: redis:7-alpine
     container_name: sanbook-pay-redis
     restart: unless-stopped
-    command: redis-server --appendonly yes --requirepass "${REDIS_PASSWORD:-sanbook_redis_pass_2026}"
+    command: redis-server --appendonly yes --requirepass "${REDIS_PASSWORD:?Set REDIS_PASSWORD privately}"
     volumes:
       - redis-data:/data
     ports:
       - "6379:6379"
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-sanbook_redis_pass_2026}", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:?Set REDIS_PASSWORD privately}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -56,10 +56,10 @@ services:
     environment:
       NODE_ENV: production
       PORT: 6100
-      DATABASE_URL: postgresql://${POSTGRES_USER:-sanbook_admin}:${POSTGRES_PASSWORD:-sanbook_secure_vault_2026}@postgres:5432/${POSTGRES_DB:-sanbook_pay}
-      REDIS_URL: redis://:${REDIS_PASSWORD:-sanbook_redis_pass_2026}@redis:6379/0
-      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef}
-      INTERNAL_TOKEN: ${INTERNAL_TOKEN:-sanbook_internal_secret_token_2026}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-sanbook_admin}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD privately}@postgres:5432/${POSTGRES_DB:-sanbook_pay}
+      REDIS_URL: redis://:${REDIS_PASSWORD:?Set REDIS_PASSWORD privately}@redis:6379/0
+      ENCRYPTION_MASTER_KEY: ${ENCRYPTION_KEY:?Set ENCRYPTION_KEY privately}
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN:?Set INTERNAL_TOKEN privately}
       BASE_PAYMENT_API_URL: http://payment-api:6100
       CHECKOUT_PORTAL_URL: http://checkout-portal:7000
     ports:
@@ -86,7 +86,7 @@ services:
       NODE_ENV: production
       PORT: 6001
       BASE_PAYMENT_API_URL: http://payment-api:6100
-      ADMIN_API_TOKEN: ${ADMIN_API_TOKEN:-sanbook_admin_jwt_secret_2026}
+      ADMIN_API_TOKEN: ${ADMIN_API_TOKEN:?Set ADMIN_API_TOKEN privately}
     ports:
       - "6001:6001"
     healthcheck:

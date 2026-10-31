@@ -1,3 +1,5 @@
+> Historical reference: use the [current operations manual](OPERATIONS-MANUAL.md) and [acceptance report](PRODUCTION_ACCEPTANCE_REPORT.md) for this review candidate. Older capability, hosting and automatic-verification statements below are not the current release contract.
+
 # White-Label Branding System Guide
 
 YOUPI PG is built from the ground up to be 100% white-label. No hardcoded brand names, logos, or client-specific colors exist in core payment components.

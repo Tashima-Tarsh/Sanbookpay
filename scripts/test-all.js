@@ -59,6 +59,7 @@ const testFiles = [
   'apps/payment-api/src/__tests__/sanbook-pay-production.test.js',
   'apps/payment-api/src/__tests__/multi-method-and-receipts.test.js',
   'apps/payment-api/src/__tests__/payment-confirmation-regression.test.js',
+  'apps/payment-api/src/__tests__/production-hardening.test.js',
   'scripts/chaos-concurrency.test.js',
   'scripts/postgres-acceptance.test.js',
   'scripts/production-infrastructure.test.js'

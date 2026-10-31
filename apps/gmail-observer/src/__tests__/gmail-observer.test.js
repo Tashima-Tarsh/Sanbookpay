@@ -147,8 +147,8 @@ describe('Gmail Payment Observer Integration Tests', () => {
       // 2. Process matching incoming bank email via Gmail Observer
       const result = await gmailInstance.poller.processEmail({
         subject: 'Credit alert: Rs 200.00 received',
-        body: 'Your account received Rs 200.00 from buyer@upi Ref: UTR-GMAIL-777',
-        from: 'alerts@icicibank.com'
+        body: 'Your account received Rs 200.00 from buyer@upi Ref: 630414503471',
+        from: 'alerts@icici.bank.in'
       });
 
       assert.ok(result);

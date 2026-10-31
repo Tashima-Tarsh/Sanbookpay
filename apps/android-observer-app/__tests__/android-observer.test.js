@@ -79,9 +79,9 @@ describe('Android Payment Observer Integration Tests', () => {
     const res = await driver.submitObservation({
       amount: '350.00',
       receivingAccountId: '00000000-0000-0000-0000-000000000002',
-      utr: 'UTR-ANDR-9876',
+      utr: '630414503473',
       senderVpa: 'customer@paytm',
-      notificationText: 'Payment of ₹350 received from customer@paytm on PhonePe'
+      notificationText: 'Payment of ₹350 received from customer@paytm on PhonePe Ref 630414503473'
     });
 
     assert.equal(res.status, 200);

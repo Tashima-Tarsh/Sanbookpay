@@ -107,7 +107,8 @@
     table('allocationTable',['Payment','Gross','Platform fee','GST','Recipients / net amounts','Status','Action'],allocations.map(r=>`<tr><td>${esc(payments.find(p=>p.id===r.payment_id)?.orderId||r.payment_id)}</td><td>${money(r.gross_paise)}</td><td>${money(r.fee_paise)}</td><td>${money(r.gst_paise)}</td><td>${r.recipients.map(p=>`${esc(p.name)} · ${money(p.amountPaise)}<small>${esc(p.vpa)}${r.transfers.find(t=>t.recipient_vpa===p.vpa)?' · Ref: '+esc(r.transfers.find(t=>t.recipient_vpa===p.vpa).bank_reference):''}</small>`).join('<br>')}</td><td>${badge(r.status)}</td><td>${r.status==='AWAITING_TRANSFER'?`<button class="btn small" data-transfer="${esc(r.payment_id)}">Record transfer</button>`:'—'}</td></tr>`),'No allocations yet. Saved recipient rules apply to new verified UPI payments.');
   }
   async function upi(){
-    const [d,c]=await Promise.all([api('v1/admin/upi-accounts'),consoleApi('upi-channel')]);
+    const [d,c,r]=await Promise.all([api('v1/admin/upi-accounts'),consoleApi('upi-channel'),consoleApi('payment-rules')]);
+    table('paymentRuleTable',['Rule','Target','Reason','Expiry','State','Action'],r.rules.map(rule=>`<tr><td>${esc(rule.ruleType)}</td><td>${esc(rule.targetType)}<small>${esc(rule.target)}</small></td><td>${esc(rule.reason)}</td><td>${esc(date(rule.expiresAt))}</td><td>${badge(rule.active?'ACTIVE':'INACTIVE')}</td><td><button class="btn small" data-rule-id="${esc(rule.id)}" data-rule-active="${!rule.active}">${rule.active?'Disable':'Enable'}</button></td></tr>`),'No acceptance rules. Channel limits still apply.');
     $('upiChannelEnabled').checked=c.enabled;$('upiChannelMin').value=c.minAmountPaise/100;$('upiChannelMax').value=c.maxAmountPaise/100;$('upiChannelVpas').value=(c.allowedVpas||[]).join('\n');
     table('upiTable',['UPI ID','Payee','Status','Payment slot','Action'],d.accounts.map(a=>`<tr><td><strong>${esc(a.upiId)}</strong></td><td>${esc(a.payeeName)}</td><td>${badge(a.isActive?'ACTIVE':'INACTIVE')}</td><td>${a.isSlotBusy?'In use':'Available'}</td><td>${!a.isActive?`<button class="btn small" data-activate-upi="${esc(a.id)}">Activate</button>`:'Current receiving account'}</td></tr>`),'No receiving accounts. Add a valid merchant UPI ID below.');
   }
@@ -159,10 +160,25 @@
     try{await Promise.all([loadSettings(),overview()]);navigate(location.hash.slice(1)||'overview');}catch(e){$('loadError').textContent=e.message;$('loadError').hidden=false;}
     connectStream();clearInterval(timer);timer=setInterval(()=>{if(!document.hidden&&['overview','transactions','failures','alerts','settlements','refunds','splits'].includes(activePage))refresh();},20000);
   }
-  function submit(id,handler){$(id).addEventListener('submit',async e=>{e.preventDefault();const button=e.submitter;button.disabled=true;try{await handler();}catch(err){toast(err.message,true);}finally{button.disabled=false;}});}
+  function submit(id,handler){$(id).addEventListener('submit',async e=>{e.preventDefault();const button=e.submitter||$(id).querySelector?.('button[type=submit]');if(button)button.disabled=true;try{await handler();}catch(err){toast(err.message,true);}finally{if(button)button.disabled=false;}});}
   submit('loginForm',async()=>{
     $('loginError').textContent='';const res=await fetch('/api/console/session',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:$('loginEmail').value,password:$('loginPassword').value})});
     const data=await res.json();if(!res.ok){$('loginError').textContent=data.error||'Sign in failed.';return;}$('loginPassword').value='';await signedIn();
+  });
+  submit('paymentRuleForm',async()=>{
+    const expiry=$('paymentRuleExpiry').value;
+    await consoleApi('payment-rules',{ruleType:$('paymentRuleType').value,targetType:$('paymentRuleTargetType').value,target:$('paymentRuleTarget').value,reason:$('paymentRuleReason').value,expiresAt:expiry?new Date(expiry).toISOString():null});
+    $('paymentRuleForm').reset();await upi();toast('Payment acceptance rule saved.');
+  });
+  submit('ruleStateForm',async()=>{
+    await consoleApi('payment-rules/'+encodeURIComponent($('ruleStateId').value)+'/state',{active:$('ruleStateActive').value==='true',reason:$('ruleStateReason').value});$('ruleStateDialog').close();await upi();toast('Rule state saved.');
+  });
+  submit('bankReviewForm',async()=>{
+    await consoleApi('payments/'+encodeURIComponent($('bankReviewPayment').value)+'/confirm-reviewed',{bankReference:$('bankReviewReference').value,reason:$('bankReviewReason').value,bankReviewed:$('bankReviewChecked').checked});
+    $('bankReviewDialog').close();$('paymentDetailsDialog').close();toast('Bank review recorded as merchant confirmation.');await refresh();
+  });
+  $('reviewBankCredit').addEventListener('click',()=>{
+    $('bankReviewReference').value='';$('bankReviewReason').value='';$('bankReviewChecked').checked=false;$('bankReviewDialog').showModal();
   });
   submit('paymentForm',async()=>{
     const p=await api('v1/payments',{orderId:$('newOrderId').value,amount:$('newAmount').value,currency:'INR',customer:{name:$('newCustomerName').value,phone:$('newCustomerPhone').value}});
@@ -221,9 +237,12 @@
       if(el.dataset.copy){const source=$(el.dataset.copy);await navigator.clipboard.writeText(source.value||source.textContent);toast('Copied to clipboard.');}
       if(el.dataset.reveal){const input=$(el.dataset.reveal);input.type=input.type==='password'?'text':'password';el.textContent=input.type==='password'?'Show':'Hide';}
       if(el.hasAttribute('data-remove-recipient')){el.closest('.recipient').remove();preview();}
+      if(el.dataset.ruleId){$('ruleStateId').value=el.dataset.ruleId;$('ruleStateActive').value=el.dataset.ruleActive;$('ruleStateReason').value='';$('ruleStateDialog').showModal();}
       if(el.dataset.refund){navigate('refunds');$('refundPayment').value=el.dataset.refund;$('refundAmount').focus();}
       if(el.dataset.paymentDetail){
         const p=payments.find(p=>p.id===el.dataset.paymentDetail);
+        if(!p)return;
+        $('bankReviewPayment').value=p.id;$('reviewBankCredit').hidden=p.source!=='SESSION'||p.method!=='UPI'||!['ACTIVE','PROCESSING','VERIFICATION_PENDING','EXPIRED','FAILED'].includes(p.status);
         $('paymentDetails').innerHTML=[['Order ID',p.orderId],['Payment ID',p.id],['Amount',money(p.amountPaise)],['Method',p.method],['Status',p.status],['Customer',p.customer||'—'],['Bank reference',p.utr||'Not supplied'],['Confirmation source',p.confirmationSource?.replaceAll('_',' ')||'Awaiting confirmation'],['Confirmed at',date(p.completedAt)],['Created',date(p.createdAt)]].map(([label,value])=>`<div class="summary-line"><span>${label}</span><strong style="max-width:65%;overflow-wrap:anywhere;text-align:right">${esc(value)}</strong></div>`).join('');
         $('detailsCheckout').hidden=p.source!=='SESSION';$('detailsCheckout').href='/checkout/'+encodeURIComponent(p.id);$('paymentDetailsDialog').showModal();
       }

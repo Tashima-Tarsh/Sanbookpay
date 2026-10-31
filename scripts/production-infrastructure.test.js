@@ -1,3 +1,8 @@
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import {androidSourceHash,isCurrentAndroidRelease} from '@youpi/common';
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -372,4 +377,20 @@ describe('YOUPI PG V2 — Production Infrastructure Finalization (Part L Accepta
       assert.ok(sResult.reason.includes('disabled') || sResult.reason.includes('legacy'));
     });
   });
+});
+
+test('Android download requires a matching APK and current source manifest',()=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'dynamo-android-release-'));
+ try{
+  const source=path.join(root,'apps/android-observer-app/app/src/main');fs.mkdirSync(source,{recursive:true});fs.writeFileSync(path.join(source,'Observer.java'),'class Observer {}');
+  const apk=path.join(root,'observer.apk');fs.writeFileSync(apk,'isolated test artifact');
+  assert.equal(isCurrentAndroidRelease(apk,root),false);
+  const manifest={sourceHash:androidSourceHash(root),apkHash:crypto.createHash('sha256').update(fs.readFileSync(apk)).digest('hex')};fs.writeFileSync(apk+'.release.json',JSON.stringify(manifest));
+  assert.equal(isCurrentAndroidRelease(apk,root),true);
+  fs.writeFileSync(path.join(source,'Observer.java'),'class Observer { int updated; }');assert.equal(isCurrentAndroidRelease(apk,root),false);
+  manifest.sourceHash=androidSourceHash(root);fs.writeFileSync(apk+'.release.json',JSON.stringify(manifest));fs.writeFileSync(apk,'changed artifact');assert.equal(isCurrentAndroidRelease(apk,root),false);
+ }finally{
+  const absolute=path.resolve(root);if(!absolute.startsWith(path.resolve(os.tmpdir())+path.sep)||!path.basename(absolute).startsWith('dynamo-android-release-'))throw Error('Unsafe test cleanup path');
+  fs.rmSync(absolute,{recursive:true,force:true});
+ }
 });

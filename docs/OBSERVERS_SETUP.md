@@ -1,3 +1,5 @@
+> Current setup and confirmation policy: [Operations manual](OPERATIONS-MANUAL.md). Credential names and storage: [Configuration inventory](CONFIGURATION-CREDENTIALS.md). Historical examples below may describe earlier runtimes or unconfigured services.
+
 # Payment Observers Setup & Configuration Guide
 
 YOUPI PG employs a **Tri-Channel Observation Engine** where all three methods operate simultaneously to capture payment credit alerts across channels without creating duplicate payments.

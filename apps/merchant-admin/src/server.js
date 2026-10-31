@@ -1,3 +1,4 @@
+import {isCurrentAndroidRelease} from '@youpi/common';
 import http from 'node:http';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -269,6 +270,7 @@ export class AdminServer {
             break;
           }
         }
+        if(process.env.NODE_ENV==='production'&&(!apkPath||!isCurrentAndroidRelease(apkPath,path.resolve(__dirname,'../../..'))))return reply(503,{error:'A current signed Android observer build is required.',code:'ANDROID_BUILD_REQUIRED'});
         if (apkPath) {
           const stat = fs.statSync(apkPath);
           res.writeHead(200, {

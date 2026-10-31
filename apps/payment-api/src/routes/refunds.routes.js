@@ -1,3 +1,5 @@
+import crypto from 'node:crypto';
+import {toPaise} from '@youpi/common';
 import { HttpServer } from '../server.js';
 import { RefundRepository, PaymentOrderRepository, LedgerRepository } from '@youpi/db';
 import { ProviderRegistry } from '@youpi/core';
@@ -51,55 +53,40 @@ export function registerRefundsRoutes(server, ctx) {
       return HttpServer.json(res, 400, { error: `Cannot refund order with status ${order.status}. Only SUCCESS orders can be refunded.` });
     }
 
-    const refundAmountPaise = body.amount 
-      ? (typeof body.amount === 'number' ? Math.round(body.amount * 100) : Math.round(parseFloat(body.amount) * 100))
-      : order.amount_paise;
-
-    if (isNaN(refundAmountPaise) || refundAmountPaise <= 0 || refundAmountPaise > order.amount_paise) {
-      return HttpServer.json(res, 400, { error: `Invalid refund amount. Maximum refundable: ${(order.amount_paise / 100).toFixed(2)}` });
+    let refundAmountPaise;
+    try{refundAmountPaise=body.amount===undefined?Number(order.amount_paise):Number(toPaise(body.amount));}
+    catch{return HttpServer.json(res,400,{error:'Enter a positive refund amount with at most two decimal places.'});}
+    if(!Number.isSafeInteger(refundAmountPaise)||refundAmountPaise<=0)return HttpServer.json(res,400,{error:'Invalid refund amount.'});
+    const refundId=body.refundId||`ref_${crypto.randomUUID()}`;
+    const existing=refundRepo.findByRefundId(refundId);
+    if(existing){
+      if(existing.merchant_id!==merchantId||existing.payment_order_id!==order.id||Number(existing.amount_paise)!==refundAmountPaise)return HttpServer.json(res,409,{error:'Refund ID is already used for a different request.'});
+      return HttpServer.json(res,200,{refundId:existing.refund_id,paymentId:order.id,status:existing.status,amount:(Number(existing.amount_paise)/100).toFixed(2)});
     }
-
-    const refundId = body.refundId || `ref_${Date.now()}`;
-    let providerRefundId = null;
-    let liveStatus = 'PENDING';
-
-    try {
-      const provider = providerRegistry.getProvider(merchantId, order.provider_name);
-      const provRes = await provider.createRefund({
-        merchantOrderId: order.merchant_order_id,
-        refundId,
-        amountPaise: refundAmountPaise,
-        reason: body.reason || 'Merchant requested refund'
+    let refund;
+    try{
+      refund=db.transaction(()=>{
+        const locked=db.queryOne(`SELECT * FROM payment_orders WHERE id=?${db.dialect==='postgres'?' FOR UPDATE':''}`,[order.id]);
+        const reserved=Number(db.queryOne("SELECT COALESCE(SUM(amount_paise),0) AS n FROM refunds WHERE payment_order_id=? AND status NOT IN ('FAILED','REJECTED')",[order.id]).n);
+        const manual=Number(db.queryOne("SELECT COALESCE(SUM(amount_paise),0) AS n FROM console_refund_requests WHERE payment_id IN (?,?) AND status!='REJECTED'",[order.id,order.payment_session_id||order.id]).n);
+        if(reserved+manual+refundAmountPaise>Number(locked.amount_paise))throw Error('Amount exceeds remaining refundable balance.');
+        const created=refundRepo.create({merchantId,paymentOrderId:order.id,refundId,amountPaise:refundAmountPaise,currency:order.currency,reason:body.reason||null,status:'SUBMITTING'});
+        ledgerRepo.recordDoubleEntry(merchantId,'REFUND',created.id,`Refund reserved for ${order.merchant_order_id}`,'REFUND_LIABILITIES','PROVIDER_CLEARING',refundAmountPaise);
+        return created;
       });
-      providerRefundId = provRes.providerRefundId;
-      liveStatus = provRes.status;
-    } catch (err) {
-      liveStatus = 'PENDING';
+    }catch(error){return HttpServer.json(res,409,{error:error.message});}
+    try{
+      const provider=providerRegistry.getProvider(merchantId,order.provider_name);
+      const result=await provider.createRefund({merchantOrderId:order.merchant_order_id,refundId,amountPaise:refundAmountPaise,reason:body.reason||'Merchant requested refund'});
+      refund=db.transaction(()=>{
+        if(['FAILED','REJECTED'].includes(result.status))ledgerRepo.recordDoubleEntry(merchantId,'REFUND_REVERSAL',refund.id,'Provider rejected reserved refund','PROVIDER_CLEARING','REFUND_LIABILITIES',refundAmountPaise);
+        return refundRepo.update(refund.id,{providerRefundId:result.providerRefundId,status:result.status||'PENDING',providerResponse:result});
+      });
+    }catch(error){
+      // A timeout can occur after the provider accepted the refund. Retain the reservation.
+      refundRepo.update(refund.id,{status:'RECONCILIATION_REQUIRED',providerResponse:{error:'Provider submission could not be confirmed'}});
+      return HttpServer.json(res,502,{error:'Refund submission requires provider reconciliation. Retry with the same refundId; do not create another refund.',refundId,status:'RECONCILIATION_REQUIRED'});
     }
-
-    const refund = refundRepo.create({
-      merchantId,
-      paymentOrderId: order.id,
-      refundId,
-      providerRefundId,
-      amountPaise: refundAmountPaise,
-      currency: order.currency,
-      reason: body.reason || null,
-      status: liveStatus
-    });
-
-    // Record in ledger: Debit REFUND_LIABILITIES, Credit PROVIDER_CLEARING
-    try {
-      ledgerRepo.recordDoubleEntry(
-        merchantId,
-        'REFUND',
-        refund.id,
-        `Refund initiated for order ${order.merchant_order_id}`,
-        'REFUND_LIABILITIES',
-        'PROVIDER_CLEARING',
-        refundAmountPaise
-      );
-    } catch {}
 
     return HttpServer.json(res, 201, {
       refundId: refund.refund_id,

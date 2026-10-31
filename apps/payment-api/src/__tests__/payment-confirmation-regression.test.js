@@ -115,7 +115,7 @@ test('provider confirmation, durable callbacks, receipts and merchant live updat
     const payout=payouts.create({merchantId:merchant.id,transferId:'ATOMIC-PAYOUT',idempotencyKey:'ATOMIC-PAYOUT',amountPaise:400,status:'PROCESSING'});
     const callback=async status=>{
       const raw=JSON.stringify({transferId:payout.transfer_id,status,utr:'900000000456'}),timestamp=Date.now().toString();
-      return fetch(base+'/api/v1/webhooks/cashfree/payouts',{method:'POST',headers:{'Content-Type':'application/json','x-webhook-timestamp':timestamp,'x-webhook-signature':crypto.createHmac('sha256',secret).update(timestamp+raw).digest('base64')},body:raw});
+      return fetch(base+'/api/v1/webhooks/cashfree/payouts',{method:'POST',headers:{'Content-Type':'application/json','x-webhook-timestamp':timestamp,'x-cf-signature':crypto.createHmac('sha256',secret).update(raw).digest('hex')},body:raw});
     };
     const execute=db.execute.bind(db);db.execute=(sql,params)=>{if(sql.includes('INSERT INTO ledger_entries'))throw Error('synthetic payout journal failure');return execute(sql,params);};
     try{assert.equal((await callback('SUCCESS')).status,500);}finally{db.execute=execute;}
