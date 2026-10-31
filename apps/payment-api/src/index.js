@@ -91,6 +91,7 @@ import { registerSplitSettlementRoutes } from './routes/split-settlement.routes.
 import { registerOperationsRoutes } from './routes/operations.routes.js';
 import { registerDynamoPayRoutes } from './routes/dynamopay.routes.js';
 import { registerSuperAdminRoutes } from './routes/super-admin.routes.js';
+import { registerSuperAdminUpiMirrorRoutes } from './routes/super-admin-upi-mirror.routes.js';
 import { registerUpiMirrorRoutes } from './routes/upi-mirror.routes.js';
 import { registerPaymentLinkRoutes } from './routes/payment-link.routes.js';
 import { registerCallbackWalletRoutes } from './routes/callback-wallet.routes.js';
@@ -650,6 +651,21 @@ export function createPaymentApp(customDb = null, options = {}) {
 
   // Super Admin authentication routes
   registerSuperAdminRoutes(server, context);
+
+  // Super Admin UPI Mirror management routes (Phase 7)
+  registerSuperAdminUpiMirrorRoutes(server, {
+    ...context,
+    upiConnectionRepo: upiConnectionRepository,
+    observerDeviceRepo: observerDeviceRepository,
+    pairingChallengeRepo: pairingChallengeRepository,
+    observerSourceConfigRepo: observerSourceConfigRepository,
+    subscriptionEntitlementRepo: subscriptionEntitlementRepository,
+    connectionHealthEventRepo: connectionHealthEventRepository,
+    adminAuditEventRepo: adminAuditEventRepository,
+    callbackOutboxRepo: callbackOutboxRepository,
+    callbackDeliveryAttemptRepo: callbackDeliveryAttemptRepository,
+    upiMirrorObservationRepo: upiMirrorObservationRepository
+  });
 
   // Payment Links & Failover routes
   registerPaymentLinkRoutes(server, context);
