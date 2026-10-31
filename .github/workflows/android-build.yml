@@ -1,94 +1,24 @@
-name: Build Dynamo Bridge APK
+name: CI
 
 on:
   push:
     branches: [main]
-  workflow_dispatch:
-
-permissions:
-  contents: write
+  pull_request:
+    branches: [main]
 
 jobs:
-  build-android:
+  build:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v5
+      - uses: actions/setup-node@v4
         with:
-          java-version: '17'
-          distribution: 'temurin'
+          node-version: 20
+          cache: npm
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v4
+      - name: Install frontend dependencies
+        run: npm ci
 
-      - name: Accept Android SDK licenses
-        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses
-
-      - name: Install Android SDK packages
-        run: |
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platform-tools"
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-34"
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "build-tools;34.0.0"
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.5'
-          cache-read-only: true
-
-      - name: Build Debug APK + checksum
-        run: |
-          cd apps/android-bridge
-          gradle :app:assembleDebug --no-daemon --console=plain --stacktrace 2>&1 | tee "$RUNNER_TEMP/gradle.log"
-          echo "=== APK FILES ==="
-          find . -type f \( -name '*.apk' -o -name '*.aab' \) 2>/dev/null
-          APK=$(find . -type f -name '*.apk' -print -quit)
-          if [ -z "$APK" ]; then
-            echo "NO_APK_PRODUCED"
-            exit 1
-          fi
-          echo "APK_PATH=$APK" >> $GITHUB_ENV
-          sha256sum "$APK" > "${APK}.sha256"
-          echo "APK_SHA256=$(sha256sum "$APK" | awk '{print $1}')" >> $GITHUB_ENV
-          ls -la "$(dirname "$APK")"
-
-      - name: Upload Gradle build log
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: gradle-build-log
-          path: ${{ runner.temp }}/gradle.log
-
-      - name: Create GitHub Release
-        if: success()
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: dynamo-bridge-${{ github.run_number }}
-          name: Dynamo Bridge v${{ github.run_number }}
-          body: |
-            Dynamo Bridge Android APK (debug build)
-
-            ## Download
-            - APK: app-debug.apk
-            - SHA256: ${{ env.APK_SHA256 }}
-
-            ## Install
-            1. Download the APK below.
-            2. Enable "Install from unknown sources" in Android Settings.
-            3. Open the APK to install.
-            4. Grant Notification Listener permission when prompted.
-
-            ## Security
-            - APK is signed with a debug key.
-            - Verify SHA256 checksum before installing.
-            - TLS-only network config in release builds.
-          files: |
-            apps/android-bridge/app/build/outputs/**/*.apk
-            apps/android-bridge/app/build/outputs/**/*.sha256
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build frontend
+        run: npm run build
