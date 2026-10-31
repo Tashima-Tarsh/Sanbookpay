@@ -111,25 +111,27 @@ export function registerPlatformIdentity(server,ctx){
       db.execute('INSERT INTO pp_users (id,merchant_id,email,password_hash,role,mobile,active,created_at) VALUES (?,?,?,?,?,?,?,?)',[crypto.randomUUID(),created.id,address,passwordHash,'OWNER',profile.mobile,body.password===undefined?0:1,now()]);
       audit(req,'MERCHANT_CREATED',created.id,{merchantId:created.id,ownerEmail:address});return created;
     });
-    let invitationSent=false;if(body.password===undefined){const owner=db.queryOne("SELECT * FROM pp_users WHERE merchant_id=? AND role='OWNER'",[merchant.id]);try{await inviteOwner(owner);invitationSent=true;}catch(e){if(e.statusCode!==503)throw e;}}
-    json(res,201,{merchantId:merchant.id,businessName:profile.businessName,ownerEmail:address,status:'EMAIL_PENDING',loginPath:'/platform',verificationRequired:true,invitationSent,invitationRequired:body.password===undefined});
+    let invitation={invitationSent:false};if(body.password===undefined){const owner=db.queryOne("SELECT * FROM pp_users WHERE merchant_id=? AND role='OWNER'",[merchant.id]);invitation=await inviteOwner(owner);}
+    res.setHeader('Cache-Control','no-store');json(res,201,{merchantId:merchant.id,businessName:profile.businessName,ownerEmail:address,status:'EMAIL_PENDING',loginPath:'/platform',verificationRequired:true,...invitation,invitationRequired:body.password===undefined});
   });
   async function inviteOwner(user){
     db.execute("DELETE FROM pp_tokens WHERE user_id=? AND kind='owner_setup'",[user.id]);const raw=token('owner_setup',user,{},24*3600000);
     const origin=process.env.DYNAMO_PUBLIC_URL||process.env.RENDER_EXTERNAL_URL;
-    await deliver({kind:'merchant_owner_invitation',channel:'email',to:user.email,token:raw,invitationUrl:origin?new URL('/platform',origin).origin+'/platform#owner-invitation/'+raw:undefined,expiresIn:86400});
+    try{await deliver({kind:'merchant_owner_invitation',channel:'email',to:user.email,token:raw,invitationUrl:origin?new URL('/platform',origin).origin+'/platform#owner-invitation/'+raw:undefined,expiresIn:86400});db.execute('UPDATE pp_tokens SET payload=? WHERE token_hash=?',[JSON.stringify({emailDeliveryConfirmed:true}),hash(raw)]);return {invitationSent:true};}
+    catch(e){if(e.statusCode!==503)throw e;return {invitationSent:false,invitationPath:'/platform#owner-invitation/'+raw};}
   }
   route('POST','/merchants/:id/invite-owner',async(req,res,body,p)=>{
     if(!req.platform.platform||req.platform.role!=='SUPER_ADMIN')fail(403,'Only the platform owner can invite merchant owners');sensitive(req);limit(req,'owner-invite');
     const user=db.queryOne("SELECT * FROM pp_users WHERE merchant_id=? AND role='OWNER'",[p.id]);if(!user)fail(404,'Merchant owner not found');if(user.active)fail(409,'Owner is already activated; use account recovery instead');
-    await inviteOwner(user);audit(req,'OWNER_INVITATION_SENT',p.id);json(res,200,{invitationSent:true});
+    const invitation=await inviteOwner(user);audit(req,invitation.invitationSent?'OWNER_INVITATION_SENT':'OWNER_INVITATION_ISSUED',p.id);res.setHeader('Cache-Control','no-store');json(res,200,invitation);
   });
   route('POST','/owner-invitations/accept',async(req,res,body)=>{
     limit(req,'owner-setup');const entry=consume(body.token,'owner_setup'),pass=password(body.password);
     db.transaction(()=>{const user=db.queryOne("SELECT * FROM pp_users WHERE id=? AND merchant_id=? AND role='OWNER' AND active=0",[entry.user_id,entry.merchant_id]);if(!user)fail(409,'Invitation is no longer available');
       if(db.execute('DELETE FROM pp_tokens WHERE id=?',[entry.id]).changes!==1)fail(400,'Invitation already used');
-      db.execute('UPDATE pp_users SET password_hash=?,active=1,email_verified=1 WHERE id=?',[hashPlatformPassword(pass),user.id]);
-      db.execute("UPDATE pp_merchants SET status='PROFILE_INCOMPLETE',updated_at=? WHERE merchant_id=? AND status='EMAIL_PENDING'",[now(),user.merchant_id]);
+      const emailVerified=JSON.parse(entry.payload||'{}').emailDeliveryConfirmed===true;
+      db.execute('UPDATE pp_users SET password_hash=?,active=1,email_verified=? WHERE id=?',[hashPlatformPassword(pass),emailVerified?1:0,user.id]);
+      db.execute("UPDATE pp_merchants SET status='PROFILE_INCOMPLETE',updated_at=? WHERE merchant_id=? AND status='EMAIL_PENDING'",[now(),user.merchant_id]);if(!emailVerified)db.execute("UPDATE pp_merchants SET status='EMAIL_PENDING' WHERE merchant_id=?",[user.merchant_id]);
       audit({platform:{userId:user.id,merchantId:user.merchant_id}},'OWNER_INVITATION_ACCEPTED',user.merchant_id);
     });json(res,200,{accepted:true});
   });

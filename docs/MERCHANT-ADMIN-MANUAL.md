@@ -58,3 +58,7 @@ Sign in at /admin and choose Manage merchants, then Add merchant in /platform. T
 Create payment asks only for amount and generates the order reference. Customer name, phone and manual UTR entry are removed from the active creation/checkout UI. Approved providers may still require real customer information from the merchant backend. Cashfree Orders requires a genuine phone; it is not fabricated. A local direct-UPI QR is not a Cashfree dynamic QR. Without approved provider access, automatic provider verification cannot be certified.
 
 The separate 25-module control-center claim is superseded by the actual grouped platform controls and docs/audit/ATTACHED_REQUIREMENTS_MATRIX.md. Render Free hosting, missing provider/KYC credentials and unfinished external acceptance prevent a production-readiness claim.
+
+## Private invitation handover when email is unavailable
+
+If email delivery is not configured, Add merchant shows the MFA-authenticated platform owner a one-time invitation link. Copy and share it privately with that merchant owner, preferably using a separate browser profile for testing. The link expires in 24 hours, is consumed once, and is removed from the dialog when closed. It contains no password. Opening it allows the owner to choose their own password. Email/mobile verification and provider activation are still pending; a manually handed-over link does not mark email verified. Access & details can reissue a link only for an owner who has not activated yet.
