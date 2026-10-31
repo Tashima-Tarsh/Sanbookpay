@@ -3,7 +3,6 @@ package com.dynamopay.bridge
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
-import androidx.security.crypto.EncryptedSharedPreferences
 
 data class HealthReport(
     val deviceId: String,
@@ -22,7 +21,7 @@ data class HealthReport(
 class HealthMonitor(
     private val context: Context,
     private val cryptoHelper: CryptoHelper,
-    private val securePrefs: EncryptedSharedPreferences,
+    private val securePrefs: SharedPreferences,
     private val eventForwarder: EventForwarder
 ) {
     private val handler = Handler(Looper.getMainLooper())

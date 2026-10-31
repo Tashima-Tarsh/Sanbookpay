@@ -28,7 +28,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnRevoke: Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate()
+        super.onCreate(savedInstanceState)
         app = applicationContext as BridgeApp
         cryptoHelper = app.cryptoHelper
         eventQueue = app.eventQueue
@@ -83,7 +83,7 @@ class MainActivity : AppCompatActivity() {
         btnPair = Button(this).apply {
             text = "Scan Pairing QR"
             setOnClickListener {
-                val intent = android.content.Intent(this, QrPairingActivity::class.java)
+                val intent = android.content.Intent(this@MainActivity, QrPairingActivity::class.java)
                 startActivity(intent)
             }
         }
@@ -92,7 +92,7 @@ class MainActivity : AppCompatActivity() {
         btnSettings = Button(this).apply {
             text = "Device Settings"
             setOnClickListener {
-                val intent = android.content.Intent(this, DeviceSettingsActivity::class.java)
+                val intent = android.content.Intent(this@MainActivity, DeviceSettingsActivity::class.java)
                 startActivity(intent)
             }
         }
@@ -197,10 +197,10 @@ class MainActivity : AppCompatActivity() {
             .setPositiveButton("Revoke") { _, _ ->
                 val success = apiClient.revokeDevice()
                 if (success) {
-                    Toast.makeText(this, "Device revoked", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@MainActivity, "Device revoked", Toast.LENGTH_SHORT).show()
                     updateStatus()
                 } else {
-                    Toast.makeText(this, "Revoke failed", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@MainActivity, "Revoke failed", Toast.LENGTH_SHORT).show()
                 }
             }
             .setNegativeButton("Cancel", null)
@@ -234,7 +234,7 @@ class MainActivity : AppCompatActivity() {
         startActivity(Intent.createChooser(intent, "Export Logs"))
     }
 
-    private fun getSecurePrefs(): EncryptedSharedPreferences {
+    private fun getSecurePrefs(): SharedPreferences {
         val masterKeyAlias = MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC)
         return EncryptedSharedPreferences.create(
             "dynamo_bridge_secure_prefs",

@@ -5,7 +5,6 @@ import android.os.Handler
 import android.os.Looper
 import androidx.security.crypto.EncryptedSharedPreferences
 import okhttp3.*
-import okhttp3.logging.HttpLoggingInterceptor
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
@@ -42,12 +41,11 @@ data class DeviceHealth(
 class ApiClient(
     private val context: Context,
     private val cryptoHelper: CryptoHelper,
-    private val securePrefs: EncryptedSharedPreferences
+    private val securePrefs: SharedPreferences
 ) {
     private val client = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(10, TimeUnit.SECONDS)
-        .addInterceptor(HttpLoggingInterceptor().setLevel(HttpLoggingInterceptor.Level.BASIC))
         .build()
 
     private val handler = Handler(Looper.getMainLooper())
@@ -113,7 +111,7 @@ class ApiClient(
                 .addHeader("Content-Type", "application/json")
                 .addHeader("X-Timestamp", timestamp)
                 .addHeader("X-Signature", signature)
-                .post(RequestBody.create(pairingPayload.toString(), MediaType.get("application/json")))
+                .post(RequestBody.create(MediaType.Companion.parse("application/json"), pairingPayload.toString()))
                 .build()
 
             client.newCall(request).execute().use { response ->
@@ -173,7 +171,7 @@ class ApiClient(
             .addHeader("Content-Type", "application/json")
             .addHeader("X-Timestamp", timestamp)
             .addHeader("X-Signature", signature)
-            .post(RequestBody.create(bodyJson.toString(), MediaType.get("application/json")))
+            .post(RequestBody.create(MediaType.Companion.parse("application/json"), bodyJson.toString()))
             .build()
 
         return try {

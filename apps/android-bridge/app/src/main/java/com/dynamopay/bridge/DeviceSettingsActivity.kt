@@ -11,10 +11,10 @@ class DeviceSettingsActivity : AppCompatActivity() {
     private lateinit var cryptoHelper: CryptoHelper
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate()
+        super.onCreate(savedInstanceState)
 
         val masterKeyAlias = MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC)
-        val securePrefs = EncryptedSharedPreferences.create(
+        val securePrefs: SharedPreferences = EncryptedSharedPreferences.create(
             "dynamo_bridge_secure_prefs",
             masterKeyAlias,
             this,
@@ -69,7 +69,7 @@ class DeviceSettingsActivity : AppCompatActivity() {
             text = "Sync Subscription Status"
             setOnClickListener {
                 val status = apiClient.syncSubscriptionStatus()
-                Toast.makeText(this, "Subscription: $status", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this@DeviceSettingsActivity, "Subscription: $status", Toast.LENGTH_SHORT).show()
             }
         }
         layout.addView(btnSync)
@@ -78,7 +78,7 @@ class DeviceSettingsActivity : AppCompatActivity() {
             text = "Send Heartbeat"
             setOnClickListener {
                 val success = apiClient.sendHeartbeat()
-                Toast.makeText(this, if (success) "Heartbeat sent" else "Heartbeat failed", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this@DeviceSettingsActivity, if (success) "Heartbeat sent" else "Heartbeat failed", Toast.LENGTH_SHORT).show()
             }
         }
         layout.addView(btnHeartbeat)

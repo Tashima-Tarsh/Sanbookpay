@@ -27,7 +27,7 @@ data class ForwardResult(
 class EventForwarder(
     private val context: Context,
     private val cryptoHelper: CryptoHelper,
-    private val securePrefs: EncryptedSharedPreferences,
+    private val securePrefs: SharedPreferences,
     private val eventQueue: EventQueue
 ) {
     private val client = OkHttpClient.Builder()
@@ -106,7 +106,7 @@ class EventForwarder(
             .addHeader("X-Timestamp", timestamp)
             .addHeader("X-Signature", signature)
             .addHeader("Content-Type", "application/json")
-            .post(RequestBody.create(bodyString, MediaType.get("application/json")))
+            .post(RequestBody.create(MediaType.Companion.parse("application/json"), bodyString))
             .build()
 
         return try {

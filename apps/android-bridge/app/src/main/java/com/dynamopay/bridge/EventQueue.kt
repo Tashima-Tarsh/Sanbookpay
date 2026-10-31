@@ -1,7 +1,6 @@
 package com.dynamopay.bridge
 
 import android.content.Context
-import androidx.security.crypto.EncryptedSharedPreferences
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -35,7 +34,7 @@ data class QueuedEvent(
 class EventQueue(
     private val context: Context,
     private val cryptoHelper: CryptoHelper,
-    private val securePrefs: EncryptedSharedPreferences
+    private val securePrefs: SharedPreferences
 ) {
     private val MAX_QUEUE_SIZE = 10000
     private val MAX_EVENT_AGE_HOURS = 168 // 7 days

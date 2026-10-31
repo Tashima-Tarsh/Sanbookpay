@@ -3,7 +3,6 @@ package com.dynamopay.bridge
 import android.content.Context
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
-import androidx.security.crypto.EncryptedSharedPreferences
 import java.security.KeyPairGenerator
 import java.security.KeyStore
 import java.security.MessageDigest
@@ -22,7 +21,7 @@ import javax.crypto.spec.SecretKeySpec
  */
 class CryptoHelper(
     private val context: Context,
-    private val securePrefs: EncryptedSharedPreferences
+    private val securePrefs: SharedPreferences
 ) {
     private val KEY_ALIAS = "dynamo_bridge_device_key"
     private val PREFS_DEVICE_KEY_PAIR_GENERATED = "device_keypair_generated"

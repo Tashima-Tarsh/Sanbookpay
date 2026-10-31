@@ -14,7 +14,7 @@ class NotificationListenerService : NotificationListenerService() {
     private val cryptoHelper: CryptoHelper by lazy {
         (applicationContext as BridgeApp).cryptoHelper
     }
-    private val securePrefs: EncryptedSharedPreferences by lazy {
+    private val securePrefs: SharedPreferences by lazy {
         (applicationContext as BridgeApp).securePrefs
     }
 

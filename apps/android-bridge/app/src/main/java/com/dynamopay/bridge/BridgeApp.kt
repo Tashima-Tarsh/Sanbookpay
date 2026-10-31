@@ -5,7 +5,7 @@ import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKeys
 
 class BridgeApp : Application() {
-    lateinit var securePrefs: EncryptedSharedPreferences
+    lateinit var securePrefs: SharedPreferences
     lateinit var cryptoHelper: CryptoHelper
     lateinit var eventQueue: EventQueue
     lateinit var eventForwarder: EventForwarder
