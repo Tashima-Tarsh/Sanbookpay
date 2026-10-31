@@ -22,10 +22,14 @@ test('every sidebar destination shows one matching content view and API settings
   };
   const document={getElementById:element,querySelectorAll:q=>q==='.dp-view'?views:q==='[data-page]'?nav:[],addEventListener:(event,fn)=>listeners[event]=fn,body:element('body'),hidden:false};
   const location={origin:'https://pay.example',hash:'',assign(url){this.destination=url;}};
-  const context={document,location,history:{replaceState(a,b,hash){location.hash=hash;}},navigator:{clipboard:{writeText:async()=>{}}},setTimeout:()=>1,setInterval:()=>1,clearTimeout(){},clearInterval(){},URL,Intl,console,fetch:async(url,init)=>{requests.push({url,init});return{ok:true,status:200,json:async()=>url==='/api/console/session'?{authenticated:true}:data[url.replace('/api/console/','')]||{}};}};
+  const context={document,location,matchMedia:()=>({matches:true,addEventListener(){}}),history:{replaceState(a,b,hash){location.hash=hash;}},navigator:{clipboard:{writeText:async()=>{}}},setTimeout:()=>1,setInterval:()=>1,clearTimeout(){},clearInterval(){},URL,Intl,console,fetch:async(url,init)=>{requests.push({url,init});return{ok:true,status:200,json:async()=>url==='/api/console/session'?{authenticated:true}:data[url.replace('/api/console/','')]||{}};}};
   const flush=async()=>{for(let i=0;i<5;i++)await new Promise(r=>setImmediate(r));};
   vm.runInNewContext(fs.readFileSync(new URL('../../public/dynamo-console.js',import.meta.url),'utf8'),context);
   await flush();
+  assert.equal(element('merchantNavigation').inert,true);
+  element('menuToggle').click();assert.equal(element('menuBackdrop').hidden,false);assert.equal(element('merchantMain').inert,true);
+  listeners.keydown({key:'Escape',preventDefault(){}});assert.equal(element('menuBackdrop').hidden,true);assert.equal(element('merchantMain').inert,false);
+  element('menuToggle').click();element('menuBackdrop').click();assert.equal(element('menuBackdrop').hidden,true);
   assert.equal(element('statTotal').textContent,'1');
   assert.ok(element('collectionChart').innerHTML.includes('has-value'));
   assert.equal(element('dashboardAttention').hidden,false);

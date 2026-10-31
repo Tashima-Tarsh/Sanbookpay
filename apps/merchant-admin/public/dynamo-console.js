@@ -17,9 +17,21 @@
     return data;
   }
   const consoleApi=(p,b)=>api('v1/admin/console/'+p,b);
-  function signedOut(){clearInterval(timer);$('console').hidden=true;$('loginScreen').hidden=false;$('clientSecret').value='';$('webhookSecret').value='';$('smsPairingQr').replaceChildren();$('gmailClientSecret').value='';$('gmailRefreshToken').value='';}
+  const compactNavigation=globalThis.matchMedia?.('(max-width: 960px)')||{matches:false,addEventListener(){}};
+  function setMenu(open,focus=false){
+    open=Boolean(open&&compactNavigation.matches);
+    document.body.classList.toggle('sidebar-open',open);
+    $('menuToggle').setAttribute('aria-expanded',String(open));
+    $('menuBackdrop').hidden=!open;
+    $('merchantNavigation').inert=compactNavigation.matches&&!open;
+    $('merchantMain').inert=open;
+    if(focus)$(open?'menuClose':'menuToggle').focus();
+  }
+  compactNavigation.addEventListener('change',()=>setMenu(false));setMenu(false);
+  function signedOut(){setMenu(false);clearInterval(timer);$('console').hidden=true;$('loginScreen').hidden=false;$('clientSecret').value='';$('webhookSecret').value='';$('smsPairingQr').replaceChildren();$('gmailClientSecret').value='';$('gmailRefreshToken').value='';}
   function table(target,headers,rows,empty='No records yet. New activity will appear here.'){
     $(target).innerHTML=`<table class="dp-table"><thead><tr>${headers.map(h=>`<th scope="col">${esc(h)}</th>`).join('')}</tr></thead><tbody>${rows.length?rows.join(''):`<tr><td class="empty" colspan="${headers.length}">${esc(empty)}</td></tr>`}</tbody></table>`;
+    $(target).querySelectorAll?.('tbody tr').forEach(row=>row.querySelectorAll('td').forEach((cell,i)=>{if(!cell.hasAttribute('colspan'))cell.setAttribute('data-label',headers[i]||'');}));
   }
   function paymentRows(list){return list.map(p=>`<tr><td>${p.source==='SESSION'?`<a href="/checkout/${encodeURIComponent(p.id)}" title="Open payment QR and UPI"><strong>${esc(p.orderId)}</strong></a>`:`<strong>${esc(p.orderId)}</strong>`}<small>${esc(p.id.slice(0,12))}</small></td><td>${esc(p.customer||'—')}</td><td><strong>${money(p.amountPaise)}</strong></td><td>${esc(p.method||'UPI')}</td><td>${badge(p.status)}</td><td>${esc(p.utr||'—')}</td><td>${esc(date(p.createdAt))}</td><td><a class="btn small" target="_blank" rel="noopener" href="/checkout/${encodeURIComponent(p.id)}">Details ↗</a>${p.status==='SUCCESS'&&p.method!=='COD'?` <button class="btn small" data-refund="${esc(p.id)}">Refund</button>`:''}</td></tr>`);}
   function renderPayments(){
@@ -48,7 +60,7 @@
     const days=Array.from({length:7},(_,i)=>{const d=new Date(Date.now()-(6-i)*86400000);return {key:dayKey(d),label:d.toLocaleDateString('en-IN',{timeZone:'Asia/Kolkata',weekday:'short'}),amount:0};});
     payments.filter(p=>p.status==='SUCCESS'&&p.method!=='COD').forEach(p=>{const day=days.find(d=>d.key===dayKey(p.createdAt));if(day)day.amount+=p.amountPaise;});
     const peak=Math.max(...days.map(d=>d.amount),100);
-    $('collectionChart').innerHTML='<div class="collection-bars">'+days.map(d=>`<div class="collection-day"><span class="collection-value">${d.amount?money(d.amount):'?'}</span><div class="collection-track"><div class="collection-fill${d.amount?' has-value':''}" style="height:${d.amount?Math.max(5,d.amount/peak*100):2}%"></div></div><span class="collection-label">${d.label}</span></div>`).join('')+'</div>';
+    $('collectionChart').innerHTML='<div class="collection-bars">'+days.map(d=>`<div class="collection-day"><span class="collection-value">${money(d.amount)}</span><div class="collection-track"><div class="collection-fill${d.amount?' has-value':''}" style="height:${d.amount?Math.max(5,d.amount/peak*100):2}%"></div></div><span class="collection-label">${d.label}</span></div>`).join('')+'</div>';
     $('dashboardDate').textContent=new Date().toLocaleDateString('en-IN',{timeZone:'Asia/Kolkata',weekday:'long',day:'numeric',month:'long',year:'numeric'});
     $('updated').textContent='Updated '+new Date().toLocaleTimeString('en-IN',{timeZone:'Asia/Kolkata',hour:'2-digit',minute:'2-digit'});
   }
@@ -117,7 +129,7 @@
     document.querySelectorAll('.dp-view').forEach(el=>el.hidden=el.id!=='page-'+page);
     document.querySelectorAll('[data-page]').forEach(el=>{el.classList.toggle('active',el.dataset.page===page);if(el.dataset.page===page)el.setAttribute('aria-current','page');else el.removeAttribute('aria-current');});
     $('pageTitle').textContent=pages[page][0];$('pageDescription').textContent=pages[page][1];$('breadcrumb').textContent=pages[page][0];
-    history.replaceState(null,'','#'+page);document.body.classList.remove('sidebar-open');$('menuToggle').setAttribute('aria-expanded','false');refresh();
+    history.replaceState(null,'','#'+page);setMenu(false);refresh();
   }
   async function signedIn(){
     $('loginScreen').hidden=true;$('console').hidden=false;
@@ -163,7 +175,19 @@
     }catch(e){toast(e.message,true);}finally{button.disabled=false;}
   });
   $('splitForm').addEventListener('input',preview);$('splitExample').addEventListener('input',preview);$('addRecipient').addEventListener('click',()=>addRecipient());
-  $('menuToggle').addEventListener('click',()=>{const open=document.body.classList.toggle('sidebar-open');$('menuToggle').setAttribute('aria-expanded',String(open));});
+  $('menuToggle').addEventListener('click',()=>setMenu($('menuBackdrop').hidden,true));
+  $('menuClose').addEventListener('click',()=>setMenu(false,true));
+  $('menuBackdrop').addEventListener('click',()=>setMenu(false,true));
+  document.addEventListener('keydown',event=>{
+    if($('menuBackdrop').hidden)return;
+    if(event.key==='Escape'){event.preventDefault();setMenu(false,true);return;}
+    if(event.key==='Tab'){
+      const items=[...$('merchantNavigation').querySelectorAll('a[href],button:not([disabled])')];
+      const first=items[0],last=items.at(-1);
+      if(event.shiftKey&&document.activeElement===first){event.preventDefault();last?.focus();}
+      else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first?.focus();}
+    }
+  });
   $('createPayment').addEventListener('click',()=>{$('newOrderId').value='ORDER-'+Date.now();$('paymentResult').hidden=true;$('paymentDialog').showModal();});
   $('logout').addEventListener('click',async()=>{await fetch('/api/console/session',{method:'DELETE'});signedOut();});
   document.addEventListener('click',async e=>{
