@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Dynamo Bridge</string>
+    <string name="status_not_paired">Not Paired</string>
+    <string name="status_pairing_pending">Pairing Pending</string>
+    <string name="status_connected">Connected</string>
+    <string name="status_degraded">Degraded</string>
+    <string name="status_offline">Offline</string>
+    <string name="permission_notification">Notification Access Required</string>
+    <string name="permission_notification_desc">Dynamo Bridge needs notification access to observe UPI credit alerts from your payment apps.</string>
+    <string name="pair_qr_title">Pair with Merchant Dashboard</string>
+    <string name="pair_qr_desc">Scan the QR code shown in your merchant dashboard to enroll this device.</string>
+    <string name="device_health">Device Health</string>
+    <string name="last_heartbeat">Last Heartbeat</string>
+    <string name="events_forwarded">Events Forwarded</string>
+    <string name="revoke_device">Revoke Device</string>
+    <string name="export_logs">Export Logs (Redacted)</string>
+    <string name="privacy_notice">Dynamo Bridge only observes payment credit notifications you explicitly authorize. It never collects UPI PINs, passwords, or OTPs.</string>
+</resources>
