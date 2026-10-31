@@ -41,9 +41,21 @@ jobs:
           gradle-version: '8.5'
           cache-read-only: true
 
-      - name: Build Debug APK
-        working-directory: apps/android-bridge
-        run: gradle assembleDebug --no-daemon --console=plain --stacktrace 2>&1 | tee "$RUNNER_TEMP/gradle.log"
+      - name: Build Debug APK + checksum
+        run: |
+          cd apps/android-bridge
+          gradle :app:assembleDebug --no-daemon --console=plain --stacktrace 2>&1 | tee "$RUNNER_TEMP/gradle.log"
+          echo "=== APK FILES ==="
+          find . -type f \( -name '*.apk' -o -name '*.aab' \) 2>/dev/null
+          APK=$(find . -type f -name '*.apk' -print -quit)
+          if [ -z "$APK" ]; then
+            echo "NO_APK_PRODUCED"
+            exit 1
+          fi
+          echo "APK_PATH=$APK" >> $GITHUB_ENV
+          sha256sum "$APK" > "${APK}.sha256"
+          echo "APK_SHA256=$(sha256sum "$APK" | awk '{print $1}')" >> $GITHUB_ENV
+          ls -la "$(dirname "$APK")"
 
       - name: Upload Gradle build log
         if: always()
@@ -51,20 +63,6 @@ jobs:
         with:
           name: gradle-build-log
           path: ${{ runner.temp }}/gradle.log
-
-      - name: Generate SHA256 checksum
-        if: success()
-        run: |
-          ls -R apps/android-bridge/app/build/outputs 2>&1 | head -60 || true
-          APK=$(find apps/android-bridge/app/build/outputs -name '*.apk' -print -quit)
-          if [ -z "$APK" ]; then
-            echo "No APK produced by assembleDebug"
-            exit 1
-          fi
-          echo "Found APK: $APK"
-          sha256sum "$APK" > "${APK}.sha256"
-          echo "APK_SHA256=$(sha256sum "$APK" | awk '{print $1}')" >> $GITHUB_ENV
-          echo "APK_PATH=$APK" >> $GITHUB_ENV
 
       - name: Create GitHub Release
         if: success()

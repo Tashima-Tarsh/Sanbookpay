@@ -67,18 +67,32 @@ jobs:
           node scripts/serve-for-load.js > output/testing/api.log 2>&1 &
           API_PID=$!
           READY=0
-          for i in $(seq 1 45); do
-            if curl -sf http://localhost:6100/health > /dev/null 2>&1; then
+          # Wait for the server's own "listening" marker first (avoids TCP/IP quirks)
+          for i in $(seq 1 90); do
+            if grep -q "listening on" output/testing/api.log 2>/dev/null; then
+              echo "Server listening (marker after $i attempts)"
               READY=1
-              echo "API ready after $i attempts"
               break
             fi
             sleep 2
           done
-          if [ "$READY" != "1" ]; then
-            echo "API failed to become healthy"
+          # Confirm over HTTP too
+          if [ "$READY" = "1" ]; then
+            for i in $(seq 1 15); do
+              if curl -sf http://localhost:6100/health > /dev/null 2>&1; then
+                echo "API health OK"
+                READY=2
+                break
+              fi
+              sleep 2
+            done
+          fi
+          if [ "$READY" != "2" ]; then
+            echo "API failed to become healthy (READY=$READY)"
             echo "===== API LOG ====="
             cat output/testing/api.log
+            echo "===== LISTENING SOCKETS ====="
+            (ss -ltnp 2>/dev/null || netstat -ltnp 2>/dev/null) | grep -E '6100|State' || true
             exit 1
           fi
           echo "API_PID=$API_PID"
