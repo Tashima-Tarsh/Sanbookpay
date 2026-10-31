@@ -1,20 +1,22 @@
 package com.dynamopay.bridge
 
-import android.os.Bundle
-import android.widget.*
-import androidx.appcompat.app.AppCompatActivity
-import com.journeyapps.barcodescanner.BarcodeCallback
-import com.journeyapps.barcodescanner.BarcodeResult
-import com.journeyapps.barcodescanner.DecoratedBarcodeView
-import org.json.JSONObject
+import android.widget.Toast
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKeys
+import com.google.zxing.Result
+import com.journeyapps.barcodescanner.CaptureActivity
+import org.json.JSONObject
 
-class QrPairingActivity : AppCompatActivity() {
+/**
+ * Dynamo Bridge QR pairing screen.
+ * Uses the ZXing Android Embedded built-in CaptureActivity camera scanner.
+ */
+class QrPairingActivity : CaptureActivity() {
+
     private lateinit var apiClient: ApiClient
     private lateinit var cryptoHelper: CryptoHelper
 
-    override fun onCreate(savedInstanceState: Bundle?) {
+    override fun onCreate(savedInstanceState: android.os.Bundle?) {
         super.onCreate(savedInstanceState)
 
         val masterKeyAlias = MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC)
@@ -27,55 +29,29 @@ class QrPairingActivity : AppCompatActivity() {
         )
         cryptoHelper = CryptoHelper(this, securePrefs)
         apiClient = ApiClient(this, cryptoHelper, securePrefs)
+    }
 
-        val layout = android.widget.LinearLayout(this).apply {
-            orientation = android.widget.LinearLayout.VERTICAL
-            setPadding(24, 24, 24, 24)
+    override fun handleResult(rawResult: Result?) {
+        if (rawResult == null) {
+            Toast.makeText(this, "No QR code detected", Toast.LENGTH_SHORT).show()
+            finish()
+            return
         }
-
-        val title = TextView(this).apply {
-            text = "Dynamo Bridge - Pair Device"
-            textSize = 22f
-            setTypeface(null, android.graphics.Typeface.BOLD)
-            setPadding(0, 0, 0, 24)
-        }
-        layout.addView(title)
-
-        val desc = TextView(this).apply {
-            text = "Scan the pairing QR code shown in your merchant dashboard."
-            textSize = 16f
-            setPadding(0, 0, 0, 24)
-        }
-        layout.addView(desc)
-
-        val scannerView = DecoratedBarcodeView(this)
-        layout.addView(scannerView)
-
-        setContentView(layout)
-
-        scannerView.decodeContinuous(callback = object : BarcodeCallback {
-            override fun barcodeResult(result: BarcodeResult?) {
-                if (result != null) {
-                    handleQrResult(result.text)
-                    scannerView.pause()
-                }
-            }
-
-            override fun possibleResultPoints(p: List<com.google.zxing.ResultPoint>?) {}
-        })
+        handleQrResult(rawResult.text)
     }
 
     private fun handleQrResult(qrText: String?) {
-        if (qrText == null || qrText.isEmpty()) {
+        if (qrText.isNullOrEmpty()) {
             Toast.makeText(this, "Invalid QR code", Toast.LENGTH_SHORT).show()
+            finish()
             return
         }
 
         try {
             val json = JSONObject(qrText)
-            val type = json.optString("type", "")
-            if (type != "dynamo-bridge-pairing") {
+            if (json.optString("type", "") != "dynamo-bridge-pairing") {
                 Toast.makeText(this, "Not a Dynamo Bridge pairing QR", Toast.LENGTH_SHORT).show()
+                finish()
                 return
             }
 
@@ -83,7 +59,6 @@ class QrPairingActivity : AppCompatActivity() {
             if (result.paired) {
                 Toast.makeText(this, "Device paired successfully!", Toast.LENGTH_LONG).show()
                 setResult(RESULT_OK)
-                finish()
             } else {
                 Toast.makeText(this, "Pairing failed: ${result.error}", Toast.LENGTH_LONG).show()
             }
@@ -91,13 +66,6 @@ class QrPairingActivity : AppCompatActivity() {
             e.printStackTrace()
             Toast.makeText(this, "Invalid QR code format", Toast.LENGTH_SHORT).show()
         }
-    }
-
-    override fun onPause() {
-        super.onPause()
-    }
-
-    override fun onResume() {
-        super.onResume()
+        finish()
     }
 }
