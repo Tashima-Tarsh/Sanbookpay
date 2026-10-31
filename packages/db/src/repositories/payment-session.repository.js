@@ -4,9 +4,13 @@ import { PaymentStatus, PaymentMethod, isValidTransition, TERMINAL_STATES } from
 export class PaymentSessionRepository {
   /**
    * @param {import('../database.js').Database} db
+   * @param {{ releaseOffset: (receivingAccountId: string, offset: number) => void }} [paiseOffsetAllocator]
+   * @param {{ recordVolume: (receivingAccountId: string, amountPaise: number) => void }} [vpaRotationGuard]
    */
-  constructor(db) {
+  constructor(db, paiseOffsetAllocator, vpaRotationGuard) {
     this.db = db;
+    this.paiseOffsetAllocator = paiseOffsetAllocator;
+    this.vpaRotationGuard = vpaRotationGuard;
   }
 
   create(data) {
@@ -17,11 +21,14 @@ export class PaymentSessionRepository {
     const sql = `
       INSERT INTO payment_sessions (
         id, merchant_id, customer_id, receiving_account_id, order_id,
-        amount_paise, currency, method, status, queue_position,
+        amount_paise, paise_offset, base_amount_paise, currency, method, status, queue_position,
         return_url, idempotency_key, device_id, verification_level, verification_sources,
         verification_tag, metadata, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, '[]', 'UNVERIFIED', ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, '[]', 'UNVERIFIED', ?, ?, ?)
     `;
+
+    const baseAmountPaise = data.baseAmountPaise !== undefined ? Number(data.baseAmountPaise) : Number(data.amountPaise) || 1;
+    const paiseOffset = data.paiseOffset !== undefined ? Number(data.paiseOffset) : 0;
 
     this.db.execute(sql, [
       id,
@@ -29,7 +36,9 @@ export class PaymentSessionRepository {
       data.customerId || null,
       data.receivingAccountId || null,
       data.orderId,
-      Number(data.amountPaise),
+      Number(data.amountPaise) || 1,
+      paiseOffset,
+      baseAmountPaise,
       data.currency || 'INR',
       data.method || PaymentMethod.UPI,
       data.status || PaymentStatus.INITIATED,
@@ -282,6 +291,25 @@ export class PaymentSessionRepository {
           SET is_slot_busy = 0, current_active_session_id = NULL, updated_at = ?
           WHERE id = ? AND (current_active_session_id = ? OR current_active_session_id IS NULL)
         `, [now, session.receivingAccountId, sessionId]);
+
+        // Release paise offset back to the pool
+        if (this.paiseOffsetAllocator && session.metadata) {
+          let metadata = session.metadata;
+          if (typeof metadata === 'string') {
+            try { metadata = JSON.parse(metadata); } catch { metadata = {}; }
+          }
+          if (metadata && metadata.paiseOffset !== undefined) {
+            this.paiseOffsetAllocator.releaseOffset(session.receivingAccountId, Number(metadata.paiseOffset));
+          }
+        }
+
+        // Record daily volume for VPA rotation guard on successful payment
+        if (targetStatus === PaymentStatus.SUCCESS && session.receivingAccountId && this.paiseOffsetAllocator) {
+          const totalAmount = Number(session.amount_paise || session.amountPaise || 0);
+          if (totalAmount > 0 && this.vpaRotationGuard) {
+            this.vpaRotationGuard.recordVolume(session.receivingAccountId, totalAmount);
+          }
+        }
       }
 
       return this.findById(sessionId);

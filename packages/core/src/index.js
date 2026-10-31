@@ -19,5 +19,7 @@ export { UpiMirrorService } from './upi-mirror-service.js';
 export { ConcurrentWebhookEngine } from './webhook-engine-concurrent.js';
 export { SecurityMiddleware } from './security-middleware.js';
 export { AndroidDiagnostics } from './android-diagnostics.js';
+export { PaiseOffsetAllocator } from './paise-offset-engine.js';
+export { VpaRotationGuard } from './vpa-rotation-guard.js';
 
 

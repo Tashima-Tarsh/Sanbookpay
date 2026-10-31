@@ -249,7 +249,6 @@ export class AttributionEngine {
       const isTimeValid = !isPriorExpiredSession && (normalizedObs.observedAt >= slotStart);
 
       if (isEligibleStatus && isAmountMatch && isTimeValid) {
-      console.error('[DEBUG-ATTRIB] Found session:', currentSession.id, currentSession.status, currentSession.amountPaise, normalizedObs.amountPaise);
         const wasActive = currentSession.status === PaymentStatus.ACTIVE;
 
         // Check if there is already an active grace period awaiting second source for this session
@@ -294,6 +293,20 @@ export class AttributionEngine {
             verificationTag: verifyResult.tag,
             sources: verifyResult.sources
           });
+
+          if (this.server) {
+            this.server.broadcastSse(`payment_session_${currentSession.id}`, 'status_change', {
+              sessionId: currentSession.id,
+              orderId: currentSession.orderId,
+              status: PaymentStatus.SUCCESS,
+              amountPaise: currentSession.amountPaise ? currentSession.amountPaise.toString() : '0',
+              baseAmountPaise: currentSession.metadata?.baseAmountPaise ? String(currentSession.metadata.baseAmountPaise) : null,
+              paiseOffset: currentSession.metadata?.paiseOffset || 0,
+              completedAt: currentSession.completedAt ? currentSession.completedAt.toISOString() : null,
+              verificationLevel: 2,
+              verificationTag: verifyResult.tag
+            });
+          }
 
           this.eventEmitter.emit('PAYMENT.VERIFICATION_UPGRADED', {
             paymentId: currentSession.id,
@@ -376,6 +389,20 @@ export class AttributionEngine {
             sources: finalResult.sources
           });
 
+          if (this.server) {
+            this.server.broadcastSse(`payment_session_${currentSession.id}`, 'status_change', {
+              sessionId: currentSession.id,
+              orderId: currentSession.orderId,
+              status: PaymentStatus.SUCCESS,
+              amountPaise: currentSession.amountPaise ? currentSession.amountPaise.toString() : '0',
+              baseAmountPaise: currentSession.metadata?.baseAmountPaise ? String(currentSession.metadata.baseAmountPaise) : null,
+              paiseOffset: currentSession.metadata?.paiseOffset || 0,
+              completedAt: currentSession.completedAt ? currentSession.completedAt.toISOString() : null,
+              verificationLevel: finalResult.level,
+              verificationTag: finalResult.tag
+            });
+          }
+
           return {
             attributed: true,
             duplicate: false,
@@ -434,6 +461,18 @@ export class AttributionEngine {
             verificationTag: finalResult.tag,
             sources: finalResult.sources
           });
+
+          if (this.server) {
+            this.server.broadcastSse(`payment_session_${targetSessionId}`, 'status_change', {
+              sessionId: targetSessionId,
+              orderId: targetOrderId,
+              status: PaymentStatus.SUCCESS,
+              amountPaise: targetAmountPaise ? targetAmountPaise.toString() : '0',
+              completedAt: new Date().toISOString(),
+              verificationLevel: finalResult.level,
+              verificationTag: finalResult.tag
+            });
+          }
         }, this.gracePeriodMs);
 
         if (graceTimer.unref) graceTimer.unref();

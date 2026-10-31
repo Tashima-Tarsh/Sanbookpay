@@ -71,7 +71,9 @@ import {
   WebhookEngine,
   PaymentVerificationPipeline,
   FlashMatchingEngine,
-  UpiMirrorService
+  UpiMirrorService,
+  PaiseOffsetAllocator,
+  VpaRotationGuard
 } from '@youpi/core';
 import { HttpServer } from './server.js';
 import { authGuard, isAdminRequest } from './auth-guard.js';
@@ -149,6 +151,24 @@ export function createPaymentApp(customDb = null, options = {}) {
     eventEmitter,
     auditRepo
   });
+
+  const paiseOffsetAllocator = new PaiseOffsetAllocator({
+    sessionRepo,
+    eventEmitter,
+    auditRepo
+  });
+
+  sessionRepo.paiseOffsetAllocator = paiseOffsetAllocator;
+
+  const vpaRotationGuard = new VpaRotationGuard({
+    accountRepo,
+    sessionRepo,
+    eventEmitter,
+    auditRepo
+  });
+
+  sessionRepo.paiseOffsetAllocator = paiseOffsetAllocator;
+  sessionRepo.vpaRotationGuard = vpaRotationGuard;
 
   const timingEngine = new TimingEngine({
     sessionRepo,
@@ -587,6 +607,8 @@ export function createPaymentApp(customDb = null, options = {}) {
     providerWebhookEngine,
     dynamoQueue,
     dynamoWebhooks,
+    paiseOffsetAllocator,
+    vpaRotationGuard,
     dynamoGmail,
     dynamoSMS,
     superAdminRepo,

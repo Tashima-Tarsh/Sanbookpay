@@ -43,9 +43,11 @@ export class ReceivingAccountRepository {
       const sql = `
         INSERT INTO payment_receiving_accounts (
           id, merchant_id, upi_id, payee_name, is_merchant_enabled,
-          is_active, is_slot_busy, current_active_session_id, created_at, updated_at
+          is_active, is_slot_busy, current_active_session_id,
+          daily_volume_paise, daily_txn_count, rotation_threshold_paise,
+          created_at, updated_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `;
 
       this.db.execute(sql, [
@@ -57,6 +59,9 @@ export class ReceivingAccountRepository {
         isActive ? 1 : 0,
         0,
         null,
+        0,                                          // daily_volume_paise
+        0,                                          // daily_txn_count
+        data.rotationThresholdPaise ?? 9000000,     // rotation_threshold_paise (₹90,000)
         now,
         now
       ]);
@@ -249,6 +254,9 @@ export class ReceivingAccountRepository {
       isActive: Boolean(row.is_active),
       isSlotBusy: Boolean(row.is_slot_busy),
       currentActiveSessionId: row.current_active_session_id,
+      dailyVolumePaise: Number(row.daily_volume_paise || 0),
+      dailyTxnCount: Number(row.daily_txn_count || 0),
+      rotationThresholdPaise: Number(row.rotation_threshold_paise || 9000000),
       createdAt: new Date(row.created_at),
       updatedAt: new Date(row.updated_at)
     };

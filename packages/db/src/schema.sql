@@ -27,6 +27,9 @@ CREATE TABLE IF NOT EXISTS payment_receiving_accounts (
     is_active BOOLEAN NOT NULL DEFAULT true,
     is_slot_busy BOOLEAN NOT NULL DEFAULT false,
     current_active_session_id TEXT,
+    daily_volume_paise BIGINT NOT NULL DEFAULT 0,
+    daily_txn_count INT NOT NULL DEFAULT 0,
+    rotation_threshold_paise BIGINT NOT NULL DEFAULT 9000000,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -76,6 +79,8 @@ CREATE TABLE IF NOT EXISTS payment_sessions (
     receiving_account_id TEXT REFERENCES payment_receiving_accounts(id),
     order_id VARCHAR(255) NOT NULL,
     amount_paise BIGINT NOT NULL CHECK (amount_paise > 0),
+    paise_offset BIGINT NOT NULL DEFAULT 0 CHECK (paise_offset >= 0 AND paise_offset <= 99),
+    base_amount_paise BIGINT NOT NULL DEFAULT 0 CHECK (base_amount_paise >= 0),
     currency VARCHAR(3) NOT NULL DEFAULT 'INR',
     method VARCHAR(50) NOT NULL DEFAULT 'UPI',
     status VARCHAR(50) NOT NULL DEFAULT 'INITIATED',

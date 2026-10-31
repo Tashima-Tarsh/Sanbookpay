@@ -2,7 +2,7 @@ import {enforcePaymentControls} from '../payment-controls.js';
 import { validateUpiChannel } from '../upi-channel.js';
 import { HttpServer } from '../server.js';
 import { toPaise, toRupeesString, resolveRuntimeUrls, PaymentStatus, safeEqual, hasBearer, getObserverToken, maskPhone, maskEmail, generateCustomerId } from '@youpi/common';
-import { isTerminalStatus, toPublicOutcome } from '@youpi/core';
+import { isTerminalStatus, toPublicOutcome, PaiseOffsetAllocator } from '@youpi/core';
 import { isAdminRequest } from '../auth-guard.js';
 
 /**
@@ -179,6 +179,12 @@ export function registerPaymentRoutes(server, ctx) {
 
     let receivingAccountId = null;
     let receivingAccountSnapshot = null;
+
+    // Paise Offset Engine: allocate a unique paise offset (₹0.00–₹0.99) per VPA
+    // so multiple concurrent buyers can pay the same base amount without queueing.
+    var paiseOffset = 0;
+    var totalAmountPaise = Number(amountPaise) || 1;
+
     if (!isCounterPayment) {
       // Resolve active receiving account for UPI
       const receivingAccount = ctx.accountRepo.findActiveForMerchant(merchant.id);
@@ -197,6 +203,63 @@ export function registerPaymentRoutes(server, ctx) {
         payeeName: receivingAccount.payeeName,
         isMerchantEnabled: receivingAccount.isMerchantEnabled
       };
+
+      // Paise Offset Engine: allocate a unique paise offset (₹0.00–₹0.99) per VPA
+      // so multiple concurrent buyers can pay the same base amount without queueing.
+      // Opt-in via body.usePaiseOffset === true.
+      if (body.usePaiseOffset && ctx.paiseOffsetAllocator) {
+        const allocation = ctx.paiseOffsetAllocator.allocateOffset(receivingAccountId, amountPaise);
+        if (allocation) {
+          paiseOffset = allocation.offset;
+          totalAmountPaise = allocation.totalAmountPaise;
+        } else {
+          HttpServer.json(res, 409, {
+            error: 'PAYMENT_SLOT_UNAVAILABLE',
+            message: 'All paise offsets are in use for this receiving account. Please try again.'
+          });
+          return;
+        }
+      }
+    }
+
+    // Multi-VPA Auto-Rotation Guard: check if this VPA can handle the payment volume
+    if (!isCounterPayment && ctx.vpaRotationGuard && receivingAccountId) {
+      const capacityCheck = ctx.vpaRotationGuard.checkCapacity(receivingAccountId, totalAmountPaise);
+      if (!capacityCheck.ok) {
+        // Try to find another active VPA for this merchant
+        const alternative = ctx.vpaRotationGuard.findBestAccount(merchant.id, totalAmountPaise);
+        if (alternative) {
+          receivingAccountId = alternative.id;
+          receivingAccountSnapshot = {
+            id: alternative.id,
+            upiId: alternative.upiId,
+            payeeName: alternative.payeeName,
+            isMerchantEnabled: alternative.isMerchantEnabled
+          };
+          // Re-allocate paise offset for the new VPA
+          const newAllocation = ctx.paiseOffsetAllocator.allocateOffset(receivingAccountId, amountPaise);
+          if (!newAllocation) {
+            HttpServer.json(res, 409, {
+              error: 'PAYMENT_SLOT_UNAVAILABLE',
+              message: 'All paise offsets are in use for all available receiving accounts. Please try again.'
+            });
+            return;
+          }
+          paiseOffset = newAllocation.offset;
+          totalAmountPaise = newAllocation.totalAmountPaise;
+        } else {
+          HttpServer.json(res, 409, {
+            error: 'VPA_CAPACITY_EXCEEDED',
+            reason: capacityCheck.reason,
+            suggestedAction: capacityCheck.suggestedAction,
+            currentVolumePaise: capacityCheck.currentVolumePaise,
+            thresholdPaise: capacityCheck.thresholdPaise,
+            projectedVolumePaise: capacityCheck.projectedVolumePaise,
+            message: 'All receiving accounts for this merchant are at daily volume threshold. Please try again later.'
+          });
+          return;
+        }
+      }
     }
 
     // Resolve or auto-generate customer with masked details
@@ -288,7 +351,9 @@ export function registerPaymentRoutes(server, ctx) {
 
     const sessionMetadata = {
       ...(body.metadata || {}),
-      ...(receivingAccountSnapshot ? { receivingAccountSnapshot } : {})
+      ...(receivingAccountSnapshot ? { receivingAccountSnapshot } : {}),
+      baseAmountPaise: Number(amountPaise) || 1,
+      paiseOffset: paiseOffset || 0
     };
 
     if (deviceId && customerId && ctx.deviceRepo) {
@@ -301,7 +366,7 @@ export function registerPaymentRoutes(server, ctx) {
       customerId,
       receivingAccountId,
       orderId: body.orderId,
-      amountPaise,
+      amountPaise: totalAmountPaise,
       currency: body.currency || 'INR',
       method: body.method || 'UPI',
       // Counter payments (CASH_COUNTER/CARD_COUNTER) don't use UPI slots -> insert as ACTIVE.
@@ -333,8 +398,11 @@ export function registerPaymentRoutes(server, ctx) {
     HttpServer.json(res, 201, {
       paymentId: session.id,
       orderId: session.orderId,
-      amount: toRupeesString(amountPaise),
-      amountPaise: amountPaise.toString(),
+      amount: toRupeesString(totalAmountPaise),
+      baseAmount: toRupeesString(totalAmountPaise),
+      amountPaise: totalAmountPaise.toString(),
+      baseAmountPaise: amountPaise.toString(),
+      paiseOffset: paiseOffset || 0,
       currency: session.currency,
       status: queueResult.status,
       queuePosition: queueResult.queuePosition,
@@ -391,6 +459,30 @@ export function registerPaymentRoutes(server, ctx) {
       returnUrl: session.returnUrl,
       metadata: session.metadata
     });
+  });
+
+  // GET /api/v1/payments/:id/stream (SSE Real-Time Confirmation)
+  server.get('/api/v1/payments/:id/stream', async (req, res, params) => {
+    const session = ctx.sessionRepo.findById(params.id);
+    if (!session) {
+      HttpServer.json(res, 404, { error: `Payment session not found: ${params.id}` });
+      return;
+    }
+
+    const topic = `payment_session_${session.id}`;
+    server.initSse(topic, res);
+
+    if (isTerminalStatus(session.status)) {
+      server.broadcastSse(topic, 'status_change', {
+        sessionId: session.id,
+        orderId: session.orderId,
+        status: session.status,
+        amountPaise: session.amountPaise ? session.amountPaise.toString() : '0',
+        baseAmountPaise: session.metadata?.baseAmountPaise ? String(session.metadata.baseAmountPaise) : null,
+        paiseOffset: session.metadata?.paiseOffset || 0,
+        completedAt: session.completedAt ? session.completedAt.toISOString() : null
+      });
+    }
   });
 
   // GET /api/v1/payments/:id/cod (Developer COD Info Endpoint)
