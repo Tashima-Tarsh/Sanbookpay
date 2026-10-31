@@ -36,6 +36,13 @@ test('scoped keys enforce tenant, revocation, suspension, idempotency and persis
  assert.equal((await call('/v1/payments',{orderId:'different',amount:'201.00'},auth)).status,409);
  assert.equal((await call('/v1/payments',{orderId:'same-order',amount:'202.00'},{...auth,'idempotency-key':'other'})).status,409);
  assert.equal((await call('/v1/payments/not-owned',undefined,auth)).status,404);
+ const consoleHeaders={'x-test-owner':'yes','idempotency-key':'console-request'};
+ const consolePayment=await call('/api/platform/v1/payments',{orderId:'console-order',amount:'201.00'},consoleHeaders);
+ assert.equal(consolePayment.status,201);
+ assert.equal(db.queryOne('SELECT merchant_id FROM payment_sessions WHERE id=?',[consolePayment.body.paymentId]).merchant_id,a.id);
+ assert.equal((await call('/api/platform/v1/payments',{orderId:'console-order',amount:'201.00'},consoleHeaders)).body.paymentId,consolePayment.body.paymentId);
+ const authorize=identity.authorize;identity.authorize=()=>false;
+ assert.equal((await call('/api/platform/v1/payments',{orderId:'denied-order',amount:'201.00'},consoleHeaders)).status,403);identity.authorize=authorize;
  assert.equal((await call('/v1/balance',undefined,auth)).status,403);
  db.execute("UPDATE pp_merchants SET status='SUSPENDED' WHERE merchant_id=?",[a.id]);
  assert.equal((await call('/v1/payments',{orderId:'new-order',amount:'201'}, {...auth,'idempotency-key':'new'})).status,403);

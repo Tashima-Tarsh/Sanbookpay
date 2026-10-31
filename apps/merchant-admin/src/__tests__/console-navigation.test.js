@@ -12,7 +12,7 @@ test('every sidebar destination shows one matching content view and API settings
   }
   function element(id){if(!elements.has(id)){
     const classes=new Set();
-    elements.set(id,{id,hidden:false,value:'',dataset:{},classList:{toggle(c,on){on?classes.add(c):classes.delete(c);},remove(c){classes.delete(c);}},addEventListener(event,fn){this[event]=fn;},setAttribute(){},removeAttribute(){},insertAdjacentHTML(){},replaceChildren(){},closest(){return this;},focus(){},showModal(){},close(){}});
+    elements.set(id,{id,hidden:false,value:'',dataset:{},classList:{toggle(c,on){on?classes.add(c):classes.delete(c);},remove(c){classes.delete(c);}},addEventListener(event,fn){this[event]=fn;},setAttribute(){},removeAttribute(){},insertAdjacentHTML(){},replaceChildren(){},closest(){return this;},focus(){},showModal(){},close(){},reset(){}});
   }return elements.get(id);}
   const names=['overview','transactions','failures','refunds','splits','settlements','upi','merchants','api','alerts'];
   const nav=names.map(name=>Object.assign(element('nav-'+name),{dataset:{page:name}}));
@@ -29,7 +29,7 @@ test('every sidebar destination shows one matching content view and API settings
   };
   const document={getElementById:element,querySelectorAll:q=>q==='.dp-view'?views:q==='[data-page]'?nav:[],addEventListener:(event,fn)=>listeners[event]=fn,body:element('body'),hidden:false};
   const location={origin:'https://pay.example',hash:'',assign(url){this.destination=url;}};
-  const context={document,location,EventSource,matchMedia:()=>({matches:true,addEventListener(){}}),history:{replaceState(a,b,hash){location.hash=hash;}},navigator:{clipboard:{writeText:async()=>{}}},setTimeout:callback=>{timeouts.set(++timeoutId,callback);return timeoutId;},setInterval:()=>1,clearTimeout:id=>timeouts.delete(id),clearInterval(){},URL,Intl,console,fetch:async(url,init)=>{requests.push({url,init});return{ok:!expired,status:expired?401:200,json:async()=>url==='/api/console/session'?{authenticated:true}:data[url.replace('/api/console/','')]||{}};}};
+  const context={crypto:{randomUUID:()=> 'automatic-order'},document,location,EventSource,matchMedia:()=>({matches:true,addEventListener(){}}),history:{replaceState(a,b,hash){location.hash=hash;}},navigator:{clipboard:{writeText:async()=>{}}},setTimeout:callback=>{timeouts.set(++timeoutId,callback);return timeoutId;},setInterval:()=>1,clearTimeout:id=>timeouts.delete(id),clearInterval(){},URL,Intl,console,fetch:async(url,init)=>{requests.push({url,init});return{ok:!expired,status:expired?401:200,json:async()=>url==='/api/console/session'?{authenticated:true}:data[url.replace('/api/console/','')]||{}};}};
   const flush=async()=>{for(let i=0;i<5;i++)await new Promise(r=>setImmediate(r));};
   vm.runInNewContext(fs.readFileSync(new URL('../../public/dynamo-console.js',import.meta.url),'utf8'),context);
   await flush();
@@ -62,8 +62,11 @@ test('every sidebar destination shows one matching content view and API settings
   const saved=requests.find(r=>r.url.endsWith('/merchant-settings')&&r.init?.method==='POST');
   assert.equal(JSON.parse(saved.init.body).webhookUrl,'https://store.example/webhook');
   data['v1/payments']={paymentId:'one-click-payment'};
+  element('createPayment').click();element('newAmount').value='201.00';
   await element('paymentForm').submit({preventDefault(){},submitter:element('createSubmit')});
   assert.equal(location.destination,'/checkout/one-click-payment');
+  const creation=requests.find(r=>r.url.endsWith('/v1/payments')&&r.init.method==='POST');
+  assert.deepEqual(JSON.parse(creation.init.body),{orderId:'ORDER-automatic-order',amount:'201.00',currency:'INR'});
   element('gmailClientId').value='google-client.apps.googleusercontent.com';element('gmailClientSecret').value='google-client-secret';element('gmailRefreshToken').value='';
   await element('gmailForm').submit({preventDefault(){},submitter:element('gmailSave')});
   const gmailSaved=requests.find(r=>r.url.endsWith('/gmail/credentials')&&r.init?.method==='POST');

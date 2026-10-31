@@ -6,7 +6,7 @@
   const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const badge=s=>`<span class="status ${esc(String(s).toLowerCase())}">${esc((s==='VERIFICATION_PENDING'?'Awaiting bank verification':String(s).replaceAll('_',' ').toLowerCase()))}</span>`;
   const failureStatuses=['FAILED','EXPIRED','CANCELLED','SUSPICIOUS'];
-  let payments=[],allocations=[],settings={},timer,toastTimer,activePage='overview',stream,liveTimer,refreshing=false,refreshAgain=false,authenticated=false,sessionVersion=0;
+  let pendingOrderId='',payments=[],allocations=[],settings={},timer,toastTimer,activePage='overview',stream,liveTimer,refreshing=false,refreshAgain=false,authenticated=false,sessionVersion=0;
   const pages={overview:['Your business at a glance','Payments, collections and the details that need your attention.'],transactions:['Transactions','Search, inspect and export your payment history.'],failures:['Failed payments','Find unsuccessful attempts and understand their status.'],refunds:['Refunds','Manage full and partial refund requests and transfer records.'],splits:['Split payments','Configure your platform fee and distribute merchant proceeds.'],settlements:['Settlements','Track settlement batches and confirmed bank credits.'],upi:['UPI accounts','Manage where your customer payments are received.'],merchants:['Business profile','Keep your business identity and customer support details up to date.'],api:['Developer tools','Connect your website and receive signed payment events.'],alerts:['Connections & alerts','Monitor bank observation channels and operational alerts.']};
   function toast(message,error=false){ $('toast').textContent=message;$('toast').className='toast'+(error?' error':'');$('toast').hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').hidden=true,5000); }
   async function api(path,body,method){
@@ -173,15 +173,8 @@
   submit('ruleStateForm',async()=>{
     await consoleApi('payment-rules/'+encodeURIComponent($('ruleStateId').value)+'/state',{active:$('ruleStateActive').value==='true',reason:$('ruleStateReason').value});$('ruleStateDialog').close();await upi();toast('Rule state saved.');
   });
-  submit('bankReviewForm',async()=>{
-    await consoleApi('payments/'+encodeURIComponent($('bankReviewPayment').value)+'/confirm-reviewed',{bankReference:$('bankReviewReference').value,reason:$('bankReviewReason').value,bankReviewed:$('bankReviewChecked').checked});
-    $('bankReviewDialog').close();$('paymentDetailsDialog').close();toast('Bank review recorded as merchant confirmation.');await refresh();
-  });
-  $('reviewBankCredit').addEventListener('click',()=>{
-    $('bankReviewReference').value='';$('bankReviewReason').value='';$('bankReviewChecked').checked=false;$('bankReviewDialog').showModal();
-  });
   submit('paymentForm',async()=>{
-    const p=await api('v1/payments',{orderId:$('newOrderId').value,amount:$('newAmount').value,currency:'INR',customer:{name:$('newCustomerName').value,phone:$('newCustomerPhone').value}});
+    const p=await api('v1/payments',{orderId:pendingOrderId,amount:$('newAmount').value,currency:'INR'});
     const id=p.paymentId||p.id;if(!id)throw new Error('The payment API did not return a payment ID.');
     location.assign('/checkout/'+encodeURIComponent(id));
   });
@@ -227,7 +220,8 @@
       else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first?.focus();}
     }
   });
-  $('createPayment').addEventListener('click',()=>{$('newOrderId').value='ORDER-'+Date.now();$('paymentResult').hidden=true;$('paymentDialog').showModal();});
+  $('createPayment').addEventListener('click',()=>{pendingOrderId='ORDER-'+crypto.randomUUID();$('paymentForm').reset();$('paymentResult').hidden=true;$('paymentDialog').showModal();});
+  $('manageMerchants')?.addEventListener('click',async()=>{try{await api('v1/admin/platform-session',{});location.assign('/platform#merchants');}catch(e){toast(e.message,true);}});
   $('logout').addEventListener('click',async()=>{await fetch('/api/console/session',{method:'DELETE'});signedOut();});
   document.addEventListener('click',async e=>{
     const el=e.target.closest('button');if(!el)return;
@@ -242,7 +236,6 @@
       if(el.dataset.paymentDetail){
         const p=payments.find(p=>p.id===el.dataset.paymentDetail);
         if(!p)return;
-        $('bankReviewPayment').value=p.id;$('reviewBankCredit').hidden=p.source!=='SESSION'||p.method!=='UPI'||!['ACTIVE','PROCESSING','VERIFICATION_PENDING','EXPIRED','FAILED'].includes(p.status);
         $('paymentDetails').innerHTML=[['Order ID',p.orderId],['Payment ID',p.id],['Amount',money(p.amountPaise)],['Method',p.method],['Status',p.status],['Customer',p.customer||'—'],['Bank reference',p.utr||'Not supplied'],['Confirmation source',p.confirmationSource?.replaceAll('_',' ')||'Awaiting confirmation'],['Confirmed at',date(p.completedAt)],['Created',date(p.createdAt)]].map(([label,value])=>`<div class="summary-line"><span>${label}</span><strong style="max-width:65%;overflow-wrap:anywhere;text-align:right">${esc(value)}</strong></div>`).join('');
         $('detailsCheckout').hidden=p.source!=='SESSION';$('detailsCheckout').href='/checkout/'+encodeURIComponent(p.id);$('paymentDetailsDialog').showModal();
       }

@@ -6,8 +6,8 @@
   <meta name="color-scheme" content="light">
   <title>Dynamo Pay · Platform</title>
   <link rel="stylesheet" href="/dynamo-console.css">
-  <link rel="stylesheet" href="/platform.css">
-  <script src="/platform.js" defer></script>
+  <link rel="stylesheet" href="/platform.css?v=20261031-workspace">
+  <script src="/platform.js?v=20261031-workspace" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#workspace">Skip to content</a>
@@ -32,7 +32,7 @@
     </aside>
     <main class="dp-main" id="workspace" tabindex="-1">
       <header class="topbar"><div class="actions"><button class="btn menu-toggle" id="menuToggle" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">Menu</button><span>Dynamo Pay / <strong id="breadcrumb">Overview</strong></span></div><div class="right"><span id="tenantName"></span><button class="btn small" id="refresh">Refresh data</button></div></header>
-      <div class="content"><div class="page-head"><div><h1 id="pageTitle"></h1><p id="pageDescription"></p></div><div class="actions" id="pageActions"></div></div><p id="statusMessage" class="notice" role="status" hidden></p><div id="view" aria-live="polite"></div><footer><span>Dynamo Pay</span><a href="/downloads">Manuals &amp; downloads</a></footer></div>
+      <div class="content"><div id="merchantContext" class="merchant-context" hidden></div><div class="page-head"><div><h1 id="pageTitle"></h1><p id="pageDescription"></p></div><div class="actions" id="pageActions"></div></div><p id="statusMessage" class="notice" role="status" hidden></p><div id="view" aria-live="polite"></div><footer><span>Dynamo Pay</span><a href="/downloads">Manuals &amp; downloads</a></footer></div>
     </main>
   </div>
   <dialog id="resultDialog" aria-labelledby="resultTitle"><h2 id="resultTitle"></h2><div id="resultBody"></div><div class="actions"><button class="btn primary" id="closeResult">Done</button></div></dialog>
