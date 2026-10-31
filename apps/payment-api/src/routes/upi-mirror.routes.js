@@ -971,4 +971,79 @@ export function registerUpiMirrorRoutes(server, ctx) {
       return HttpServer.json(res, 500, { error: 'Internal Server Error' });
     }
   });
+
+  // GET /api/v1/upi-mirror/download — Secure APK download for subscribed merchants
+  server.get(`${base}/download`, async (req, res) => {
+    try {
+      const merchant = resolveMerchant(req);
+      if (!merchant) {
+        return HttpServer.json(res, 401, { error: 'Merchant authentication required.' });
+      }
+
+      const entitlement = ctx.subscriptionEntitlementRepo.findByMerchant(merchant.id);
+      if (!entitlement || entitlement.status !== 'ACTIVE') {
+        return HttpServer.json(res, 403, {
+          error: 'Active subscription required to download Dynamo Bridge.',
+          message: 'Subscribe to Dynamo Pay to enable Android Bridge download.'
+        });
+      }
+
+      const downloadUrl = process.env.DYNAMO_BRIDGE_APK_URL
+        || 'https://github.com/Tashima-Tarsh/Sanbookpay/releases/latest/download/app-debug.apk';
+
+      const checksumUrl = process.env.DYNAMO_BRIDGE_APK_CHECKSUM_URL
+        || 'https://github.com/Tashima-Tarsh/Sanbookpay/releases/latest/download/app-debug.apk.sha256';
+
+      // QR code payload: the download URL (merchant scans this on their phone)
+      const qrPayload = JSON.stringify({
+        type: 'dynamo-bridge-download',
+        app: 'Dynamo Bridge',
+        downloadUrl,
+        checksumUrl,
+        merchantId: merchant.id,
+        timestamp: new Date().toISOString()
+      });
+
+      return HttpServer.json(res, 200, {
+        appName: 'Dynamo Bridge',
+        version: '1.0.0',
+        minAndroidVersion: 'Android 8.0 (API 26)',
+        downloadUrl,
+        checksumUrl,
+        qrPayload,
+        qrDisplayText: downloadUrl,
+        security: {
+          integrityCheck: 'SHA256 checksum provided',
+          delivery: 'HTTPS only',
+          codeSigning: 'Debug key (CI-built). Use release key for Play Store.',
+          dataCollection: 'No UPI PINs, passwords, OTPs, or bank credentials collected.',
+          permissions: [
+            'Notification access (to observe UPI credit alerts)',
+            'Internet (to forward events to your backend)',
+            'Camera (to scan pairing QR)',
+            'Foreground service (background persistence)'
+          ],
+          whatWeDoNotCollect: [
+            'UPI PIN',
+            'Bank login password',
+            'OTP',
+            'Debit card details',
+            'Private UPI app credentials'
+          ]
+        },
+        installationSteps: [
+          '1. Tap the download link or scan the QR code on your phone.',
+          '2. Enable "Install from unknown sources" in Android Settings if prompted.',
+          '3. Open the downloaded APK to install Dynamo Bridge.',
+          '4. Open the app and scan the pairing QR from your merchant dashboard.',
+          '5. Grant Notification Listener permission when prompted.'
+        ],
+        merchantId: merchant.id,
+        generatedAt: new Date().toISOString()
+      });
+    } catch (err) {
+      console.error('[UPI Mirror] Download endpoint error:', err);
+      return HttpServer.json(res, 500, { error: 'Internal Server Error' });
+    }
+  });
 }
