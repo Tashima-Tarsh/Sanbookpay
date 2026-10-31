@@ -2,6 +2,7 @@ package com.dynamopay.bridge
 
 import android.app.Service
 import android.content.Intent
+import android.content.SharedPreferences
 import android.os.IBinder
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
@@ -27,7 +28,6 @@ class NotificationListenerService : NotificationListenerService() {
         if (sbn == null) return
         val packageName = sbn.packageName ?: return
 
-        // Only observe notifications from payment/banking apps
         if (!isRelevantPackage(packageName)) return
 
         val notification = sbn.notification ?: return
@@ -37,14 +37,12 @@ class NotificationListenerService : NotificationListenerService() {
         val text = extras.getCharSequence(android.app.Notification.EXTRA_TEXT)?.toString()
             ?: extras.getCharSequence(android.app.Notification.EXTRA_BIG_TEXT)?.toString()
 
-        // Only process credit notifications
         val combined = "$title $text"
         val creditMatch = java.util.regex.Pattern.compile(
             "(?i)(credited|received|deposit|payment received|upi/cr)"
         )
         if (!creditMatch.matcher(combined).find()) return
 
-        // Extract amount
         val amountPattern = java.util.regex.Pattern.compile("(?i)(?:rs\\.?|inr|₹)\\s*([\\d,]+(?:\\.\\d{1,2})?)")
         val amtMatcher = amountPattern.matcher(combined)
         if (!amtMatcher.find()) return
@@ -61,7 +59,6 @@ class NotificationListenerService : NotificationListenerService() {
 
         if (paise <= 0L) return
 
-        // Extract UTR/RRN
         val refPattern = java.util.regex.Pattern.compile(
             "(?i)(?:utr|ref(?:\\s*no)?|txn(?:\\s*id)?|rrn)[\\s:#]+([a-zA-Z0-9\\-_]{6,35})"
         )
@@ -69,7 +66,6 @@ class NotificationListenerService : NotificationListenerService() {
         val refMatcher = refPattern.matcher(combined)
         if (refMatcher.find()) bankRef = refMatcher.group(1)?.trim()
 
-        // Extract sender VPA
         val vpaPattern = java.util.regex.Pattern.compile(
             "(?i)(?:from|by)\\s+([a-zA-Z0-9.\\-_]{2,100}@[a-zA-Z0-9.\\-_]{2,64})"
         )
@@ -77,10 +73,8 @@ class NotificationListenerService : NotificationListenerService() {
         val vpaMatcher = vpaPattern.matcher(combined)
         if (vpaMatcher.find()) senderVpa = vpaMatcher.group(1)?.trim()?.trimEnd('.', ',', ';')
 
-        // Extract fingerprint hash for deduplication
         val fingerprint = cryptoHelper.sha256Hex("$packageName:$paise:$bankRef:${sbn.postTime}")
 
-        // Create event and enqueue for forwarding
         val event = QueuedEvent(
             id = java.util.UUID.randomUUID().toString(),
             eventId = "evt_${java.util.UUID.randomUUID().toString()}",
@@ -114,7 +108,7 @@ class NotificationListenerService : NotificationListenerService() {
     }
 
     private fun isRelevantPackage(pkg: String): Boolean {
-        val lower = pkg.toLowerCase()
+        val lower = pkg.lowercase()
         return lower.contains("upi") || lower.contains("bank") ||
             lower.contains("pay") || lower.contains("phonepe") ||
             lower.contains("gpay") || lower.contains("paytm") ||
@@ -127,3 +121,4 @@ class NotificationListenerService : NotificationListenerService() {
         private const val TAG = "DynamoBridgeListener"
     }
 }
+

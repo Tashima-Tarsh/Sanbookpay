@@ -6,6 +6,7 @@ import android.os.Handler
 import android.os.Looper
 import androidx.security.crypto.EncryptedSharedPreferences
 import okhttp3.*
+import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.MediaType.Companion.toMediaType
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
@@ -36,10 +37,6 @@ data class DeviceHealth(
     val version: String
 )
 
-/**
- * API client for Dynamo Bridge backend communication.
- * Handles device pairing, event ingestion, health reporting, and subscription sync.
- */
 class ApiClient(
     private val context: Context,
     private val cryptoHelper: CryptoHelper,
@@ -52,30 +49,12 @@ class ApiClient(
 
     private val handler = Handler(Looper.getMainLooper())
 
-    fun isPaired(): Boolean {
-        return securePrefs.getBoolean(PREFS_PAIRED, false)
-    }
+    fun isPaired(): Boolean = securePrefs.getBoolean(PREFS_PAIRED, false)
+    fun getDeviceId(): String? = securePrefs.getString(PREFS_DEVICE_ID, null)
+    fun getDeviceToken(): String? = securePrefs.getString(PREFS_DEVICE_TOKEN, null)
+    fun getBaseUrl(): String = securePrefs.getString(PREFS_BASE_URL, "https://api.dynamopay.example") ?: "https://api.dynamopay.example"
+    fun getMerchantId(): String? = securePrefs.getString(PREFS_MERCHANT_ID, null)
 
-    fun getDeviceId(): String? {
-        return securePrefs.getString(PREFS_DEVICE_ID, null)
-    }
-
-    fun getDeviceToken(): String? {
-        return securePrefs.getString(PREFS_DEVICE_TOKEN, null)
-    }
-
-    fun getBaseUrl(): String {
-        return securePrefs.getString(PREFS_BASE_URL, "https://api.dynamopay.example") ?: "https://api.dynamopay.example"
-    }
-
-    fun getMerchantId(): String? {
-        return securePrefs.getString(PREFS_MERCHANT_ID, null)
-    }
-
-    /**
-     * Pair device via QR payload (from merchant dashboard).
-     * The QR payload contains merchantId, challenge, and pairing endpoint.
-     */
     fun pairViaQr(qrPayload: String): DevicePairingResult {
         return try {
             val json = JSONObject(qrPayload)
@@ -83,7 +62,6 @@ class ApiClient(
             val challenge = json.getString("challenge")
             val baseUrl = json.optString("baseUrl", getBaseUrl())
 
-            // Generate device key pair if not already done
             if (!cryptoHelper.ensureDeviceKeyPair()) {
                 return DevicePairingResult(false, null, null, null, "Failed to generate device keys")
             }
@@ -91,7 +69,6 @@ class ApiClient(
             val publicKeyPem = cryptoHelper.getPublicKeyPem() ?: ""
             val deviceFingerprint = cryptoHelper.getDeviceFingerprint() ?: ""
 
-            // Create pairing request signed with device key
             val pairingPayload = JSONObject().apply {
                 put("merchantId", merchantId)
                 put("challenge", challenge)
@@ -144,13 +121,10 @@ class ApiClient(
             }
         } catch (e: Exception) {
             e.printStackTrace()
-            return DevicePairingResult(false, null, null, null, e.message ?: "Pairing error")
+            DevicePairingResult(false, null, null, null, e.message ?: "Pairing error")
         }
     }
 
-    /**
-     * Send device heartbeat for health monitoring.
-     */
     fun sendHeartbeat(): Boolean {
         if (!isPaired()) return false
 
@@ -178,18 +152,13 @@ class ApiClient(
             .build()
 
         return try {
-            client.newCall(request).execute().use { response ->
-                response.isSuccessful
-            }
+            client.newCall(request).execute().use { response -> response.isSuccessful }
         } catch (e: Exception) {
             e.printStackTrace()
             false
         }
     }
 
-    /**
-     * Sync subscription status from backend.
-     */
     fun syncSubscriptionStatus(): String? {
         if (!isPaired()) return null
 

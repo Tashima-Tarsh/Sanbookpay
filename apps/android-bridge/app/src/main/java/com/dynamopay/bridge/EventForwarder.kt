@@ -7,6 +7,7 @@ import android.os.Looper
 import androidx.security.crypto.EncryptedSharedPreferences
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
@@ -22,10 +23,6 @@ data class ForwardResult(
     val eventId: String
 )
 
-/**
- * Event forwarder: immediately forwards queued observations to the backend
- * with signed transport, retry logic, and duplicate suppression.
- */
 class EventForwarder(
     private val context: Context,
     private val cryptoHelper: CryptoHelper,
@@ -170,8 +167,6 @@ class EventForwarder(
             .apply()
     }
 
-    fun getConsecutiveFailures(): Int {
-        return securePrefs.getInt(PREFS_CONSECUTIVE_FAILURES, 0)
-    }
+    fun getConsecutiveFailures(): Int = securePrefs.getInt(PREFS_CONSECUTIVE_FAILURES, 0)
 }
 
