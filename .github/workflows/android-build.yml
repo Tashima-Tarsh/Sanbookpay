@@ -35,10 +35,16 @@ jobs:
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-34"
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "build-tools;34.0.0"
 
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.5'
+          cache-read-only: true
+
       - name: Build Debug APK + checksum
         run: |
           cd apps/android-bridge
-          ./gradlew :app:assembleDebug --no-daemon --console=plain --stacktrace 2>&1 | tee "$RUNNER_TEMP/gradle.log"
+          gradle :app:assembleDebug --no-daemon --console=plain --stacktrace 2>&1 | tee "$RUNNER_TEMP/gradle.log"
           echo "=== APK FILES ==="
           find . -type f \( -name '*.apk' -o -name '*.aab' \) 2>/dev/null
           APK=$(find . -type f -name '*.apk' -print -quit)
