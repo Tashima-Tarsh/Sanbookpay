@@ -41,33 +41,8 @@ jobs:
   load-test:
     name: k6 Load Test (UPI Mirror)
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 20
     needs: security-scan
-
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_DB: dynamopay
-          POSTGRES_USER: dynamopay
-          POSTGRES_PASSWORD: dynamopay
-        ports:
-          - "5432:5432"
-        options: >-
-          --health-cmd "pg_isready -U dynamopay -d dynamopay"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-      redis:
-        image: redis:7-alpine
-        ports:
-          - "6379:6379"
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
 
     steps:
       - name: Checkout repository
@@ -82,24 +57,25 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Start Payment API and wait for health
+      - name: Start Payment API (SQLite) and wait for health
         run: |
           mkdir -p output/testing
-          export DATABASE_URL=postgresql://dynamopay:dynamopay@localhost:5432/dynamopay
-          export REDIS_URL=redis://localhost:6379
           export NODE_ENV=test
+          export SQLITE_DB_PATH="$RUNNER_TEMP/loadtest.sqlite"
           export ENCRYPTION_MASTER_KEY=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
           export JWT_SECRET=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
           npm run start:prod:api > output/testing/api.log 2>&1 &
           API_PID=$!
-          for i in $(seq 1 45); do
+          READY=0
+          for i in $(seq 1 30); do
             if curl -sf http://localhost:6100/health > /dev/null 2>&1; then
-              echo "API ready ($i attempts)"
+              READY=1
+              echo "API ready after $i attempts"
               break
             fi
             sleep 2
           done
-          if ! curl -sf http://localhost:6100/health > /dev/null 2>&1; then
+          if [ "$READY" != "1" ]; then
             echo "API failed to become healthy"
             echo "===== API LOG ====="
             cat output/testing/api.log

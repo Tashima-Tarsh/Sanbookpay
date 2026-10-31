@@ -138,7 +138,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateStatus() {
-        val hasPermission = android.app.NotificationManagerCompat.getEnabledListenerPackages(this)
+        val hasPermission = androidx.core.app.NotificationManagerCompat.getEnabledListenerPackages(this)
             .contains(packageName)
         btnPermission.isEnabled = !hasPermission
         btnPermission.text = if (hasPermission) "✓ Notification Access Granted" else "Grant Notification Access"

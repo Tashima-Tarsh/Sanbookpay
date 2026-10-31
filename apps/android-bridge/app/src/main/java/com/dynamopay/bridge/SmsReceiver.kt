@@ -28,7 +28,7 @@ class SmsReceiver : BroadcastReceiver() {
             val app = (context as? com.dynamopay.bridge.BridgeApp) ?: return
             val eventQueue = app.eventQueue
 
-            val amountPattern = android.util.Pattern.compile("(?i)(?:rs\\.?|inr|₹)\\s*([\\d,]+(?:\\.\\d{1,2})?)")
+            val amountPattern = java.util.regex.Pattern.compile("(?i)(?:rs\\.?|inr|₹)\\s*([\\d,]+(?:\\.\\d{1,2})?)")
             val amtMatcher = amountPattern.matcher(body)
             if (!amtMatcher.find()) continue
 

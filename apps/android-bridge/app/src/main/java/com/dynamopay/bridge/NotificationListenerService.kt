@@ -39,13 +39,13 @@ class NotificationListenerService : NotificationListenerService() {
 
         // Only process credit notifications
         val combined = "$title $text"
-        val creditMatch = android.util.Pattern.compile(
+        val creditMatch = java.util.regex.Pattern.compile(
             "(?i)(credited|received|deposit|payment received|upi/cr)"
         )
         if (!creditMatch.matcher(combined).find()) return
 
         // Extract amount
-        val amountPattern = android.util.Pattern.compile("(?i)(?:rs\\.?|inr|₹)\\s*([\\d,]+(?:\\.\\d{1,2})?)")
+        val amountPattern = java.util.regex.Pattern.compile("(?i)(?:rs\\.?|inr|₹)\\s*([\\d,]+(?:\\.\\d{1,2})?)")
         val amtMatcher = amountPattern.matcher(combined)
         if (!amtMatcher.find()) return
 
@@ -62,7 +62,7 @@ class NotificationListenerService : NotificationListenerService() {
         if (paise <= 0L) return
 
         // Extract UTR/RRN
-        val refPattern = android.util.Pattern.compile(
+        val refPattern = java.util.regex.Pattern.compile(
             "(?i)(?:utr|ref(?:\\s*no)?|txn(?:\\s*id)?|rrn)[\\s:#]+([a-zA-Z0-9\\-_]{6,35})"
         )
         var bankRef: String? = null
@@ -70,7 +70,7 @@ class NotificationListenerService : NotificationListenerService() {
         if (refMatcher.find()) bankRef = refMatcher.group(1)?.trim()
 
         // Extract sender VPA
-        val vpaPattern = android.util.Pattern.compile(
+        val vpaPattern = java.util.regex.Pattern.compile(
             "(?i)(?:from|by)\\s+([a-zA-Z0-9.\\-_]{2,100}@[a-zA-Z0-9.\\-_]{2,64})"
         )
         var senderVpa: String? = null

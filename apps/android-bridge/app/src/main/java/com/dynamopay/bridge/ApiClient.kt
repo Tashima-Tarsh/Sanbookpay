@@ -5,6 +5,7 @@ import android.os.Handler
 import android.os.Looper
 import androidx.security.crypto.EncryptedSharedPreferences
 import okhttp3.*
+import okhttp3.logging.HttpLoggingInterceptor
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 

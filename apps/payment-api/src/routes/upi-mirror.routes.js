@@ -1,5 +1,5 @@
 import { HttpServer } from '../server.js';
-import { generateHmac, generateRandomToken, toPaise, UpiConnectionState, ObserverDevicePairingState, ObservationClassification, UpisourceCategory, PaymentEvidenceState } from '@youpi/common';
+import { generateHmac, generateRandomToken, toPaise, UpiConnectionState, ObserverDevicePairingState, ObservationClassification, UpisourceCategory, PaymentEvidenceState, getAdminToken, safeEqual } from '@youpi/common';
 import { SecurityMiddleware } from '@youpi/core';
 
 /**
@@ -23,11 +23,28 @@ import { SecurityMiddleware } from '@youpi/core';
 export function registerUpiMirrorRoutes(server, ctx) {
   const base = '/api/v1/upi-mirror';
 
-  // Helper: resolve merchant from request
+  // Helper: resolve and authenticate merchant from request (server-side).
+  // Prevents IDOR: X-Merchant-Id alone is never trusted.
+  // Accepted credentials: admin bearer token, or merchant webhook-secret
+  // presented as `Authorization: Bearer <secret>` (or X-Merchant-Secret).
+  // Returns null on failure; callers respond with 401/404 themselves.
   function resolveMerchant(req) {
     const merchantId = req.headers['x-merchant-id'];
+    const presented = (req.headers['authorization'] || '').replace(/^Bearer\s+/i, '').trim();
+    const headerSecret = req.headers['x-merchant-secret'] || '';
+
     if (!merchantId) return null;
-    return ctx.merchantRepo.findById(merchantId);
+    const merchant = ctx.merchantRepo.findById(merchantId);
+    if (!merchant) return null;
+
+    const adminOk = Boolean(presented) && safeEqual(presented, getAdminToken());
+    if (adminOk) return merchant;
+
+    const secretOk = (Boolean(presented) && merchant.webhookSecret && safeEqual(presented, merchant.webhookSecret)) ||
+                     (headerSecret && merchant.webhookSecret && safeEqual(headerSecret, merchant.webhookSecret));
+    if (secretOk) return merchant;
+
+    return null;
   }
 
   // Helper: check feature flag

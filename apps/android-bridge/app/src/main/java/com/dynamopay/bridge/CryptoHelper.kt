@@ -36,19 +36,12 @@ class CryptoHelper(
             val generator = KeyPairGenerator.getInstance(
                 KeyProperties.KEY_ALGORITHM_EC, "AndroidKeyStore"
             )
-            generator.initialize(
-                KeyGenParameterSpec.Builder(
-                    KEY_ALIAS,
-                    KeyProperties.PURPOSE_SIGN
-                ).setDigests(KeyProperties.DIGEST_SHA256)
-                 .setAlgorithmParameterSpec(
-                     KeyGenParameterSpec.Builder(
-                         KEY_ALIAS,
-                         KeyProperties.PURPOSE_SIGN
-                     ).setDigests(KeyProperties.DIGEST_SHA256)
-                      .build() as java.security.spec.AlgorithmParameterSpec
-                 ).build()
-            )
+            val spec = KeyGenParameterSpec.Builder(
+                KEY_ALIAS,
+                KeyProperties.PURPOSE_SIGN
+            ).setDigests(KeyProperties.DIGEST_SHA256)
+             .build()
+            generator.initialize(spec)
             val keyPair = generator.generateKeyPair()
             val publicKey = keyPair.public
             val publicKeyPem = publicKeyToPem(publicKey)

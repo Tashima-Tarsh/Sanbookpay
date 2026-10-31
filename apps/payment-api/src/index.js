@@ -728,6 +728,17 @@ export function createPaymentApp(customDb = null, options = {}) {
 
 export function startServer(port = null, customDb = null) {
   const finalPort = port || Number(process.env.PAYMENT_API_PORT || 6100);
+
+  // Fail fast in production rather than silently running with dev defaults.
+  if (process.env.NODE_ENV === 'production') {
+    const required = ['ENCRYPTION_MASTER_KEY', 'JWT_SECRET'];
+    const missing = required.filter(k => !process.env[k]);
+    if (missing.length) {
+      console.error(`[Payment API] Missing required environment variables in production: ${missing.join(', ')}`);
+      process.exit(1);
+    }
+  }
+
   const app = createPaymentApp(customDb);
 
   return new Promise(resolve => {

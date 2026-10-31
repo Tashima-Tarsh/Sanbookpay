@@ -39,17 +39,27 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.5'
+          cache-read-only: true
 
       - name: Build Debug APK
         working-directory: apps/android-bridge
-        run: gradle assembleDebug --no-daemon
+        run: gradle assembleDebug --no-daemon --console=plain --stacktrace 2>&1 | tee "$RUNNER_TEMP/gradle.log"
+
+      - name: Upload Gradle build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gradle-build-log
+          path: ${{ runner.temp }}/gradle.log
 
       - name: Generate SHA256 checksum
+        if: success()
         run: |
           sha256sum apps/android-bridge/app/build/outputs/apk/debug/app-debug.apk > apps/android-bridge/app/build/outputs/apk/debug/app-debug.apk.sha256
           echo "APK_SHA256=$(sha256sum apps/android-bridge/app/build/outputs/apk/debug/app-debug.apk | awk '{print $1}')" >> $GITHUB_ENV
 
       - name: Create GitHub Release
+        if: success()
         uses: softprops/action-gh-release@v2
         with:
           tag_name: dynamo-bridge-${{ github.run_number }}

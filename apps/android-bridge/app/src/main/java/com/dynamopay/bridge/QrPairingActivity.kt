@@ -3,8 +3,8 @@ package com.dynamopay.bridge
 import android.os.Bundle
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
-import com.google.zxing.Result
 import com.journeyapps.barcodescanner.BarcodeCallback
+import com.journeyapps.barcodescanner.BarcodeResult
 import com.journeyapps.barcodescanner.DecoratedBarcodeView
 import org.json.JSONObject
 import androidx.security.crypto.EncryptedSharedPreferences
@@ -54,7 +54,7 @@ class QrPairingActivity : AppCompatActivity() {
         setContentView(layout)
 
         scannerView.decodeContinuous(callback = object : BarcodeCallback {
-            override fun decodeResult(result: Result?) {
+            override fun barcodeResult(result: BarcodeResult?) {
                 if (result != null) {
                     handleQrResult(result.text)
                     scannerView.pause()
