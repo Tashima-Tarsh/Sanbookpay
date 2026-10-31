@@ -106,6 +106,7 @@ describe('Merchant Admin Integration Tests', () => {
     const anonymous=await get('/downloads/private-credentials.pdf');assert.equal(anonymous.status,302);assert.equal(anonymous.headers.location,'/downloads');
     const landing=await get('/downloads');assert.equal(landing.status,200);assert.ok(landing.text.includes('const authenticated=false'));
     const manual=await get('/downloads/manual.pdf');assert.equal(manual.status,200);assert.match(manual.headers['content-disposition'],/^attachment;/);
+    const quickGuide=await get('/downloads/developer-guide.pdf');assert.equal(quickGuide.status,200);assert.equal(quickGuide.headers['content-type'],'application/pdf');assert.match(quickGuide.headers['content-disposition'],/attachment;.*Developer-Quick-Guide/);assert.ok(quickGuide.text.startsWith('%PDF-'));
     const login=await fetch(baseUrl+'/api/console/session',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:getAdminToken()})});
     const headers={Cookie:login.headers.get('set-cookie').split(';')[0]};
     const privateFile=await get('/downloads/private-credentials.pdf',headers);assert.equal(privateFile.status,200);assert.match(privateFile.headers['content-disposition'],/^attachment;/);assert.equal(privateFile.headers['cache-control'],'no-store');assert.equal(privateFile.text,'%PDF-1.4\nPRIVATE TEST DOCUMENT');
