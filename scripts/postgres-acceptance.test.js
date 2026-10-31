@@ -33,6 +33,11 @@ test('Postgres: schema, API collection, queue, bank matching and rollback',{skip
   assert.equal(app.context.attributionEngine.processObservation(bank).attributed,true);assert.equal(app.context.sessionRepo.findById(payment.transaction).status,'SUCCESS');
   const status=await fetch(base+'/v1.0/payin/checkstatus',{method:'POST',headers,body:JSON.stringify({uniquetransactionid:'PG-ONE'})});assert.equal(status.status,200);assert.equal((await status.json()).status,'SUCCESS');
   const balance=await fetch(base+'/v1.0/wallet',{method:'POST',headers,body:'{}'});assert.equal(balance.status,200);
+  const previousOrigin=process.env.DYNAMO_PUBLIC_URL;process.env.DYNAMO_PUBLIC_URL='https://hosted.example.test';
+  try{
+   const legacy=await fetch(base+'/api/v1/payments',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({orderId:'PG-HOSTED-LINK',amount:'201.00'})});
+   assert.equal(legacy.status,201);assert.ok((await legacy.json()).checkoutUrl.startsWith('https://hosted.example.test/checkout/'));
+  }finally{if(previousOrigin===undefined)delete process.env.DYNAMO_PUBLIC_URL;else process.env.DYNAMO_PUBLIC_URL=previousOrigin;}
  }finally{
   app?.destroy();if(server){server.closeAllConnections?.();await new Promise(r=>server.close(r));}
   db.exec(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);db.close();

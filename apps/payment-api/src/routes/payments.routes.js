@@ -40,6 +40,7 @@ function isPaymentOwner(req, session, ctx) {
  */
 export function registerPaymentRoutes(server, ctx) {
   function resolveCheckoutBaseUrl(merchant) {
+    if (process.env.DYNAMO_PUBLIC_URL) return process.env.DYNAMO_PUBLIC_URL.replace(/\/+$/, '');
     if (process.env.DYNAMO_UNIFIED_GATEWAY === 'true') return '';
     if (merchant?.branding) {
       try {

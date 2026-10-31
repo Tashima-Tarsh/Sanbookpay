@@ -2,6 +2,7 @@ import {workerData} from 'node:worker_threads';
 import pg from 'pg';
 
 pg.types.setTypeParser(20,value=>{const n=Number(value);if(!Number.isSafeInteger(n))throw Error('Database integer exceeds safe precision');return n;});
+pg.types.setTypeParser(1700,value=>{const n=Number(value);if(!Number.isFinite(n)||(/^-?\d+$/.test(value)&&!Number.isSafeInteger(n)))throw Error('Database numeric exceeds safe precision');return n;});
 const {port,control,connectionString}=workerData;
 const signal=new Int32Array(control);
 const host=new URL(connectionString).hostname;
