@@ -9,7 +9,7 @@ A practical account of what was checked, what was fixed, and how the payment que
 
 Executed check | Result
 
-42 automated suites / 331 tests | PASS
+42 automated suites / 332 tests | PASS
 
 183 registered API routes; anonymous / invalid-input smoke | PASS — no 5xx or transport failures
 
@@ -125,7 +125,7 @@ Full route list and response codes | output/testing/route-test-results.csv
 
 Customer request and signature examples | Dynamo-Pay-Integration-Manual.pdf
 
-Environment: v24.14.1, Windows, 11th Gen Intel(R) Core(TM) i5-1145G7 @ 2.60GHz, 8 logical CPUs, 16 GiB RAM. Capacity transport was HTTP loopback with isolated on-disk SQLite WAL. Test execution time: 129.49 seconds for the regression runner.
+Environment: v24.14.1, Windows, 11th Gen Intel(R) Core(TM) i5-1145G7 @ 2.60GHz, 8 logical CPUs, 16 GiB RAM. Capacity transport was HTTP loopback with isolated on-disk SQLite WAL. Test execution time: 130.93 seconds for the regression runner.
 
 What the route inventory means
 

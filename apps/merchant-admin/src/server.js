@@ -53,7 +53,8 @@ export class AdminServer {
   /**
    * @param {{
    *   db?: import('@youpi/db').Database,
-   *   apiBaseUrl?: string
+   *   apiBaseUrl?: string,
+   *   privateCredentialsPath?: string
    * }} options
    */
   constructor(options = {}) {
@@ -63,6 +64,7 @@ export class AdminServer {
     this.ticketRepo = new SupportTicketRepository(this.db);
     this.sessions = new Map();
     this.loginAttempts = new Map();
+    this.privateCredentialsPath = options.privateCredentialsPath || path.resolve(__dirname, '../../../data/.secrets/Dynamo-Pay-Private-Credentials.pdf');
     this.htmlTemplatePath = path.join(__dirname, 'views', 'admin-premium.html');
     this.template = fs.readFileSync(this.htmlTemplatePath, 'utf8');
   }
@@ -95,6 +97,22 @@ export class AdminServer {
       if (req.method !== 'GET' && req.method !== 'OPTIONS' && origin) {
         let originHost; try { originHost = new URL(origin).host; } catch { return reply(403,{error:'Invalid request origin.'}); }
         if(originHost !== (req.headers['x-forwarded-host'] || req.headers.host)) return reply(403, { error:'Request origin does not match the console.' });
+      }
+      if (pathname === '/downloads') {
+        if (req.method !== 'GET') return reply(405, {error:'Method not allowed'});
+        const page=fs.readFileSync(path.join(__dirname,'../public/dynamo-downloads.html'),'utf8').replaceAll('{{AUTHENTICATED}}',authenticated?'true':'false');
+        res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store',...BASE_SECURITY_HEADERS});res.end(page);return;
+      }
+      if (pathname === '/downloads/manual.pdf' || pathname === '/downloads/private-credentials.pdf') {
+        if (req.method !== 'GET') return reply(405, {error:'Method not allowed'});
+        const privateDocument=pathname === '/downloads/private-credentials.pdf';
+        if(privateDocument && !authenticated){res.writeHead(302,{'Location':'/downloads','Cache-Control':'no-store',...BASE_SECURITY_HEADERS});res.end();return;}
+        const file=privateDocument?this.privateCredentialsPath:path.join(__dirname,'../public/dynamo-pay-manual.pdf');
+        try {
+          const data=await fs.promises.readFile(file);
+          res.writeHead(200,{'Content-Type':'application/pdf','Content-Disposition':`attachment; filename="${privateDocument?'Dynamo-Pay-Private-Credentials.pdf':'Dynamo-Pay-User-Manual.pdf'}"`,'Cache-Control':'no-store','Pragma':'no-cache',...BASE_SECURITY_HEADERS});res.end(data);
+        }catch(error){reply(error.code==='ENOENT'?404:503,{error:'This document is unavailable. Contact your account administrator.'});}
+        return;
       }
       if (pathname === '/api/console/session') {
         if (req.method === 'GET') return reply(authenticated ? 200 : 401, { authenticated });

@@ -1,6 +1,9 @@
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { Database } from '@youpi/db';
 import { getAdminToken } from '@youpi/common';
 import { startAdminServer } from '../index.js';
@@ -9,16 +12,21 @@ describe('Merchant Admin Integration Tests', () => {
   let serverInstance;
   let baseUrl;
   let testDb;
+  let documentFolder;
 
   before(async () => {
     testDb = new Database({ inMemory: true });
-    serverInstance = await startAdminServer(6101, { db: testDb });
+    documentFolder=fs.mkdtempSync(path.join(os.tmpdir(),'dynamo-documents-'));
+    const privateCredentialsPath=path.join(documentFolder,'credentials.pdf');
+    fs.writeFileSync(privateCredentialsPath,'%PDF-1.4\nPRIVATE TEST DOCUMENT');
+    serverInstance = await startAdminServer(6101, { db: testDb, privateCredentialsPath });
     baseUrl = `http://localhost:${serverInstance.port}`;
   });
 
   after(async () => {
     await serverInstance.close();
     testDb.close();
+    fs.unlinkSync(path.join(documentFolder,'credentials.pdf'));fs.rmdirSync(documentFolder);
   });
 
   function get(path, headers = {}) {
@@ -93,5 +101,15 @@ describe('Merchant Admin Integration Tests', () => {
     const spec=await get('/developers/openapi.json');assert.equal(spec.status,200);assert.ok(JSON.parse(spec.text).paths['/v1.0/collect/upi']);
     const manual=await get('/dynamo-pay-manual.pdf');assert.equal(manual.status,200);assert.equal(manual.headers['content-type'],'application/pdf');assert.ok(manual.text.startsWith('%PDF-'));
     assert.ok(!guide.text.toLowerCase().includes('sky8'));
+  });
+  test('browser downloads require a session for private credentials and disable caching',async()=>{
+    const anonymous=await get('/downloads/private-credentials.pdf');assert.equal(anonymous.status,302);assert.equal(anonymous.headers.location,'/downloads');
+    const landing=await get('/downloads');assert.equal(landing.status,200);assert.ok(landing.text.includes('const authenticated=false'));
+    const manual=await get('/downloads/manual.pdf');assert.equal(manual.status,200);assert.match(manual.headers['content-disposition'],/^attachment;/);
+    const login=await fetch(baseUrl+'/api/console/session',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:getAdminToken()})});
+    const headers={Cookie:login.headers.get('set-cookie').split(';')[0]};
+    const privateFile=await get('/downloads/private-credentials.pdf',headers);assert.equal(privateFile.status,200);assert.match(privateFile.headers['content-disposition'],/^attachment;/);assert.equal(privateFile.headers['cache-control'],'no-store');assert.equal(privateFile.text,'%PDF-1.4\nPRIVATE TEST DOCUMENT');
+    assert.ok((await get('/downloads',headers)).text.includes('const authenticated=true'));
+    await fetch(baseUrl+'/api/console/session',{method:'DELETE',headers});assert.equal((await get('/downloads/private-credentials.pdf',headers)).status,302);
   });
 });
