@@ -1,120 +1,120 @@
 {
-  "testedAt": "2026-10-31T16:21:58.534Z",
+  "testedAt": "2026-10-31T16:28:11.869Z",
   "suiteCount": 51,
   "completed": 51,
   "passedSuites": 51,
   "totalTests": 390,
-  "durationSeconds": 304.63,
+  "durationSeconds": 266.65,
   "suites": [
     {
       "file": "packages/common/src/__tests__/common.test.js",
       "passed": true,
-      "durationSeconds": 3.29,
+      "durationSeconds": 6.03,
       "tests": 17,
       "testFailures": 0
     },
     {
       "file": "packages/db/src/__tests__/customer-reset.test.js",
       "passed": true,
-      "durationSeconds": 3.07,
+      "durationSeconds": 6.22,
       "tests": 1,
       "testFailures": 0
     },
     {
       "file": "packages/db/src/__tests__/auth-matrix.test.js",
       "passed": true,
-      "durationSeconds": 19.19,
+      "durationSeconds": 21.54,
       "tests": 1,
       "testFailures": 0
     },
     {
       "file": "packages/db/src/__tests__/db.test.js",
       "passed": true,
-      "durationSeconds": 7.18,
+      "durationSeconds": 3.98,
       "tests": 7,
       "testFailures": 0
     },
     {
       "file": "packages/core/src/__tests__/core.test.js",
       "passed": true,
-      "durationSeconds": 7.19,
+      "durationSeconds": 3.62,
       "tests": 8,
       "testFailures": 0
     },
     {
       "file": "packages/core/src/__tests__/queue-timing.test.js",
       "passed": true,
-      "durationSeconds": 5.19,
+      "durationSeconds": 3.68,
       "tests": 4,
       "testFailures": 0
     },
     {
       "file": "packages/core/src/__tests__/verification-pending.test.js",
       "passed": true,
-      "durationSeconds": 7.67,
+      "durationSeconds": 3.28,
       "tests": 4,
       "testFailures": 0
     },
     {
       "file": "packages/core/src/__tests__/webhook-engine.test.js",
       "passed": true,
-      "durationSeconds": 7,
+      "durationSeconds": 3.17,
       "tests": 2,
       "testFailures": 0
     },
     {
       "file": "packages/core/src/__tests__/webhook-failure-matrix.test.js",
       "passed": true,
-      "durationSeconds": 6.01,
+      "durationSeconds": 7.28,
       "tests": 2,
       "testFailures": 0
     },
     {
       "file": "packages/merchant-sdk/src/__tests__/merchant-sdk.test.js",
       "passed": true,
-      "durationSeconds": 8.36,
+      "durationSeconds": 3.49,
       "tests": 5,
       "testFailures": 0
     },
     {
       "file": "packages/merchant-sdk/src/__tests__/sanbook-pay-sdk.test.js",
       "passed": true,
-      "durationSeconds": 5.94,
+      "durationSeconds": 5.23,
       "tests": 2,
       "testFailures": 0
     },
     {
       "file": "packages/merchant-sdk/src/__tests__/youpi-universal-integration.test.js",
       "passed": true,
-      "durationSeconds": 9.14,
+      "durationSeconds": 7.65,
       "tests": 5,
       "testFailures": 0
     },
     {
       "file": "apps/checkout-portal/src/__tests__/checkout-portal.test.js",
       "passed": true,
-      "durationSeconds": 4.98,
+      "durationSeconds": 6.78,
       "tests": 9,
       "testFailures": 0
     },
     {
       "file": "apps/checkout-portal/src/__tests__/checkout-interactions.test.js",
       "passed": true,
-      "durationSeconds": 0.52,
+      "durationSeconds": 0.79,
       "tests": 9,
       "testFailures": 0
     },
     {
       "file": "apps/coin-wallet-store/src/__tests__/coin-wallet-store.test.js",
       "passed": true,
-      "durationSeconds": 8.08,
+      "durationSeconds": 9.14,
       "tests": 19,
       "testFailures": 0
     },
     {
       "file": "apps/merchant-admin/src/__tests__/merchant-admin.test.js",
       "passed": true,
-      "durationSeconds": 5.28,
+      "durationSeconds": 5.74,
       "tests": 7,
       "testFailures": 0
     },
@@ -128,70 +128,70 @@
     {
       "file": "apps/payment-help/src/__tests__/payment-help.test.js",
       "passed": true,
-      "durationSeconds": 5.5,
+      "durationSeconds": 6.03,
       "tests": 3,
       "testFailures": 0
     },
     {
       "file": "apps/gmail-observer/src/__tests__/gmail-observer.test.js",
       "passed": true,
-      "durationSeconds": 8.8,
+      "durationSeconds": 6.95,
       "tests": 9,
       "testFailures": 0
     },
     {
       "file": "apps/sms-observer/src/__tests__/sms-observer.test.js",
       "passed": true,
-      "durationSeconds": 4.98,
+      "durationSeconds": 5.39,
       "tests": 6,
       "testFailures": 0
     },
     {
       "file": "apps/android-observer-app/__tests__/android-observer.test.js",
       "passed": true,
-      "durationSeconds": 2.87,
+      "durationSeconds": 6.39,
       "tests": 5,
       "testFailures": 0
     },
     {
       "file": "apps/control-center/src/__tests__/control-center.test.js",
       "passed": true,
-      "durationSeconds": 3.27,
+      "durationSeconds": 3.3,
       "tests": 6,
       "testFailures": 0
     },
     {
       "file": "apps/payment-api/src/__tests__/payment-api.test.js",
       "passed": true,
-      "durationSeconds": 9.08,
+      "durationSeconds": 8.93,
       "tests": 13,
       "testFailures": 0
     },
     {
       "file": "apps/payment-api/src/__tests__/merchant-console.test.js",
       "passed": true,
-      "durationSeconds": 2.85,
+      "durationSeconds": 3.21,
       "tests": 10,
       "testFailures": 0
     },
     {
       "file": "apps/payment-api/src/__tests__/dynamo-public-api.test.js",
       "passed": true,
-      "durationSeconds": 3.37,
+      "durationSeconds": 4.04,
       "tests": 6,
       "testFailures": 0
     },
     {
       "file": "apps/payment-api/src/__tests__/auth-guard.test.js",
       "passed": true,
-      "durationSeconds": 5.71,
+      "durationSeconds": 6.43,
       "tests": 12,
       "testFailures": 0
     },
     {
       "file": "apps/payment-api/src/__tests__/rate-limit.test.js",
       "passed": true,
-      "durationSeconds": 2.77,
+      "durationSeconds": 3.29,
       "tests": 3,
       "testFailures": 0
     },
@@ -205,161 +205,161 @@
     {
       "file": "apps/payment-api/src/__tests__/selling-modes-and-cod.test.js",
       "passed": true,
-      "durationSeconds": 5.31,
+      "durationSeconds": 5,
       "tests": 4,
       "testFailures": 0
     },
     {
       "file": "apps/payment-api/src/__tests__/developer-payment-simulator.test.js",
       "passed": true,
-      "durationSeconds": 5.38,
+      "durationSeconds": 4.99,
       "tests": 18,
       "testFailures": 0
     },
     {
       "file": "apps/payment-api/src/__tests__/developer-test-mode.test.js",
       "passed": true,
-      "durationSeconds": 6.05,
+      "durationSeconds": 5.09,
       "tests": 16,
       "testFailures": 0
     },
     {
       "file": "apps/payment-api/src/__tests__/device-binding-duplicate-session.test.js",
       "passed": true,
-      "durationSeconds": 3.21,
+      "durationSeconds": 5.09,
       "tests": 10,
       "testFailures": 0
     },
     {
       "file": "apps/payment-api/src/__tests__/fraud-ban-pipeline.test.js",
       "passed": true,
-      "durationSeconds": 9.18,
+      "durationSeconds": 5.07,
       "tests": 31,
       "testFailures": 0
     },
     {
       "file": "apps/payment-api/src/__tests__/sms-gmail-verification-levels.test.js",
       "passed": true,
-      "durationSeconds": 9.54,
+      "durationSeconds": 6.15,
       "tests": 5,
       "testFailures": 0
     },
     {
       "file": "apps/payment-api/src/__tests__/upi-server-health-and-pc-ui.test.js",
       "passed": true,
-      "durationSeconds": 8.72,
+      "durationSeconds": 4.94,
       "tests": 6,
       "testFailures": 0
     },
     {
       "file": "apps/payment-api/src/__tests__/whatsapp-berry-auth.test.js",
       "passed": true,
-      "durationSeconds": 11.93,
+      "durationSeconds": 8.38,
       "tests": 13,
       "testFailures": 0
     },
     {
       "file": "apps/payment-api/src/__tests__/whitelabel-branding.test.js",
       "passed": true,
-      "durationSeconds": 8.73,
+      "durationSeconds": 5.11,
       "tests": 3,
       "testFailures": 0
     },
     {
       "file": "apps/payment-api/src/__tests__/cod-parallel-timer-decoupling.test.js",
       "passed": true,
-      "durationSeconds": 6.97,
+      "durationSeconds": 5.34,
       "tests": 2,
       "testFailures": 0
     },
     {
       "file": "apps/payment-api/src/__tests__/sanbook-pay-production.test.js",
       "passed": true,
-      "durationSeconds": 9.14,
+      "durationSeconds": 6.6,
       "tests": 16,
       "testFailures": 0
     },
     {
       "file": "apps/payment-api/src/__tests__/multi-method-and-receipts.test.js",
       "passed": true,
-      "durationSeconds": 7.55,
+      "durationSeconds": 5.05,
       "tests": 5,
       "testFailures": 0
     },
     {
       "file": "apps/payment-api/src/__tests__/payment-confirmation-regression.test.js",
       "passed": true,
-      "durationSeconds": 8.81,
+      "durationSeconds": 5.2,
       "tests": 11,
       "testFailures": 0
     },
     {
       "file": "apps/payment-api/src/__tests__/production-hardening.test.js",
       "passed": true,
-      "durationSeconds": 7.24,
+      "durationSeconds": 5.24,
       "tests": 12,
       "testFailures": 0
     },
     {
       "file": "apps/payment-api/src/__tests__/platform-identity.test.js",
       "passed": true,
-      "durationSeconds": 7.27,
+      "durationSeconds": 4.61,
       "tests": 5,
       "testFailures": 0
     },
     {
       "file": "apps/payment-api/src/__tests__/platform-operations.test.js",
       "passed": true,
-      "durationSeconds": 3.17,
+      "durationSeconds": 3.69,
       "tests": 9,
       "testFailures": 0
     },
     {
       "file": "apps/payment-api/src/__tests__/platform-payments.test.js",
       "passed": true,
-      "durationSeconds": 2.97,
+      "durationSeconds": 3.79,
       "tests": 1,
       "testFailures": 0
     },
     {
       "file": "apps/payment-api/src/__tests__/external-banking.test.js",
       "passed": true,
-      "durationSeconds": 4.16,
+      "durationSeconds": 3.74,
       "tests": 3,
       "testFailures": 0
     },
     {
       "file": "apps/payment-api/src/__tests__/secure-platform-boundaries.test.js",
       "passed": true,
-      "durationSeconds": 5.74,
+      "durationSeconds": 5.64,
       "tests": 4,
       "testFailures": 0
     },
     {
       "file": "apps/merchant-admin/src/__tests__/platform-ui.test.js",
       "passed": true,
-      "durationSeconds": 0.36,
+      "durationSeconds": 0.21,
       "tests": 7,
       "testFailures": 0
     },
     {
       "file": "scripts/chaos-concurrency.test.js",
       "passed": true,
-      "durationSeconds": 3.65,
+      "durationSeconds": 3.22,
       "tests": 5,
       "testFailures": 0
     },
     {
       "file": "scripts/postgres-acceptance.test.js",
       "passed": true,
-      "durationSeconds": 2.89,
+      "durationSeconds": 3.06,
       "tests": 2,
       "testFailures": 0
     },
     {
       "file": "scripts/production-infrastructure.test.js",
       "passed": true,
-      "durationSeconds": 3.39,
+      "durationSeconds": 3.88,
       "tests": 22,
       "testFailures": 0
     }
