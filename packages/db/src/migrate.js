@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import crypto from 'node:crypto';
-import { getCoinStoreWebhookSecret, LEGACY_DEFAULT_WEBHOOK_SECRET } from '@youpi/common';
+import { getCoinStoreWebhookSecret, LEGACY_DEFAULT_WEBHOOK_SECRET, hashPassword } from '@youpi/common';
 import { getDatabase } from './database.js';
 import { MerchantRepository } from './repositories/merchant.repository.js';
 import { ReceivingAccountRepository } from './repositories/receiving-account.repository.js';
@@ -182,6 +182,141 @@ export function runMigrations(targetDb) {
       });
     }
   }
+
+  // Seed default system roles
+  try {
+    const roleRows = db.query('SELECT id FROM roles');
+    const existingRoleIds = new Set((roleRows || []).map(r => r.id));
+    const defaultRoles = [
+      { id: 'role_super_admin', name: 'SUPER_ADMIN', scope: 'platform', description: 'Platform owner with full access', is_system: 1 },
+      { id: 'role_platform_admin', name: 'PLATFORM_ADMIN', scope: 'platform', description: 'Platform administrator', is_system: 1 },
+      { id: 'role_operations', name: 'OPERATIONS', scope: 'platform', description: 'Operations team', is_system: 1 },
+      { id: 'role_finance', name: 'FINANCE', scope: 'platform', description: 'Finance team', is_system: 1 },
+      { id: 'role_security', name: 'SECURITY', scope: 'platform', description: 'Security team', is_system: 1 },
+      { id: 'role_support', name: 'SUPPORT', scope: 'platform', description: 'Support team', is_system: 1 },
+      { id: 'role_merchant_owner', name: 'MERCHANT_OWNER', scope: 'merchant', description: 'Merchant owner', is_system: 1 },
+      { id: 'role_merchant_admin', name: 'MERCHANT_ADMIN', scope: 'merchant', description: 'Merchant administrator', is_system: 1 },
+      { id: 'role_merchant_developer', name: 'MERCHANT_DEVELOPER', scope: 'merchant', description: 'Merchant developer', is_system: 1 },
+      { id: 'role_merchant_finance', name: 'MERCHANT_FINANCE', scope: 'merchant', description: 'Merchant finance', is_system: 1 },
+      { id: 'role_merchant_operations', name: 'MERCHANT_OPERATIONS', scope: 'merchant', description: 'Merchant operations', is_system: 1 },
+      { id: 'role_merchant_viewer', name: 'MERCHANT_VIEWER', scope: 'merchant', description: 'Merchant viewer (read-only)', is_system: 1 }
+    ];
+    for (const role of defaultRoles) {
+      if (!existingRoleIds.has(role.id)) {
+        db.execute(
+          'INSERT INTO roles (id, name, scope, description, is_system, created_at) VALUES ($1, $2, $3, $4, $5, $6)',
+          [role.id, role.name, role.scope, role.description, role.is_system, new Date().toISOString()]
+        );
+      }
+    }
+  } catch {}
+
+  // Seed default permissions
+  try {
+    const permRows = db.query('SELECT id FROM permissions');
+    const existingPermIds = new Set((permRows || []).map(r => r.id));
+    const defaultPermissions = [
+      { id: 'perm_merchant_create', code: 'MERCHANT_CREATE', name: 'Create Merchant', module: 'merchant' },
+      { id: 'perm_merchant_read', code: 'MERCHANT_READ', name: 'View Merchants', module: 'merchant' },
+      { id: 'perm_merchant_update', code: 'MERCHANT_UPDATE', name: 'Update Merchant', module: 'merchant' },
+      { id: 'perm_merchant_suspend', code: 'MERCHANT_SUSPEND', name: 'Suspend/Activate Merchant', module: 'merchant' },
+      { id: 'perm_merchant_users', code: 'MERCHANT_USERS', name: 'Manage Merchant Users', module: 'merchant' },
+      { id: 'perm_bank_manage', code: 'BANK_MANAGE', name: 'Manage Receiving Banks', module: 'bank' },
+      { id: 'perm_upi_manage', code: 'UPI_MANAGE', name: 'Manage UPI Routes', module: 'upi' },
+      { id: 'perm_routing_manage', code: 'ROUTING_MANAGE', name: 'Manage Smart Routing', module: 'routing' },
+      { id: 'perm_failover_manage', code: 'FAILOVER_MANAGE', name: 'Manage Failover', module: 'routing' },
+      { id: 'perm_api_keys', code: 'API_KEYS', name: 'Manage API Keys', module: 'api' },
+      { id: 'perm_webhooks', code: 'WEBHOOKS', name: 'Manage Webhooks', module: 'webhook' },
+      { id: 'perm_transactions_read', code: 'TRANSACTIONS_READ', name: 'View Transactions', module: 'transactions' },
+      { id: 'perm_ledger_read', code: 'LEDGER_READ', name: 'View Ledger', module: 'ledger' },
+      { id: 'perm_reconciliation', code: 'RECONCILIATION', name: 'Run Reconciliation', module: 'reconciliation' },
+      { id: 'perm_pricing', code: 'PRICING', name: 'Manage Pricing', module: 'billing' },
+      { id: 'perm_diagnostics', code: 'DIAGNOSTICS', name: 'Run Diagnostics', module: 'diagnostics' },
+      { id: 'perm_incidents', code: 'INCIDENTS', name: 'Manage Incidents', module: 'operations' },
+      { id: 'perm_audit_read', code: 'AUDIT_READ', name: 'View Audit Logs', module: 'security' },
+      { id: 'perm_mfa_manage', code: 'MFA_MANAGE', name: 'Manage MFA', module: 'security' }
+    ];
+    for (const perm of defaultPermissions) {
+      if (!existingPermIds.has(perm.id)) {
+        db.execute(
+          'INSERT INTO permissions (id, code, name, description, module, created_at) VALUES ($1, $2, $3, $4, $5, $6)',
+          [perm.id, perm.code, perm.name, perm.name, perm.module, new Date().toISOString()]
+        );
+      }
+    }
+  } catch {}
+
+  // Seed role-permission mappings (SUPER_ADMIN gets all)
+  try {
+    const rpRows = db.query('SELECT id FROM role_permissions');
+    const existingRP = new Set((rpRows || []).map(r => r.id));
+    const superAdminPerms = defaultPermissions.map(p => p.id);
+    const mappingCounter = (rpRows || []).length;
+    let idx = 0;
+    for (const permId of superAdminPerms) {
+      const mapId = `rp_super_admin_${idx++}`;
+      if (!existingRP.has(mapId)) {
+        db.execute(
+          'INSERT INTO role_permissions (id, role_id, permission_id) VALUES ($1, $2, $3)',
+          [mapId, 'role_super_admin', permId]
+        );
+      }
+    }
+    // MERCHANT_OWNER gets merchant-scoped permissions
+    const merchantOwnerPerms = [
+      'perm_merchant_read', 'perm_bank_manage', 'perm_upi_manage', 'perm_routing_manage',
+      'perm_api_keys', 'perm_webhooks', 'perm_transactions_read', 'perm_ledger_read',
+      'perm_diagnostics', 'perm_audit_read'
+    ];
+    let mIdx = 0;
+    for (const permId of merchantOwnerPerms) {
+      const mapId = `rp_merchant_owner_${mIdx++}`;
+      if (!existingRP.has(mapId)) {
+        db.execute(
+          'INSERT INTO role_permissions (id, role_id, permission_id) VALUES ($1, $2, $3)',
+          [mapId, 'role_merchant_owner', permId]
+        );
+      }
+    }
+  } catch {}
+
+  // Seed default super admin user (password must be changed on first login)
+  try {
+    const existingAdmin = db.queryOne('SELECT id FROM super_admin_users LIMIT 1');
+    if (!existingAdmin) {
+      const adminId = 'admin_00000000000000000000000000000001';
+      const passwordHash = hashPassword('SanbookPayAdmin_ChangeMe!');
+      db.execute(
+        `INSERT INTO super_admin_users (id, email, password_hash, full_name, role, status, mfa_enabled, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+        [adminId, 'superadmin@sanbookpay.com', passwordHash, 'Sanbook Pay Platform Owner', 'SUPER_ADMIN', 'ACTIVE', 0, new Date().toISOString(), new Date().toISOString()]
+      );
+      console.warn('[migrate] Seeded default super admin user: superadmin@sanbookpay.com / SanbookPayAdmin_ChangeMe! (CHANGE ON FIRST LOGIN)');
+    }
+  } catch {}
+
+  // Seed default pricing plans
+  try {
+    const planRows = db.query('SELECT id FROM pricing_plans');
+    const existingPlanIds = new Set((planRows || []).map(r => r.id));
+    const defaultPlans = [
+      { id: 'plan_starter', name: 'Starter', slug: 'starter', monthlyFee: 0, feePercent: 200, feeFixed: 0, apiQuota: 1000, linkLimit: 100 },
+      { id: 'plan_growth', name: 'Growth', slug: 'growth', monthlyFee: 500000, feePercent: 150, feeFixed: 200, apiQuota: 10000, linkLimit: 1000 },
+      { id: 'plan_enterprise', name: 'Enterprise', slug: 'enterprise', monthlyFee: 2000000, feePercent: 100, feeFixed: 100, apiQuota: 100000, linkLimit: 10000 }
+    ];
+    for (const plan of defaultPlans) {
+      if (!existingPlanIds.has(plan.id)) {
+        db.execute(
+          `INSERT INTO pricing_plans (id, name, slug, description, monthly_fee_paise, transaction_fee_percent, transaction_fee_fixed_paise,
+           api_quota_daily, payment_link_limit, allowed_payment_methods, feature_entitlements, is_active, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+          [plan.id, plan.name, plan.slug, `${plan.name} plan for growing merchants`, plan.monthlyFee, plan.feePercent, plan.feeFixed,
+           plan.apiQuota, plan.linkLimit, '["UPI"]', '["dynamic_qr","upi_intent","webhooks","api_access","settlement_reports"]', 1,
+           new Date().toISOString(), new Date().toISOString()]
+        );
+      }
+    }
+  } catch {}
 
   return {
     db,

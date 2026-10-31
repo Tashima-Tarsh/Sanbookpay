@@ -21,4 +21,14 @@ export * from './repositories/reconciliation.repository.js';
 export * from './repositories/operational-alert.repository.js';
 export * from './repositories/idempotency.repository.js';
 export * from './repositories/split-settlement.repository.js';
+export * from './repositories/super-admin.repository.js';
+export * from './repositories/merchant-user.repository.js';
+export * from './repositories/role.repository.js';
+export * from './repositories/routing.repository.js';
+export * from './repositories/wallet.repository.js';
+export * from './repositories/pricing.repository.js';
+export * from './repositories/diagnostic.repository.js';
+export * from './repositories/incident.repository.js';
+export * from './repositories/mfa.repository.js';
+export * from './routing-engine.js';
 
