@@ -262,16 +262,17 @@ export class CashfreeProvider extends PaymentProvider {
    * Registers a beneficiary for outbound payouts.
    */
   async registerBeneficiary(beneficiary) {
+    if(typeof beneficiary.name!=='string'||!beneficiary.name.trim()||!/^[0-9]{10}$/.test(String(beneficiary.phone||'')))throw Error('Actual beneficiary name and phone are required; no default contact is permitted.');
     const isUpi = beneficiary.beneficiaryType === 'UPI_ID' || Boolean(beneficiary.upiId);
     const payload = {
       beneId: beneficiary.id || `bene_${Date.now()}`,
       name: beneficiary.name,
-      email: beneficiary.email || 'beneficiary@sanbookpay.com',
-      phone: beneficiary.phone || '9999999999',
-      address1: 'Corporate Office',
-      city: 'Mumbai',
-      state: 'Maharashtra',
-      pincode: '400001'
+      email: beneficiary.email || undefined,
+      phone: beneficiary.phone,
+      address1: beneficiary.address1 || undefined,
+      city: beneficiary.city || undefined,
+      state: beneficiary.state || undefined,
+      pincode: beneficiary.pincode || undefined
     };
 
     if (isUpi) {
@@ -302,6 +303,7 @@ export class CashfreeProvider extends PaymentProvider {
    */
   async verifyBeneficiary(target) {
     const isUpi = Boolean(target.upiId);
+    if(!isUpi&&!/^[0-9]{10}$/.test(String(target.phone||'')))throw Error('A real beneficiary phone is required for bank verification.');
     let url;
     let method = 'GET';
     let body = undefined;
@@ -309,7 +311,7 @@ export class CashfreeProvider extends PaymentProvider {
     if (isUpi) {
       url = `${this.payoutBaseUrl}/validation/upiDetails?vpa=${encodeURIComponent(target.upiId)}&name=${encodeURIComponent(target.name || '')}`;
     } else {
-      url = `${this.payoutBaseUrl}/validation/bankDetails?name=${encodeURIComponent(target.name || '')}&phone=${encodeURIComponent(target.phone || '9999999999')}&bankAccount=${encodeURIComponent(target.bankAccount)}&ifsc=${encodeURIComponent(target.ifsc)}`;
+      url = `${this.payoutBaseUrl}/validation/bankDetails?name=${encodeURIComponent(target.name || '')}&phone=${encodeURIComponent(target.phone)}&bankAccount=${encodeURIComponent(target.bankAccount)}&ifsc=${encodeURIComponent(target.ifsc)}`;
     }
 
     const res = await this._request(url, { method });
