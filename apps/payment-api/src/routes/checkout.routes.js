@@ -2114,4 +2114,86 @@ export function registerCheckoutRoutes(server, ctx) {
     }
     server.initSse(params.id, res);
   });
+
+  // GET /api/v1/checkout/:id/upi-mirror-status — UPI Mirror observation status for SmartLink
+  server.get('/api/v1/checkout/:id/upi-mirror-status', async (req, res, params) => {
+    const session = ctx.sessionRepo.findById(params.id);
+    if (!session) {
+      HttpServer.json(res, 404, { error: 'Session not found' });
+      return;
+    }
+
+    const merchantId = session.merchantId;
+    const upiMirrorObsRepo = ctx.upiMirrorObservationRepo;
+    const upiConnectionRepo = ctx.upiConnectionRepo;
+
+    if (!upiMirrorObsRepo || !upiConnectionRepo) {
+      HttpServer.json(res, 200, {
+        observationEnabled: false,
+        message: 'UPI Mirror not enabled for this merchant.'
+      });
+      return;
+    }
+
+    // Find observations for this merchant related to this order
+    const observations = upiMirrorObsRepo.findByMerchant(merchantId, 100)
+      .filter(o => o.matchedOrderId === session.orderId || o.referenceUtr === session.metadata?.reportedUtr);
+
+    // Find the receiving account / VPA for this session
+    const snapshot = session.metadata?.receivingAccountSnapshot;
+    let receivingAccount = session.receivingAccountId
+      ? ctx.accountRepo?.findById(session.receivingAccountId)
+      : null;
+    if (!receivingAccount && snapshot?.id) {
+      receivingAccount = ctx.accountRepo?.findById(snapshot.id);
+    }
+    const payeeVpa = receivingAccount?.upiId || snapshot?.upiId || null;
+
+    // Get the latest observation
+    const latestObs = observations.length > 0 ? observations[0] : null;
+
+    // Determine observation state
+    let observationState = 'NONE';
+    let observationMessage = 'No UPI Mirror observation received yet.';
+    let matched = false;
+    let verified = false;
+
+    if (latestObs) {
+      observationState = latestObs.classification;
+      matched = latestObs.classification === 'MATCHED';
+      verified = latestObs.classification === 'VERIFIED';
+      observationMessage = latestObs.isDuplicate
+        ? 'Duplicate observation received.'
+        : `Observation from ${latestObs.source}: ₹${(latestObs.amountPaise / 100).toFixed(2)}`;
+    }
+
+    // Check if UPI Mirror is enabled for this merchant
+    const connections = upiConnectionRepo.findByMerchant(merchantId);
+    const observationEnabled = connections.some(c => c.connectionState === 'OBSERVER_CONNECTED');
+
+    HttpServer.json(res, 200, {
+      paymentId: session.id,
+      orderId: session.orderId,
+      observationEnabled,
+      observationState,
+      matched,
+      verified,
+      observationMessage,
+      latestObservation: latestObs ? {
+        id: latestObs.id,
+        source: latestObs.source,
+        amountPaise: latestObs.amountPaise.toString(),
+        currency: latestObs.currency,
+        referenceUtr: latestObs.referenceUtr,
+        classification: latestObs.classification,
+        deviceObservedTimestamp: latestObs.deviceObservedTimestamp,
+        serverReceivedTimestamp: latestObs.serverReceivedTimestamp,
+        isDuplicate: latestObs.isDuplicate
+      } : null,
+      payeeVpa,
+      upiSseChannel: session.id,
+      checkoutUrl: `/checkout/${session.id}`,
+      timestamp: new Date().toISOString()
+    });
+  });
 }
