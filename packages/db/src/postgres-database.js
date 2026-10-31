@@ -36,7 +36,7 @@ CREATE OR REPLACE FUNCTION json_extract(value text, json_path text) RETURNS text
    if(index<0)throw Error('Circular schema dependencies require an explicit migration');
    const statement=tables.splice(index,1)[0];created.add(tableName(statement));ordered.push(statement);
   }
-  return [...ordered,...other].join(';\n')+';';
+  return ([...ordered,...other].join(';\n')+';').replace(/\bINTEGER\b/g,'BIGINT');
  }
  query(sql,params=[]){
   const pragma=/^\s*PRAGMA table_info\((\w+)\)/i.exec(sql);
