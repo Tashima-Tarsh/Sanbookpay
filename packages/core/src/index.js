@@ -14,5 +14,7 @@ export * from './providers/payment-provider.interface.js';
 export * from './providers/cashfree-provider.js';
 export * from './providers/direct-bank-provider.js';
 export * from './providers/provider-registry.js';
+export { FlashMatchingEngine } from './flash-matching-engine.js';
+export { UpiMirrorService } from './upi-mirror-service.js';
 
 

@@ -69,7 +69,9 @@ import {
   AttributionEngine,
   RecoveryEngine,
   WebhookEngine,
-  PaymentVerificationPipeline
+  PaymentVerificationPipeline,
+  FlashMatchingEngine,
+  UpiMirrorService
 } from '@youpi/core';
 import { HttpServer } from './server.js';
 import { authGuard, isAdminRequest } from './auth-guard.js';
@@ -180,6 +182,35 @@ export function createPaymentApp(customDb = null, options = {}) {
     maxRetries: Number(process.env.WEBHOOK_MAX_RETRIES || 5)
   });
 
+  // UPI Mirror services (Phases 3-4)
+  const flashMatchingEngine = new FlashMatchingEngine({
+    db,
+    sessionRepo,
+    obsRepo,
+    upiMirrorObsRepo: upiMirrorObservationRepository,
+    upiConnectionRepo: upiConnectionRepository,
+    callbackOutboxRepo: callbackOutboxRepository,
+    eventEmitter
+  });
+
+  const upiMirrorService = new UpiMirrorService({
+    db,
+    upiConnectionRepo: upiConnectionRepository,
+    observerDeviceRepo: observerDeviceRepository,
+    pairingChallengeRepo: pairingChallengeRepository,
+    observerSourceConfigRepo: observerSourceConfigRepository,
+    subscriptionEntitlementRepo: subscriptionEntitlementRepository,
+    connectionHealthEventRepo: connectionHealthEventRepository,
+    upiMirrorObservationRepo: upiMirrorObservationRepository,
+    callbackOutboxRepo: callbackOutboxRepository,
+    callbackDeliveryAttemptRepo: callbackDeliveryAttemptRepository,
+    sessionRepo,
+    merchantRepo,
+    auditRepo,
+    flashMatchingEngine,
+    eventEmitter
+  });
+
   // Dynamo Pay production services
   const dynamoQueue = new DynamoPayQueue();
   const dynamoWebhooks = new DynamoPayWebhooks();
@@ -207,6 +238,8 @@ export function createPaymentApp(customDb = null, options = {}) {
   }
 
   const server = new HttpServer();
+  flashMatchingEngine.server = server;
+  upiMirrorService.server = server;
   server.use(authGuard);
   let checkoutBaseUrl = process.env.BASE_CHECKOUT_URL || 'http://localhost:7000';
   try {
@@ -636,7 +669,9 @@ export function createPaymentApp(customDb = null, options = {}) {
     upiMirrorObservationRepo: upiMirrorObservationRepository,
     callbackOutboxRepo: callbackOutboxRepository,
     callbackDeliveryAttemptRepo: callbackDeliveryAttemptRepository,
-    featureFlags: new Map()
+    featureFlags: new Map(),
+    upiMirrorService,
+    flashMatchingEngine
   });
 
 
