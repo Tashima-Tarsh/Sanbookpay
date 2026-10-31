@@ -17,5 +17,7 @@ export * from './providers/provider-registry.js';
 export { FlashMatchingEngine } from './flash-matching-engine.js';
 export { UpiMirrorService } from './upi-mirror-service.js';
 export { ConcurrentWebhookEngine } from './webhook-engine-concurrent.js';
+export { SecurityMiddleware } from './security-middleware.js';
+export { AndroidDiagnostics } from './android-diagnostics.js';
 
 

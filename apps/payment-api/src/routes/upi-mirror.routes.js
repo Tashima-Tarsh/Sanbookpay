@@ -1,5 +1,6 @@
 import { HttpServer } from '../server.js';
 import { generateHmac, generateRandomToken, toPaise, UpiConnectionState, ObserverDevicePairingState, ObservationClassification, UpisourceCategory, PaymentEvidenceState } from '@youpi/common';
+import { SecurityMiddleware } from '@youpi/core';
 
 /**
  * Registers UPI Mirror routes for merchant UPI connection management,
@@ -653,6 +654,12 @@ export function registerUpiMirrorRoutes(server, ctx) {
         return HttpServer.json(res, 400, { error: 'Malformed JSON body.' });
       }
 
+      // Security: input validation
+      const validation = SecurityMiddleware.validateObservationEvent(body);
+      if (validation) {
+        return HttpServer.json(res, validation.statusCode, { error: validation.error });
+      }
+
       // Extract device identity from headers (never trust payload merchantId)
       const deviceId = req.headers['x-device-id'];
       const deviceSignature = req.headers['x-signature'];
@@ -660,6 +667,11 @@ export function registerUpiMirrorRoutes(server, ctx) {
 
       if (!deviceId || !deviceSignature || !deviceTimestamp) {
         return HttpServer.json(res, 401, { error: 'Device authentication headers required.' });
+      }
+
+      // Security: device rate limiting
+      if (!SecurityMiddleware.checkDeviceRateLimit(deviceId)) {
+        return HttpServer.json(res, 429, { error: 'Device rate limit exceeded.' });
       }
 
       // Timestamp plausibility (within 5 minutes)
@@ -703,6 +715,11 @@ export function registerUpiMirrorRoutes(server, ctx) {
       const merchant = ctx.merchantRepo.findById(device.merchantId);
       if (!merchant) {
         return HttpServer.json(res, 401, { error: 'Device merchant not found.' });
+      }
+
+      // Security: merchant rate limiting
+      if (!SecurityMiddleware.checkMerchantRateLimit(merchant.id)) {
+        return HttpServer.json(res, 429, { error: 'Merchant rate limit exceeded.' });
       }
 
       // Validate event payload
@@ -850,6 +867,56 @@ export function registerUpiMirrorRoutes(server, ctx) {
       });
     } catch (err) {
       console.error('[UPI Mirror] List observations error:', err);
+      return HttpServer.json(res, 500, { error: 'Internal Server Error' });
+    }
+  });
+
+  // GET /api/v1/upi-mirror/devices/:id/diagnostics — Run device diagnostics
+  server.get(`${base}/devices/:id/diagnostics`, async (req, res, params) => {
+    try {
+      const merchant = resolveMerchant(req);
+      if (!merchant) {
+        return HttpServer.json(res, 401, { error: 'Merchant authentication required.' });
+      }
+
+      const device = ctx.observerDeviceRepo.findById(params.id);
+      if (!device || device.merchantId !== merchant.id) {
+        return HttpServer.json(res, 404, { error: 'Observer device not found.' });
+      }
+
+      const diagnostics = {
+        deviceId: device.id,
+        deviceName: device.deviceName,
+        pairingState: device.pairingState,
+        listenerStatus: device.listenerStatus,
+        notificationPermission: device.notificationPermission,
+        lastHeartbeatAt: device.lastHeartbeatAt,
+        lastEventAt: device.lastEventAt,
+        avgForwardingLatencyMs: device.avgForwardingLatencyMs,
+        isActive: device.isActive,
+        linkedConnections: ctx.upiConnectionRepo.findByObserverDevice(device.id).map(c => ({
+          id: c.id,
+          vpa: c.vpa,
+          connectionState: c.connectionState,
+          healthStatus: c.healthStatus
+        })),
+        healthChecks: {
+          pairing: device.pairingState === 'PAIRED' ? 'PASS' : 'FAIL',
+          listener: device.listenerStatus === 'ACTIVE' ? 'PASS' : 'WARN',
+          permission: device.notificationPermission ? 'PASS' : 'FAIL',
+          heartbeat: device.lastHeartbeatAt
+            ? (Date.now() - new Date(device.lastHeartbeatAt).getTime() < 300000 ? 'PASS' : 'WARN')
+            : 'FAIL',
+          forwarding: device.lastEventAt
+            ? (Date.now() - new Date(device.lastEventAt).getTime() < 600000 ? 'PASS' : 'INFO')
+            : 'INFO'
+        },
+        timestamp: new Date().toISOString()
+      };
+
+      return HttpServer.json(res, 200, diagnostics);
+    } catch (err) {
+      console.error('[UPI Mirror] Device diagnostics error:', err);
       return HttpServer.json(res, 500, { error: 'Internal Server Error' });
     }
   });
