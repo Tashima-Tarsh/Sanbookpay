@@ -11,3 +11,7 @@ Open dashboard selects a merchant without impersonating that owner. Configuratio
 Sensitive operations require a CSRF-bound session, permission and confirmed TOTP MFA. Recovery codes are shown once, stored as hashes, consumed once, and revoke prior sessions. No account passwords or provider secrets are returned in directory APIs.
 
 See ../audit/ATTACHED_REQUIREMENTS_MATRIX.md for actual scope, test evidence and remaining acceptance gates.
+
+## Private invitation handover when email is unavailable
+
+If email delivery is not configured, Add merchant shows the MFA-authenticated platform owner a one-time invitation link. Copy and share it privately with that merchant owner, preferably using a separate browser profile for testing. The link expires in 24 hours, is consumed once, and is removed from the dialog when closed. It contains no password. Opening it allows the owner to choose their own password. Email/mobile verification and provider activation are still pending; a manually handed-over link does not mark email verified. Access & details can reissue a link only for an owner who has not activated yet.

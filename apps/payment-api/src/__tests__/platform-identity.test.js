@@ -73,7 +73,7 @@ test('platform owner creates an isolated merchant login with MFA, CSRF and atomi
   const crypto=await import('node:crypto');const {encryptAtRest}=await import('@youpi/common');
   process.env.ENCRYPTION_MASTER_KEY ||= crypto.randomBytes(32).toString('hex');
   const db=new Database({inMemory:true}),{runMigrations}=await import('../../../../packages/db/src/migrate.js');runMigrations(db);
-  const delivered=[];const server=new HttpServer(),identity=registerPlatformIdentity(server,{db,merchantRepo:new MerchantRepository(db),platformDelivery:async message=>delivered.push(message)});server.use(identity.guard);
+  const delivered=[],deliveryContext={db,merchantRepo:new MerchantRepository(db),platformDelivery:async message=>delivered.push(message)};const server=new HttpServer(),identity=registerPlatformIdentity(server,deliveryContext);server.use(identity.guard);
   const stamp=new Date().toISOString(),raw=crypto.randomBytes(32).toString('hex');
   db.execute('INSERT INTO pp_users(id,email,password_hash,role,mfa_secret,created_at) VALUES(?,?,?,?,?,?)',['platform-owner','platform@example.test',hashPlatformPassword('owner-safe-password'),'SUPER_ADMIN',encryptAtRest('JBSWY3DPEHPK3PXP'),stamp]);
   db.execute('INSERT INTO pp_sessions(id,user_id,token_hash,csrf_token,mfa_verified,expires_at,created_at) VALUES(?,?,?,?,?,?,?)',['platform-session','platform-owner',crypto.createHash('sha256').update(raw).digest('hex'),'owner-csrf',0,new Date(Date.now()+60000).toISOString(),stamp]);
@@ -106,6 +106,13 @@ test('platform owner creates an isolated merchant login with MFA, CSRF and atomi
     assert.equal((await call('/owner-invitations/accept',{token:invitation.token,password:'invited-owner-safe-password'},'')).status,200);
     assert.equal((await call('/owner-invitations/accept',{token:invitation.token,password:'invited-owner-safe-password'},'')).status,400);
     assert.equal((await call('/login',{email:invitationBody.email,password:'invited-owner-safe-password'},'')).status,200);
+    delete deliveryContext.platformDelivery;const previousDelivery=process.env.PLATFORM_VERIFICATION_URL;delete process.env.PLATFORM_VERIFICATION_URL;
+    try{const handover=await call('/merchants',{...invitationBody,email:'manual-handover@example.test'});assert.equal(handover.status,201);assert.equal(handover.headers.get('cache-control'),'no-store');const issued=await handover.json();assert.equal(issued.invitationSent,false);assert.ok(issued.invitationPath.startsWith('/platform#owner-invitation/'));
+      const oneTimeToken=issued.invitationPath.split('/').at(-1);assert.ok(!JSON.stringify(db.query('SELECT token_hash FROM pp_tokens')).includes(oneTimeToken));
+      assert.equal((await call('/owner-invitations/accept',{token:oneTimeToken,password:'manual-owner-safe-password'},'')).status,200);assert.equal(db.queryOne('SELECT email_verified FROM pp_users WHERE email=?',['manual-handover@example.test']).email_verified,0);
+      assert.equal(db.queryOne('SELECT status FROM pp_merchants WHERE merchant_id=?',[issued.merchantId]).status,'EMAIL_PENDING');
+    }finally{if(previousDelivery!==undefined)process.env.PLATFORM_VERIFICATION_URL=previousDelivery;}
+
   }finally{await new Promise(r=>http.close(r));db.close();}
 });
 

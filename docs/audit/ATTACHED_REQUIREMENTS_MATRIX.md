@@ -71,3 +71,7 @@ The owner explicitly authorized an **interim deployment on the existing Render F
 - `docs/deployment/REPAIR_MIGRATION_AND_ROLLBACK.md`: additive schema, legacy API migration, preserved credentials and security-sensitive rollback limits.
 
 Production readiness requires approved Cashfree credentials/product and merchant model, configured verification/invitation delivery, always-on durable hosting, private backup/restore acceptance, real PostgreSQL/distributed failure tests, fresh browser/device testing and resolution of the explicitly NOT_IMPLEMENTED requirements. No credentials, bank references, KYC approval, live provider receipts or performance results are invented.
+
+### Customer-testing onboarding without email service
+
+An MFA-authenticated platform owner can hand over a one-time owner-setup link when email delivery is unavailable. Only the creation/reissue response exposes it, with no-store headers; directory APIs do not return it and only its hash is persisted. It expires after 24 hours and is consumed once. Manual handover activates password login but does not falsely verify email or activate payments. Actual automated delivery remains an external configuration gate.
