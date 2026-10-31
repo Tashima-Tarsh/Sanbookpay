@@ -1,5 +1,21 @@
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
+import crypto from 'node:crypto';
+import os from 'node:os';
+import path from 'node:path';
+
+// A clean checkout must run without a live .env or production database.
+const testEnv = {
+  NODE_ENV: 'test',
+  YOUPI_MODE: 'localhost',
+  ENCRYPTION_MASTER_KEY: crypto.randomBytes(32).toString('hex'),
+  JWT_SECRET: crypto.randomBytes(32).toString('hex'),
+  INITIAL_ADMIN_EMAIL: 'admin@example.test',
+  INITIAL_ADMIN_PASSWORD: crypto.randomBytes(24).toString('hex'),
+  BASE_CHECKOUT_URL: 'http://localhost:7000',
+  BASE_PAYMENT_API_URL: 'http://localhost:6100',
+  SQLITE_DB_PATH: path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'dynamo-tests-')), 'tests.sqlite')
+};
 
 const testFiles = [
   'packages/common/src/__tests__/common.test.js',
@@ -63,8 +79,7 @@ for (let i = 0; i < testFiles.length; i++) {
     stdio: 'pipe',
     env: {
       ...process.env,
-      YOUPI_MODE: 'localhost',
-      NODE_ENV: 'test'
+      ...testEnv
     },
     encoding: 'utf8'
   });
