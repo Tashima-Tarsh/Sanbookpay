@@ -1,6 +1,7 @@
 package com.dynamopay.bridge
 
 import android.app.Application
+import android.content.SharedPreferences
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKeys
 
@@ -29,3 +30,4 @@ class BridgeApp : Application() {
         healthMonitor = HealthMonitor(applicationContext, cryptoHelper, securePrefs, eventForwarder)
     }
 }
+

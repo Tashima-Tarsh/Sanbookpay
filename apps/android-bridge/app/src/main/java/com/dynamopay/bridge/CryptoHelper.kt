@@ -1,6 +1,7 @@
 package com.dynamopay.bridge
 
 import android.content.Context
+import android.content.SharedPreferences
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import java.security.KeyPairGenerator
@@ -171,3 +172,4 @@ class CryptoHelper(
         return sb.toString()
     }
 }
+

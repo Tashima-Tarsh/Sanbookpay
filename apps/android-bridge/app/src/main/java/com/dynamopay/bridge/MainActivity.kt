@@ -2,6 +2,7 @@ package com.dynamopay.bridge
 
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Handler
@@ -73,7 +74,7 @@ class MainActivity : AppCompatActivity() {
         btnPermission = Button(this).apply {
             text = "Grant Notification Access"
             setOnClickListener {
-                startActivity(android.content.Intent(
+                startActivity(Intent(
                     android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS
                 ))
             }
@@ -83,7 +84,7 @@ class MainActivity : AppCompatActivity() {
         btnPair = Button(this).apply {
             text = "Scan Pairing QR"
             setOnClickListener {
-                val intent = android.content.Intent(this@MainActivity, QrPairingActivity::class.java)
+                val intent = Intent(this@MainActivity, QrPairingActivity::class.java)
                 startActivity(intent)
             }
         }
@@ -92,7 +93,7 @@ class MainActivity : AppCompatActivity() {
         btnSettings = Button(this).apply {
             text = "Device Settings"
             setOnClickListener {
-                val intent = android.content.Intent(this@MainActivity, DeviceSettingsActivity::class.java)
+                val intent = Intent(this@MainActivity, DeviceSettingsActivity::class.java)
                 startActivity(intent)
             }
         }
@@ -126,7 +127,6 @@ class MainActivity : AppCompatActivity() {
         setContentView(layout)
         updateStatus()
 
-        // Start periodic forwarding if paired
         if (apiClient.isPaired()) {
             startPeriodicForwarding()
         }
@@ -174,7 +174,6 @@ class MainActivity : AppCompatActivity() {
         val deviceId = apiClient.getDeviceId() ?: return
         val signingKey = cryptoHelper.getHmacSecret() ?: return
 
-        // Forward every 5 seconds
         val handler = Handler(Looper.getMainLooper())
         handler.post(object : Runnable {
             override fun run() {
@@ -225,11 +224,11 @@ class MainActivity : AppCompatActivity() {
             logBuilder.append("---\n")
         }
 
-        val intent = android.content.Intent().apply {
-            action = android.content.Intent.ACTION_SEND
+        val intent = Intent().apply {
+            action = Intent.ACTION_SEND
             type = "text/plain"
-            putExtra(android.content.Intent.EXTRA_SUBJECT, "Dynamo Bridge Log Export")
-            putExtra(android.content.Intent.EXTRA_TEXT, logBuilder.toString())
+            putExtra(Intent.EXTRA_SUBJECT, "Dynamo Bridge Log Export")
+            putExtra(Intent.EXTRA_TEXT, logBuilder.toString())
         }
         startActivity(Intent.createChooser(intent, "Export Logs"))
     }
@@ -245,3 +244,4 @@ class MainActivity : AppCompatActivity() {
         )
     }
 }
+

@@ -1,6 +1,7 @@
 package com.dynamopay.bridge
 
 import android.content.Context
+import android.content.SharedPreferences
 import android.os.Handler
 import android.os.Looper
 
@@ -28,8 +29,6 @@ class HealthMonitor(
     private var isRunning = false
 
     fun reportHealth() {
-        // Report health asynchronously - the actual backend call happens via EventForwarder
-        // This is a placeholder for future health check integration
         val eventsQueued = (context as? BridgeApp)?.eventQueue?.getQueueSize() ?: 0
         val failures = eventForwarder.getConsecutiveFailures()
 
@@ -54,3 +53,4 @@ class HealthMonitor(
         handler.removeCallbacksAndMessages(null)
     }
 }
+
