@@ -57,17 +57,17 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Start Payment API (SQLite) and wait for health
+      - name: Start Payment API (in-process) and wait for health
         run: |
           mkdir -p output/testing
           export NODE_ENV=test
           export SQLITE_DB_PATH="$RUNNER_TEMP/loadtest.sqlite"
           export ENCRYPTION_MASTER_KEY=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
           export JWT_SECRET=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
-          npm run start:prod:api > output/testing/api.log 2>&1 &
+          node scripts/serve-for-load.js > output/testing/api.log 2>&1 &
           API_PID=$!
           READY=0
-          for i in $(seq 1 30); do
+          for i in $(seq 1 45); do
             if curl -sf http://localhost:6100/health > /dev/null 2>&1; then
               READY=1
               echo "API ready after $i attempts"
@@ -82,6 +82,13 @@ jobs:
             exit 1
           fi
           echo "API_PID=$API_PID"
+
+      - name: Upload API startup log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-startup-log
+          path: output/testing/api.log
 
       - name: Install k6
         run: |
