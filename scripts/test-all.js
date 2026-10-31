@@ -115,4 +115,6 @@ const totalDuration = ((Date.now() - startTotal) / 1000).toFixed(2);
 console.log('\n============================================================');
 console.log(`🎉 ALL ${passedCount} TEST SUITES PASSED CLEANLY (Total: ${totalDuration}s)`);
 console.log('============================================================');
-process.exit(0);
+// Force terminate: some test files leave open HTTP server handles
+// that prevent Node.js from exiting naturally.
+setImmediate(() => process.exit(0));
