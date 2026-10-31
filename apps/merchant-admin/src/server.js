@@ -80,6 +80,7 @@ export class AdminServer {
     const clientApiBase = '';
     html = html.replaceAll('{{API_BASE_URL}}', clientApiBase);
     let tunnelUrl='';try{const candidate=fs.readFileSync(path.resolve(__dirname,'../../../data/.secrets/quick_tunnel_url'),'utf8').trim();if(/^https:\/\/[a-z0-9-]+\.trycloudflare\.com$/.test(candidate))tunnelUrl=candidate;}catch{}
+    if(process.env.DYNAMO_PUBLIC_URL){try{const configured=new URL(process.env.DYNAMO_PUBLIC_URL);if(configured.protocol==='https:')tunnelUrl=configured.origin;}catch{}}
     html=html.replaceAll('{{PUBLIC_GATEWAY_URL}}',tunnelUrl);
     return html;
   }
@@ -110,7 +111,8 @@ export class AdminServer {
         const developerGuide=pathname === '/downloads/developer-guide.pdf';
         const file=privateDocument?this.privateCredentialsPath:path.join(__dirname,'../public',developerGuide?'dynamo-developer-quick-guide.pdf':'dynamo-pay-manual.pdf');
         try {
-          const data=await fs.promises.readFile(file);
+          const data=privateDocument&&this.db.dialect==='postgres'?this.db.queryOne("SELECT contents FROM hosted_files WHERE path='.secrets/Dynamo-Pay-Private-Credentials.pdf'")?.contents:await fs.promises.readFile(file);
+          if(!data)return reply(404,{error:'This document is unavailable. Contact your account administrator.'});
           res.writeHead(200,{'Content-Type':'application/pdf','Content-Disposition':`attachment; filename="${privateDocument?'Dynamo-Pay-Private-Credentials.pdf':developerGuide?'Dynamo-Pay-Developer-Quick-Guide.pdf':'Dynamo-Pay-User-Manual.pdf'}"`,'Cache-Control':'no-store','Pragma':'no-cache',...BASE_SECURITY_HEADERS});res.end(data);
         }catch(error){reply(error.code==='ENOENT'?404:503,{error:'This document is unavailable. Contact your account administrator.'});}
         return;

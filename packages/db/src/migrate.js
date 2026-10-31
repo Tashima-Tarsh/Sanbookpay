@@ -64,7 +64,7 @@ export function runMigrations(targetDb) {
   try { db.exec("ALTER TABLE payment_sessions ADD COLUMN verification_tag TEXT DEFAULT 'UNVERIFIED';"); } catch {}
 
   // Execute schema DDL
-  db.exec(schemaSql);
+  db.exec(db.dialect==='postgres'?db.prepareSchema(schemaSql):schemaSql);
 
   // Alter table columns if migrating existing databases
   try { db.exec("ALTER TABLE payment_sessions ADD COLUMN verification_level INTEGER DEFAULT 0;"); } catch {}

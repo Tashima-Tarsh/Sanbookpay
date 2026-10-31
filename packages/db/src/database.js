@@ -3,6 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
 import { runMigrations } from './migrate.js';
+import { PostgresDatabase } from './postgres-database.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -33,6 +34,11 @@ export class Database {
    * @param {{ dbPath?: string, inMemory?: boolean, autoMigrate?: boolean }} [options={}]
    */
   constructor(options = {}) {
+    if(process.env.DATABASE_URL&&!options.inMemory&&!options.dbPath){
+      const postgres=new PostgresDatabase(process.env.DATABASE_URL);
+      if(options.autoMigrate!==false)ensureDatabaseInitialized(postgres);
+      return postgres;
+    }
     if (options.inMemory) {
       this.db = new DatabaseSync(':memory:');
     } else {

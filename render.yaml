@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: dynamo-pay
+    runtime: node
+    repo: https://github.com/Tashima-Tarsh/Sanbookpay
+    branch: main
+    plan: free
+    region: singapore
+    buildCommand: npm ci && npm run typecheck && npm run build
+    startCommand: npm run start:hosted
+    healthCheckPath: /_ready
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: NODE_VERSION
+        value: 22.23.4
+      - key: NODE_ENV
+        value: production
+      - key: SQLITE_DB_PATH
+        value: /opt/render/project/src/data/youpi_pg.sqlite
+      - key: DATABASE_URL
+        sync: false
+      - key: INITIAL_ADMIN_EMAIL
+        sync: false
+      - key: INITIAL_ADMIN_PASSWORD
+        sync: false
+      - key: ENCRYPTION_MASTER_KEY
+        sync: false
+      - key: JWT_SECRET
+        sync: false
