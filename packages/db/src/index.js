@@ -30,5 +30,15 @@ export * from './repositories/pricing.repository.js';
 export * from './repositories/diagnostic.repository.js';
 export * from './repositories/incident.repository.js';
 export * from './repositories/mfa.repository.js';
+export * from './repositories/merchant-upi-connection.repository.js';
+export * from './repositories/merchant-observer-device.repository.js';
+export * from './repositories/device-pairing-challenge.repository.js';
+export * from './repositories/observer-source-config.repository.js';
+export * from './repositories/subscription-entitlement.repository.js';
+export * from './repositories/connection-health-event.repository.js';
+export * from './repositories/admin-audit-event.repository.js';
+export * from './repositories/callback-outbox.repository.js';
+export * from './repositories/callback-delivery-attempt.repository.js';
+export * from './repositories/upi-mirror-observation.repository.js';
 export * from './routing-engine.js';
 

@@ -94,6 +94,10 @@ export class HttpServer {
     this.register('DELETE', pattern, handler);
   }
 
+  patch(pattern, handler) {
+    this.register('PATCH', pattern, handler);
+  }
+
   /**
    * Rate limit check for an IP address. Returns { allowed, remaining, resetAt }.
    */

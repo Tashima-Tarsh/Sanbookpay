@@ -1,0 +1,44 @@
+{
+  "testedAt": "2026-10-31T11:51:32.672Z",
+  "scope": "isolated in-memory auth routes; dependency stubs for payment-link policy checks",
+  "results": [
+    {
+      "probe": "unsigned provider callback without amount or payment reference",
+      "status": 200,
+      "storedStatus": "SUCCESS",
+      "ledgerEntries": 0
+    },
+    {
+      "probe": "unauthenticated wallet credit without payment ID",
+      "status": 200,
+      "balance": 5000
+    },
+    {
+      "probe": "fixed default password on clean database",
+      "status": 200,
+      "sessionIssued": true
+    },
+    {
+      "probe": "MFA enrollment",
+      "status": 500
+    },
+    {
+      "probe": "existing token after administrator suspended",
+      "status": 200
+    },
+    {
+      "probe": "expired sandbox read-only key amount 12junk",
+      "status": 201,
+      "amountPaise": 1200,
+      "paymentStatus": "QUEUED",
+      "payableIntentReturned": true
+    },
+    {
+      "probe": "expired sandbox read-only key amount 12",
+      "status": 201,
+      "amountPaise": 1200,
+      "paymentStatus": "QUEUED",
+      "payableIntentReturned": true
+    }
+  ]
+}

@@ -93,3 +93,96 @@ export const AuditActorType = Object.freeze({
   ADMIN: 'ADMIN',
   OBSERVER: 'OBSERVER'
 });
+
+/**
+ * DYNAMO PAY UNIVERSAL UPI MIRROR — UPI connection lifecycle states.
+ * A single CONNECTED badge must never imply authoritative bank verification.
+ */
+export const UpiConnectionState = Object.freeze({
+  REGISTERED: 'REGISTERED',
+  OWNERSHIP_PENDING: 'OWNERSHIP_PENDING',
+  OBSERVER_PAIRING_REQUIRED: 'OBSERVER_PAIRING_REQUIRED',
+  OBSERVER_CONNECTED: 'OBSERVER_CONNECTED',
+  OBSERVATION_TESTED: 'OBSERVATION_TESTED',
+  AUTHORITATIVE_VERIFIED: 'AUTHORITATIVE_VERIFIED',
+  DEGRADED: 'DEGRADED',
+  OFFLINE: 'OFFLINE',
+  SUSPENDED: 'SUSPENDED',
+  REVOKED: 'REVOKED'
+});
+
+/**
+ * Merchant observer device pairing states.
+ */
+export const ObserverDevicePairingState = Object.freeze({
+  PAIRING_REQUIRED: 'PAIRING_REQUIRED',
+  PAIRING_PENDING: 'PAIRING_PENDING',
+  PAIRED: 'PAIRED',
+  REVOKED: 'REVOKED'
+});
+
+/**
+ * UPI Mirror observation classification states.
+ */
+export const ObservationClassification = Object.freeze({
+  PENDING: 'PENDING',
+  OBSERVED: 'OBSERVED',
+  MATCHED: 'MATCHED',
+  VERIFIED: 'VERIFIED',
+  FAILED: 'FAILED',
+  EXPIRED: 'EXPIRED',
+  UNKNOWN: 'UNKNOWN',
+  REVERSED: 'REVERSED',
+  DISPUTED: 'DISPUTED'
+});
+
+/**
+ * UPI Mirror observation event directions.
+ */
+export const ObservationDirection = Object.freeze({
+  INBOUND: 'INBOUND',
+  OUTBOUND: 'OUTBOUND'
+});
+
+/**
+ * UPI source categories for observer allowlisting.
+ */
+export const UpisourceCategory = Object.freeze({
+  GOOGLE_PAY: 'GOOGLE_PAY',
+  PHONEPE: 'PHONEPE',
+  PAYTM: 'PAYTM',
+  BHIM: 'BHIM',
+  BANK_UPI: 'BANK_UPI',
+  OTHER: 'OTHER'
+});
+
+/**
+ * Payment evidence state machine (DYNAMO FLASH).
+ * OBSERVED/MATCHED are notification evidence, NOT bank-confirmed success.
+ * VERIFIED requires an authenticated authoritative bank/PSP record.
+ */
+export const PaymentEvidenceState = Object.freeze({
+  CREATED: 'CREATED',
+  PENDING: 'PENDING',
+  OBSERVED: 'OBSERVED',
+  MATCHED: 'MATCHED',
+  VERIFIED: 'VERIFIED',
+  FAILED: 'FAILED',
+  EXPIRED: 'EXPIRED',
+  UNKNOWN: 'UNKNOWN',
+  REVERSED: 'REVERSED',
+  DISPUTED: 'DISPUTED'
+});
+
+/**
+ * Webhook event types for UPI Mirror callbacks.
+ */
+export const UpiMirrorWebhookEvent = Object.freeze({
+  PAYMENT_CREATED: 'payment.created',
+  PAYMENT_OBSERVED: 'payment.observed',
+  PAYMENT_MATCHED: 'payment.matched',
+  PAYMENT_VERIFIED: 'payment.verified',
+  PAYMENT_FAILED: 'payment.failed',
+  PAYMENT_EXCEPTION: 'payment.exception',
+  PAYMENT_REVERSED: 'payment.reversed'
+});

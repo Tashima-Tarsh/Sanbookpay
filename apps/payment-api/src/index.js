@@ -51,7 +51,17 @@ import {
   RoutingRepository,
   WalletRepository,
   PricingRepository,
-  DiagnosticRepository
+  DiagnosticRepository,
+  MerchantUpiConnectionRepository,
+  MerchantObserverDeviceRepository,
+  DevicePairingChallengeRepository,
+  ObserverSourceConfigRepository,
+  SubscriptionEntitlementRepository,
+  ConnectionHealthEventRepository,
+  AdminAuditEventRepository,
+  CallbackOutboxRepository,
+  CallbackDeliveryAttemptRepository,
+  UpiMirrorObservationRepository
 } from '@youpi/db';
 import {
   QueueEngine,
@@ -79,6 +89,7 @@ import { registerSplitSettlementRoutes } from './routes/split-settlement.routes.
 import { registerOperationsRoutes } from './routes/operations.routes.js';
 import { registerDynamoPayRoutes } from './routes/dynamopay.routes.js';
 import { registerSuperAdminRoutes } from './routes/super-admin.routes.js';
+import { registerUpiMirrorRoutes } from './routes/upi-mirror.routes.js';
 import { registerPaymentLinkRoutes } from './routes/payment-link.routes.js';
 import { registerCallbackWalletRoutes } from './routes/callback-wallet.routes.js';
 import { getWhatsAppBerryService, WhatsAppBerryService } from './services/whatsapp-berry.service.js';
@@ -103,6 +114,16 @@ export function createPaymentApp(customDb = null, options = {}) {
   const customerSessionRepo = new CustomerSessionRepository(db, customerRepo);
   const sessionRepo = new PaymentSessionRepository(db);
   const obsRepo = new ObservationRepository(db);
+  const upiConnectionRepository = new MerchantUpiConnectionRepository(db);
+  const observerDeviceRepository = new MerchantObserverDeviceRepository(db);
+  const pairingChallengeRepository = new DevicePairingChallengeRepository(db);
+  const observerSourceConfigRepository = new ObserverSourceConfigRepository(db);
+  const subscriptionEntitlementRepository = new SubscriptionEntitlementRepository(db);
+  const connectionHealthEventRepository = new ConnectionHealthEventRepository(db);
+  const adminAuditEventRepository = new AdminAuditEventRepository(db);
+  const callbackOutboxRepository = new CallbackOutboxRepository(db);
+  const callbackDeliveryAttemptRepository = new CallbackDeliveryAttemptRepository(db);
+  const upiMirrorObservationRepository = new UpiMirrorObservationRepository(db);
   const ticketRepo = new SupportTicketRepository(db);
   const auditRepo = new AuditLogRepository(db);
   const deviceRepo = new DeviceRepository(db);
@@ -541,7 +562,17 @@ export function createPaymentApp(customDb = null, options = {}) {
     routingRepo: new RoutingRepository(db),
     walletRepo,
     pricingRepo,
-    diagnosticRepo
+    diagnosticRepo,
+    upiConnectionRepo: upiConnectionRepository,
+    observerDeviceRepo: observerDeviceRepository,
+    pairingChallengeRepo: pairingChallengeRepository,
+    observerSourceConfigRepo: observerSourceConfigRepository,
+    subscriptionEntitlementRepo: subscriptionEntitlementRepository,
+    connectionHealthEventRepo: connectionHealthEventRepository,
+    adminAuditEventRepo: adminAuditEventRepository,
+    callbackOutboxRepo: callbackOutboxRepository,
+    callbackDeliveryAttemptRepo: callbackDeliveryAttemptRepository,
+    upiMirrorObservationRepo: upiMirrorObservationRepository
   };
 
   // Smart Routing Engine (created after context is available)
@@ -592,6 +623,21 @@ export function createPaymentApp(customDb = null, options = {}) {
 
   // Callback, Wallet, Diagnostics, Pricing routes
   registerCallbackWalletRoutes(server, context);
+
+  // UPI Mirror routes (Phase 1-3)
+  registerUpiMirrorRoutes(server, {
+    ...context,
+    upiConnectionRepo: upiConnectionRepository,
+    observerDeviceRepo: observerDeviceRepository,
+    pairingChallengeRepo: pairingChallengeRepository,
+    observerSourceConfigRepo: observerSourceConfigRepository,
+    subscriptionEntitlementRepo: subscriptionEntitlementRepository,
+    connectionHealthEventRepo: connectionHealthEventRepository,
+    upiMirrorObservationRepo: upiMirrorObservationRepository,
+    callbackOutboxRepo: callbackOutboxRepository,
+    callbackDeliveryAttemptRepo: callbackDeliveryAttemptRepository,
+    featureFlags: new Map()
+  });
 
 
 

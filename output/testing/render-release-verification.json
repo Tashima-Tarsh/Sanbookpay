@@ -1,0 +1,81 @@
+﻿{
+    "verifiedAt":  "2026-10-31T12:59:16.1206788Z",
+    "commit":  "159ee248444c1d9dbb28743092817432ef9bee02",
+    "deployId":  "dep-dbiubd7lk1mc73fomo0g",
+    "status":  "live",
+    "plan":  "free",
+    "ci":  "success",
+    "checks":  [
+                   {
+                       "path":  "/_ready",
+                       "status":  200,
+                       "location":  "",
+                       "title":  "",
+                       "customerFieldsRemoved":  null,
+                       "ownerEntryPresent":  null
+                   },
+                   {
+                       "path":  "/health",
+                       "status":  200,
+                       "location":  "",
+                       "title":  "",
+                       "customerFieldsRemoved":  null,
+                       "ownerEntryPresent":  null
+                   },
+                   {
+                       "path":  "/admin",
+                       "status":  200,
+                       "location":  "",
+                       "title":  "Dynamo Pay — Merchant Console",
+                       "customerFieldsRemoved":  true,
+                       "ownerEntryPresent":  true
+                   },
+                   {
+                       "path":  "/platform",
+                       "status":  200,
+                       "location":  "",
+                       "title":  "Dynamo Pay · Platform",
+                       "customerFieldsRemoved":  null,
+                       "ownerEntryPresent":  null
+                   },
+                   {
+                       "path":  "/super-admin/login",
+                       "status":  302,
+                       "location":  "/platform",
+                       "title":  "",
+                       "customerFieldsRemoved":  null,
+                       "ownerEntryPresent":  null
+                   },
+                   {
+                       "path":  "/developers",
+                       "status":  200,
+                       "location":  "",
+                       "title":  "Dynamo Pay | Developer API",
+                       "customerFieldsRemoved":  null,
+                       "ownerEntryPresent":  null
+                   },
+                   {
+                       "path":  "/api/v1/payment-links/amount-only",
+                       "status":  401,
+                       "check":  "unauthenticated or empty-payload rejection; no payment record created"
+                   },
+                   {
+                       "path":  "/api/v1/callbacks/wallets/credit",
+                       "status":  401,
+                       "check":  "unauthenticated or empty-payload rejection; no payment record created"
+                   },
+                   {
+                       "path":  "/api/v1/callbacks/providers/cashfree",
+                       "status":  400,
+                       "check":  "unauthenticated or empty-payload rejection; no payment record created"
+                   }
+               ],
+    "publicManualMatchesLocal":  true,
+    "manualSha256":  "42044D0A0D1C010B96AC0E9DFC2454E954FAA82235010EF2A7995683B8606A68",
+    "runtimeLogReview":  {
+                             "checkedAt":  "2026-10-31T12:59:54.7475718Z",
+                             "logCount":  55,
+                             "fatalPatternMatches":  0,
+                             "hasMore":  false
+                         }
+}
