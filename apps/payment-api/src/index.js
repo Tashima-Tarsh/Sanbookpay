@@ -48,7 +48,10 @@ import {
   RoleRepository,
   MfaRepository,
   SmartRoutingEngine,
-  RoutingRepository
+  RoutingRepository,
+  WalletRepository,
+  PricingRepository,
+  DiagnosticRepository
 } from '@youpi/db';
 import {
   QueueEngine,
@@ -77,6 +80,7 @@ import { registerOperationsRoutes } from './routes/operations.routes.js';
 import { registerDynamoPayRoutes } from './routes/dynamopay.routes.js';
 import { registerSuperAdminRoutes, superAdminGuard } from './routes/super-admin.routes.js';
 import { registerPaymentLinkRoutes } from './routes/payment-link.routes.js';
+import { registerCallbackWalletRoutes } from './routes/callback-wallet.routes.js';
 import { getWhatsAppBerryService, WhatsAppBerryService } from './services/whatsapp-berry.service.js';
 import { ReceiptNotificationService } from './services/receipt-notification.service.js';
 
@@ -108,6 +112,9 @@ export function createPaymentApp(customDb = null, options = {}) {
   const merchantUserRepo = new MerchantUserRepository(db);
   const roleRepo = new RoleRepository(db);
   const mfaRepo = new MfaRepository(db);
+  const walletRepo = new WalletRepository(db);
+  const pricingRepo = new PricingRepository(db);
+  const diagnosticRepo = new DiagnosticRepository(db);
 
   const eventEmitter = new EventEmitter();
 
@@ -530,7 +537,10 @@ export function createPaymentApp(customDb = null, options = {}) {
     merchantUserRepo,
     roleRepo,
     mfaRepo,
-    routingRepo: new RoutingRepository(db)
+    routingRepo: new RoutingRepository(db),
+    walletRepo,
+    pricingRepo,
+    diagnosticRepo
   };
 
   // Smart Routing Engine (created after context is available)
@@ -578,6 +588,9 @@ export function createPaymentApp(customDb = null, options = {}) {
 
   // Payment Links & Failover routes
   registerPaymentLinkRoutes(server, context);
+
+  // Callback, Wallet, Diagnostics, Pricing routes
+  registerCallbackWalletRoutes(server, context);
 
   // Expose context for super admin guard access
   global.__sanbook_ctx = { superAdminRepo };
