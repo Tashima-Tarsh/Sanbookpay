@@ -41,7 +41,7 @@ jobs:
   load-test:
     name: k6 Load Test (UPI Mirror)
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     needs: security-scan
 
     services:
@@ -82,31 +82,30 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run database migrations
+      - name: Start Payment API and wait for health
         run: |
-          DATABASE_URL=postgresql://dynamopay:dynamopay@localhost:5432/dynamopay \
-          node scripts/init-db.cjs || true
-          DATABASE_URL=postgresql://dynamopay:dynamopay@localhost:5432/dynamopay \
-          node packages/db/src/migrate.js || true
-
-      - name: Start Payment API
-        run: |
-          DATABASE_URL=postgresql://dynamopay:dynamopay@localhost:5432/dynamopay \
-          REDIS_URL=redis://localhost:6379 \
-          NODE_ENV=test \
-          ENCRYPTION_MASTER_KEY=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))") \
-          JWT_SECRET=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))") \
-          npm run start:prod:api &
-        env:
-          DATABASE_URL: postgresql://dynamopay:dynamopay@localhost:5432/dynamopay
-
-      - name: Wait for API to be ready
-        run: |
-          for i in $(seq 1 30); do
-            if curl -sf http://localhost:6100/health > /dev/null 2>&1; then echo "API ready"; exit 0; fi
+          mkdir -p output/testing
+          export DATABASE_URL=postgresql://dynamopay:dynamopay@localhost:5432/dynamopay
+          export REDIS_URL=redis://localhost:6379
+          export NODE_ENV=test
+          export ENCRYPTION_MASTER_KEY=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
+          export JWT_SECRET=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
+          npm run start:prod:api > output/testing/api.log 2>&1 &
+          API_PID=$!
+          for i in $(seq 1 45); do
+            if curl -sf http://localhost:6100/health > /dev/null 2>&1; then
+              echo "API ready ($i attempts)"
+              break
+            fi
             sleep 2
           done
-          echo "API not ready after 60s"; exit 1
+          if ! curl -sf http://localhost:6100/health > /dev/null 2>&1; then
+            echo "API failed to become healthy"
+            echo "===== API LOG ====="
+            cat output/testing/api.log
+            exit 1
+          fi
+          echo "API_PID=$API_PID"
 
       - name: Install k6
         run: |

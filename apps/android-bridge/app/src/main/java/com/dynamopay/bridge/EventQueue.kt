@@ -37,8 +37,8 @@ class EventQueue(
     private val cryptoHelper: CryptoHelper,
     private val securePrefs: EncryptedSharedPreferences
 ) {
-    private const int MAX_QUEUE_SIZE = 10000
-    private const int MAX_EVENT_AGE_HOURS = 168 // 7 days
+    private val MAX_QUEUE_SIZE = 10000
+    private val MAX_EVENT_AGE_HOURS = 168 // 7 days
 
     fun enqueue(event: QueuedEvent): Boolean {
         return try {

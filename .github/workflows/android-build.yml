@@ -26,28 +26,23 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v4
 
-      - name: Show Android SDK location
-        run: echo "ANDROID_HOME=$ANDROID_HOME" && echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" && ls "$ANDROID_HOME/cmdline-tools/latest/bin/" 2>/dev/null || ls "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/" 2>/dev/null || echo "no cmdline-tools found"
-
       - name: Accept Android SDK licenses
-        run: |
-          SDKROOT="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
-          echo "SDKROOT=$SDKROOT"
-          yes | "$SDKROOT/cmdline-tools/latest/bin/sdkmanager" --licenses || echo "License acceptance attempted"
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses
 
       - name: Install Android SDK packages
         run: |
-          SDKROOT="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
-          "$SDKROOT/cmdline-tools/latest/bin/sdkmanager" "platform-tools"
-          "$SDKROOT/cmdline-tools/latest/bin/sdkmanager" "platforms;android-34"
-          "$SDKROOT/cmdline-tools/latest/bin/sdkmanager" "build-tools;34.0.0"
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platform-tools"
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-34"
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "build-tools;34.0.0"
 
-      - name: Grant execute permission for gradlew
-        run: chmod +x apps/android-bridge/gradlew
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.5'
 
       - name: Build Debug APK
         working-directory: apps/android-bridge
-        run: ./gradlew assembleDebug
+        run: gradle assembleDebug --no-daemon
 
       - name: Generate SHA256 checksum
         run: |

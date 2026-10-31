@@ -1,7 +1,6 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
-    id("com.google.zxing.android") version "4.3.0" apply false
 }
 
 android {

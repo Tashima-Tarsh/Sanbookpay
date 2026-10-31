@@ -5,6 +5,7 @@ import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKeys
 
 class BridgeApp : Application() {
+    lateinit var securePrefs: EncryptedSharedPreferences
     lateinit var cryptoHelper: CryptoHelper
     lateinit var eventQueue: EventQueue
     lateinit var eventForwarder: EventForwarder
@@ -14,7 +15,7 @@ class BridgeApp : Application() {
         super.onCreate()
 
         val masterKeyAlias = MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC)
-        val securePrefs = EncryptedSharedPreferences.create(
+        securePrefs = EncryptedSharedPreferences.create(
             "dynamo_bridge_secure_prefs",
             masterKeyAlias,
             applicationContext,

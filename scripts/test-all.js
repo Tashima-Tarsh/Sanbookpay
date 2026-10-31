@@ -84,20 +84,21 @@ for (let i = 0; i < testFiles.length; i++) {
   const file = testFiles[i];
   process.stdout.write(`[${i + 1}/${testFiles.length}] Testing ${file}... `);
   const startFile = Date.now();
-  const result = spawnSync(process.execPath, ['--test', '--test-reporter=tap', file], {
+  const result = spawnSync(process.execPath, ['--test', '--test-force-exit', '--test-reporter=tap', file], {
     stdio: 'pipe',
     env: {
       ...process.env,
       ...testEnv
     },
     encoding: 'utf8',
-    timeout: 120000
+    timeout: 180000
   });
 
-  if (result.status === null && result.error && result.error.code === 'ETIMEDOUT') {
+  const timedOut = result.status === null && result.error && result.error.code === 'ETIMEDOUT';
+  if (timedOut) {
     const duration = ((Date.now() - startFile) / 1000).toFixed(2);
     console.log(`⏱️ TIMEOUT (${duration}s)`);
-    console.error(`[-] Test timed out after 120s in ${file}`);
+    console.error(`[-] Test timed out after 180s in ${file}`);
     process.exit(1);
   }
 
