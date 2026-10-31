@@ -62,6 +62,8 @@ test('provider selection uses the exact connection and rejects cross-merchant or
 test('Cashfree order contract rejects missing customer contact and ambiguous validation responses',async()=>{
  const provider=new CashfreeProvider({clientId:'test-client',clientSecret:'test-secret',environment:'SANDBOX'});
  await assert.rejects(()=>provider.createCollection({amountPaise:20100,merchantOrderId:'test-order'}),/requires a real customer phone/);
+ await assert.rejects(()=>provider.registerBeneficiary({name:'Recipient',bankAccount:'123456789',ifsc:'TEST0000001'}),/Actual beneficiary name and phone/);
+ await assert.rejects(()=>provider.verifyBeneficiary({name:'Recipient',bankAccount:'123456789',ifsc:'TEST0000001'}),/real beneficiary phone/);
  provider._request=async()=>({ok:false,status:0});assert.equal((await provider.validateCredentials()).valid,false);
  provider._request=async()=>({ok:false,status:404});assert.equal((await provider.validateCredentials()).valid,false);
  let request;provider._request=async(url,options)=>(request={url,...options},{ok:true,data:{order_id:'test-order',payment_session_id:'real-provider-returned-session'}});

@@ -72,10 +72,11 @@ export function registerPayoutsRoutes(server, ctx) {
         bankAccount: body.bankAccount,
         ifsc: body.ifsc,
         upiId: body.upiId,
-        beneficiaryType: beneType
+        beneficiaryType: beneType,address1:body.address1,city:body.city,state:body.state,pincode:body.pincode
       });
       providerBeneId = regRes.providerBeneId;
     } catch (err) {
+      if(process.env.NODE_ENV==='production')return HttpServer.json(res,503,{error:'The provider did not confirm beneficiary registration; no provider identity was fabricated.'});
       providerBeneId = `local_bene_${Date.now()}`;
     }
 
