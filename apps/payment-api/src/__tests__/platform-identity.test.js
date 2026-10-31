@@ -86,10 +86,11 @@ test('platform owner creates an isolated merchant login with MFA, CSRF and atomi
     assert.equal((await call('/merchants',body,undefined,'wrong')).status,403,'CSRF required');
     assert.equal((await call('/merchants',{...body,password:'short'})).status,400);
     const created=await call('/merchants',body);assert.equal(created.status,201);const record=await created.json();
-    assert.equal(record.status,'EMAIL_PENDING');assert.equal(record.loginPath,'/platform');assert.ok(!JSON.stringify(record).includes(body.password));
+    assert.equal(record.status,'EMAIL_PENDING');assert.equal(record.loginPath,'/merchant/'+record.merchantId);assert.ok(!JSON.stringify(record).includes(body.password));
     const owner=db.queryOne('SELECT * FROM pp_users WHERE merchant_id=?',[record.merchantId]);assert.equal(owner.role,'OWNER');assert.equal(owner.email_verified,0);assert.equal(owner.mobile_verified,0);assert.notEqual(owner.password_hash,body.password);
     assert.equal((await call('/merchants',body)).status,409);
-    const login=await call('/login',{email:body.email,password:body.password},'');assert.equal(login.status,200);const merchantCookie=login.headers.get('set-cookie').split(';')[0];const merchantSession=await login.json();assert.equal(merchantSession.user.merchantId,record.merchantId);
+    assert.equal((await call('/login',{email:body.email,password:body.password,merchantId:'another-merchant'},'')).status,401);
+    const login=await call('/login',{email:body.email,password:body.password,merchantId:record.merchantId},'');assert.equal(login.status,200);const merchantCookie=login.headers.get('set-cookie').split(';')[0];const merchantSession=await login.json();assert.equal(merchantSession.user.merchantId,record.merchantId);
     assert.equal((await call('/merchants',null,merchantCookie)).status,403);
     assert.equal((await call('/merchants',{...body,email:'forbidden@example.test'},merchantCookie,merchantSession.csrfToken)).status,403);
     const details=await(await call('/merchants/'+record.merchantId)).json();assert.equal(details.users[0].email,body.email);assert.ok(!JSON.stringify(details).includes(owner.password_hash));

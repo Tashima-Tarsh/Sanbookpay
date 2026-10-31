@@ -435,6 +435,7 @@ export function registerAdminRoutes(server, ctx) {
         merchantId: a.merchantId,
         upiId: a.upiId,
         payeeName: a.payeeName,
+        bankDetails:a.bankDetails,
         isMerchantEnabled: a.isMerchantEnabled,
         isActive: a.isActive,
         isSlotBusy: a.isSlotBusy,
@@ -473,7 +474,8 @@ export function registerAdminRoutes(server, ctx) {
       upiId: upiId.trim(),
       payeeName: payeeName?.trim() || merchant.businessName,
       isMerchantEnabled: true,
-      isActive: shouldActivate
+      isActive: shouldActivate,
+      bankName:body.bankName,accountHolderName:body.accountHolderName,accountNumber:body.accountNumber,ifsc:body.ifsc
     });
 
     ctx.auditRepo.log({

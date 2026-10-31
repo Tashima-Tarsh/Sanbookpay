@@ -77,6 +77,13 @@ export function registerPaymentRoutes(server, ctx) {
         return;
       }
 
+      const originalExternal=ctx.sessionRepo.findByOrderId(merchant.id,body.orderId)?.metadata?.externalCollection;
+      const useExternalDefault=(!body.method||String(body.method).toUpperCase()==='UPI')&&ctx.externalCollections?.getDefault(merchant.id);
+      if(ctx.externalCollections&&(originalExternal||useExternalDefault)){
+        if(!isAdminRequest(req)&&!(req.headers['x-merchant-key']&&merchant.webhookSecret&&safeEqual(String(req.headers['x-merchant-key']),merchant.webhookSecret)))return HttpServer.json(res,401,{error:'Merchant authentication required.'});
+        return ctx.externalCollections.createFromLegacy(req,res,body,merchant.id);
+      }
+
       const deviceId = body.deviceId || req.headers['x-device-id'] || null;
       if (deviceId && ctx.deviceRepo) {
         let dev = ctx.deviceRepo.findById(deviceId);

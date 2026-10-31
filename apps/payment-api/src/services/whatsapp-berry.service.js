@@ -116,7 +116,8 @@ export class WhatsAppBerryService extends EventEmitter {
     this.isInitializing = false;
     this.shouldKeepPairingAlive = true;
     this.reconnectTimer = null;
-    this.isSimulatedMode = false;
+    this.simulated = Boolean(options.simulated);
+    this.isSimulatedMode = this.simulated;
 
     // Check if previous valid connection session exists on disk
     this.restoreSessionMeta();
@@ -230,7 +231,7 @@ export class WhatsAppBerryService extends EventEmitter {
     this.pairingCode = null;
     this.pairingPhone = null;
     this.sessionId = `youpi_berry_${Date.now()}`;
-    this.isSimulatedMode = false;
+    this.isSimulatedMode = this.simulated;
     this.isInitializing = false;
   }
 
@@ -549,6 +550,14 @@ export class WhatsAppBerryService extends EventEmitter {
     let clean = String(phoneNumber).replace(/[^0-9]/g, '');
     if (clean.length === 10) clean = '91' + clean;
     else if (clean.length === 11 && clean.startsWith('0')) clean = '91' + clean.slice(1);
+
+    if (this.isSimulatedMode) {
+      const mockCode = `${Math.floor(1000 + Math.random() * 9000)}${Math.floor(1000 + Math.random() * 9000)}`;
+      this.pairingCode = mockCode;
+      this.pairingPhone = clean;
+      this.status = 'PAIRING_CODE_READY';
+      return { success: true, pairingCode: mockCode, phoneNumber: clean };
+    }
 
     await this.disconnect({ cleanSession: true });
     this.ensureDirectories();

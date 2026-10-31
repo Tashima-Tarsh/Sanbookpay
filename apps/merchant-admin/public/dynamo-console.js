@@ -185,7 +185,7 @@
   submit('merchantForm',async()=>{await api('v1/admin/merchant-settings',{businessName:$('businessName').value,contactEmail:$('contactEmail').value,contactPhone:$('contactPhone').value,branding:{appName:'Dynamo Pay'},supportEmails:[$('contactEmail').value].filter(Boolean),supportMobiles:[$('contactPhone').value].filter(Boolean)});await loadSettings();toast('Merchant details saved.');});
   submit('webhookForm',async()=>{await api('v1/admin/merchant-settings',{webhookUrl:$('webhookUrl').value});toast('Webhook endpoint saved.');await credentials();});
   submit('upiChannelForm',async()=>{await consoleApi('upi-channel',{enabled:$('upiChannelEnabled').checked,minAmountPaise:Math.round(Number($('upiChannelMin').value)*100),maxAmountPaise:Math.round(Number($('upiChannelMax').value)*100),allowedVpas:$('upiChannelVpas').value.split(/[,\n]+/).map(v=>v.trim()).filter(Boolean)});toast('UPI channel settings saved.');});
-  submit('upiForm',async()=>{await api('v1/admin/upi-accounts',{upiId:$('upiId').value,payeeName:$('payeeName').value});$('upiForm').reset();toast('UPI account added.');await upi();});
+  submit('upiForm',async()=>{await api('v1/admin/upi-accounts',{upiId:$('upiId').value,payeeName:$('payeeName').value,bankName:$('receivingBankName').value,accountHolderName:$('receivingHolderName').value,accountNumber:$('receivingAccountNumber').value,ifsc:$('receivingIfsc').value});$('upiForm').reset();toast('UPI account added.');await upi();});
   submit('gmailForm',async()=>{
     const body={clientId:$('gmailClientId').value.trim()};
     if($('gmailClientSecret').value.trim())body.clientSecret=$('gmailClientSecret').value.trim();

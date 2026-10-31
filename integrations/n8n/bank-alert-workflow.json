@@ -1,0 +1,71 @@
+{
+  "name": "Dynamo Pay - bank email evidence to Django",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "filters": {
+          "sender": "hdfcbank"
+        }
+      },
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        0
+      ],
+      "id": "dbd82fa7-9b3f-451b-9c72-753f2383ecf6",
+      "name": "Gmail Trigger"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://YOUR-DJANGO-SERVICE/internal/ingest-bank-alert",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "text",
+              "value": "={{ $json.textPlain || $json.text || $json.snippet || \"\" }}"
+            }
+          ]
+        },
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        208,
+        0
+      ],
+      "id": "0026f505-0612-48d0-a05d-bf9158a11bdd",
+      "name": "Send bank email evidence"
+    }
+  ],
+  "connections": {
+    "Gmail Trigger": {
+      "main": [
+        [
+          {
+            "node": "Send bank email evidence",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}

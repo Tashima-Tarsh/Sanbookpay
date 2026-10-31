@@ -49,8 +49,25 @@ function harness(authenticated = true, platformOwner = false) {
     fetch: async (url, init) => { requests.push({ url, init }); const path = url.replace('/api/platform/v1', '').split('?')[0]; if (path === '/me' && !authenticated) return { ok: false, status: 401, json: async () => ({ error: 'Platform login required' }) }; return { ok: true, status: 200, json: async () => path === '/api-keys' && init.method === 'POST' ? { secret: 'one-time-created-secret' } : responses[path] || {} }; }
   };
   vm.runInNewContext(source, context);
-  return { get, requests, context, windowEvents };
+  return { get, requests, context, windowEvents, responses };
 }
+
+test('connections collect bank details and save a merchant-owned external service with CSRF',async()=>{
+ const app=harness();await flush();
+ app.responses['/receiving-accounts']={accounts:[{id:'account-a',upiId:'business@bank',payeeName:'Business',bankDetails:{bankName:'Test Bank',accountNumberMasked:'********9012',ifsc:'TEST0000001'}}]};
+ app.context.location.hash='#connections';app.windowEvents.hashchange();await flush();
+ const bankForm=app.get('view').find(node=>node.tagName==='form'&&node.elements.namedItem('accountNumber'));
+ assert.ok(bankForm.elements.namedItem('bankName'));assert.ok(bankForm.elements.namedItem('ifsc'));
+ const form=app.get('view').find(node=>node.tagName==='form'&&node.elements.namedItem('apiKey'));
+ const select=form.elements.namedItem('receivingAccountId');
+ assert.equal(select.children[0].value,'account-a');
+ for(const [name,value] of Object.entries({kind:'DJANGO_N8N',baseUrl:'https://collections.example.test',receivingAccountId:'account-a',apiKey:'test-only-secret'}))form.elements.namedItem(name).value=value;
+ await form.events.submit({preventDefault(){}});await flush();
+ const request=app.requests.find(r=>r.url.endsWith('/banking-integrations')&&r.init.method==='POST');
+ assert.equal(request.init.headers['X-CSRF-Token'],'session-csrf');
+ assert.equal(JSON.parse(request.init.body).receivingAccountId,'account-a');
+ assert.match(app.get('view').textContent,/India Banking/);
+});
 
 test('platform renders role-scoped routes with safe text and numeric-string ledger balances', async () => {
   const app = harness(); await flush();
@@ -64,10 +81,24 @@ test('platform renders role-scoped routes with safe text and numeric-string ledg
   assert.ok(app.requests.every(request => request.init.credentials === 'same-origin'));
 });
 
+test('sidebar separates the payment product, merchant account and platform administration',async()=>{
+ const merchant=harness();await flush();
+ assert.equal(merchant.get('workspaceType').textContent,'Merchant dashboard');
+ assert.match(merchant.get('navigation').textContent,/Payments/);
+ assert.match(merchant.get('navigation').textContent,/Integration/);
+ assert.match(merchant.get('navigation').textContent,/Subscription & billing/);
+ assert.doesNotMatch(merchant.get('navigation').textContent,/Merchant directory|Platform overview/);
+ const owner=harness(true,true);await flush();
+ assert.equal(owner.get('workspaceType').textContent,'Super Admin control center');
+ assert.match(owner.get('navigation').textContent,/Platform overview/);
+ assert.match(owner.get('navigation').textContent,/Merchant directory/);
+ assert.match(owner.get('navigation').textContent,/Plans & subscriptions/);
+});
+
 test('platform owner can find merchant creation and open a scoped dashboard without impersonation',async()=>{
   const app=harness(true,true);await flush();
   assert.ok(app.get('pageActions').find(node=>node.textContent==='Add merchant'));
-  const nav=app.get('navigation').textContent;assert.match(nav,/Merchants/);assert.doesNotMatch(nav,/Your business at a glance|Connections & acceptance/);
+  const nav=app.get('navigation').textContent;assert.match(nav,/Merchant directory/);assert.doesNotMatch(nav,/Your business at a glance|Connections & acceptance/);
   app.context.location.hash='#merchants';app.windowEvents.hashchange();await flush();
   assert.match(app.get('view').textContent,/Independent A/);
   await app.get('view').find(node=>node.tagName==='button'&&node.textContent==='Open dashboard').events.click();

@@ -93,7 +93,8 @@ export function createPaymentApp(customDb = null, options = {}) {
     sessionId: 'test_berry_session',
     sessionPath: path.resolve(rootDir, 'data/test_berry_auth'),
     databasePath: path.resolve(rootDir, 'data/test_berry_store.db'),
-    metaFile: path.resolve(rootDir, 'data/test_whatsapp_session.json')
+    metaFile: path.resolve(rootDir, 'data/test_whatsapp_session.json'),
+    simulated: process.env.NODE_ENV === 'test'
   }) : getWhatsAppBerryService());
 
   const merchantRepo = new MerchantRepository(db);

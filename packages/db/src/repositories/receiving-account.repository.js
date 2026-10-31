@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import {encrypt, resolveSecret} from '@youpi/common';
 
 export class ReceivingAccountRepository {
   /**
@@ -6,6 +7,7 @@ export class ReceivingAccountRepository {
    */
   constructor(db) {
     this.db = db;
+    db.execute('CREATE TABLE IF NOT EXISTS receiving_bank_details(account_id TEXT PRIMARY KEY REFERENCES payment_receiving_accounts(id),bank_name TEXT NOT NULL,holder_name TEXT NOT NULL,account_encrypted TEXT NOT NULL,account_last_four TEXT NOT NULL,ifsc TEXT NOT NULL)');
   }
 
   /**
@@ -14,6 +16,15 @@ export class ReceivingAccountRepository {
    * Enforces that maximum ONE VPA may be active per merchant.
    */
   create(data) {
+    const bankFields=['bankName','accountHolderName','accountNumber','ifsc'];
+    const hasBank=bankFields.some(k=>data[k]!==undefined&&data[k]!=='');
+    if(hasBank){
+      if(typeof data.bankName!=='string'||!data.bankName.trim()||data.bankName.length>150)throw Error('Bank name is required (maximum 150 characters).');
+      if(typeof data.accountHolderName!=='string'||!data.accountHolderName.trim()||data.accountHolderName.length>150)throw Error('Account holder name is required (maximum 150 characters).');
+      if(typeof data.accountNumber!=='string'||!/^\d{6,20}$/.test(data.accountNumber))throw Error('Account number must contain 6–20 digits.');
+      if(typeof data.ifsc!=='string'||!(/^[A-Z]{4}0[A-Z0-9]{6}$/).test(data.ifsc.toUpperCase()))throw Error('Provide a valid 11-character IFSC.');
+    }
+    const bankCipher=hasBank?encrypt(data.accountNumber,resolveSecret('encryption_master_key','ENCRYPTION_MASTER_KEY')):null;
     const id = data.id || crypto.randomUUID();
     const now = new Date().toISOString();
     const isActive = data.isActive !== undefined ? Boolean(data.isActive) : true;
@@ -50,6 +61,7 @@ export class ReceivingAccountRepository {
         now
       ]);
 
+      if(hasBank)this.db.execute('INSERT INTO receiving_bank_details(account_id,bank_name,holder_name,account_encrypted,account_last_four,ifsc) VALUES(?,?,?,?,?,?)',[id,data.bankName.trim(),data.accountHolderName.trim(),bankCipher,data.accountNumber.slice(-4),data.ifsc.toUpperCase()]);
       return this.findById(id);
     });
   }
@@ -174,7 +186,10 @@ export class ReceivingAccountRepository {
       throw new Error(`Cannot delete account ${account.upiId} because it has an active checkout session.`);
     }
 
-    this.db.execute('DELETE FROM payment_receiving_accounts WHERE id = ? AND merchant_id = ?', [accountId, merchantId]);
+    this.db.transaction(()=>{
+      this.db.execute('DELETE FROM receiving_bank_details WHERE account_id = ?', [accountId]);
+      this.db.execute('DELETE FROM payment_receiving_accounts WHERE id = ? AND merchant_id = ?', [accountId, merchantId]);
+    });
     return true;
   }
 
@@ -223,7 +238,9 @@ export class ReceivingAccountRepository {
   }
 
   mapRow(row) {
+    const bank=this.db.queryOne('SELECT bank_name,holder_name,account_last_four,ifsc FROM receiving_bank_details WHERE account_id=?',[row.id]);
     return {
+      bankDetails:bank?{bankName:bank.bank_name,accountHolderName:bank.holder_name,accountNumberMasked:'********'+bank.account_last_four,ifsc:bank.ifsc}:null,
       id: row.id,
       merchantId: row.merchant_id,
       upiId: row.upi_id,

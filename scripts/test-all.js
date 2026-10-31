@@ -63,6 +63,7 @@ const testFiles = [
   'apps/payment-api/src/__tests__/platform-identity.test.js',
   'apps/payment-api/src/__tests__/platform-operations.test.js',
   'apps/payment-api/src/__tests__/platform-payments.test.js',
+  'apps/payment-api/src/__tests__/external-banking.test.js',
   'apps/payment-api/src/__tests__/secure-platform-boundaries.test.js',
   'apps/merchant-admin/src/__tests__/platform-ui.test.js',
   'scripts/chaos-concurrency.test.js',

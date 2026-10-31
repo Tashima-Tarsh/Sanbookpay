@@ -316,7 +316,7 @@ async function checkUpiServerHealth(ctx, enabledMethods = [], sellingMode = 'OFF
 export function registerCheckoutRoutes(server, ctx) {
   // GET /api/v1/checkout/:id/state
   server.get('/api/v1/checkout/:id/state', async (req, res, params) => {
-    const session = ctx.sessionRepo.findById(params.id);
+    let session = ctx.sessionRepo.findById(params.id);
     if (!session) {
       HttpServer.json(res, 404, { error: `Checkout session not found: ${params.id}` });
       return;
@@ -348,6 +348,8 @@ export function registerCheckoutRoutes(server, ctx) {
     }
 
     // Authoritative Server-Side Expiration Enforcer
+    if(session.metadata?.externalCollection&&ctx.externalCollections)session=await ctx.externalCollections.refresh(session);
+
     const now = Date.now();
     if (session.status === PaymentStatus.ACTIVE && session.expiresAt && session.expiresAt.getTime() <= now) {
       ctx.sessionRepo.transitionToTerminal(session.id, PaymentStatus.EXPIRED);
@@ -368,7 +370,9 @@ export function registerCheckoutRoutes(server, ctx) {
     // Terminal session handling: if session is terminal, return terminal state directly (CASE 4)
     if ([PaymentStatus.SUCCESS, PaymentStatus.FAILED, PaymentStatus.EXPIRED, PaymentStatus.CANCELLED].includes(session.status)) {
       const merchant = ctx.merchantRepo.findById(session.merchantId);
-      const branding = {
+      if(session.metadata?.externalCollection)upiUri=session.status==='ACTIVE'&&session.metadata.externalCollection.stage==='PAYABLE'?session.metadata.externalCollection.upiUri:null;
+
+    const branding = {
         appName: 'YOUPI PG',
         primaryColor: '#2563eb',
         ...(merchant?.branding || {})
@@ -597,7 +601,7 @@ export function registerCheckoutRoutes(server, ctx) {
 
     // Build URI and compute remaining time ONLY if session is already active (e.g. after customer bound or counter active)
     if (session.status === PaymentStatus.ACTIVE) {
-      if (payeeVpa && !upiUri) {
+      if (payeeVpa && !upiUri && !session.metadata?.externalCollection) {
         try {
           upiUri = buildUpiUri({
             payeeVpa,
@@ -859,6 +863,8 @@ export function registerCheckoutRoutes(server, ctx) {
       HttpServer.json(res, 404, { error: `Payment session not found: ${params.id}` });
       return;
     }
+
+    if(session.metadata?.externalCollection)return HttpServer.json(res,409,{error:'Ask the merchant to reconcile the original external payment before creating a replacement.'});
 
     if(session.status===PaymentStatus.VERIFICATION_PENDING) return HttpServer.json(res,409,{error:'A payment is awaiting bank verification. Do not pay again.'});
 

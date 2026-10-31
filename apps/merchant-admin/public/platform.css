@@ -46,6 +46,15 @@ input,textarea{caret-color:#284d44}
 #authLinks{gap:10px}
 #authLinks .btn{width:auto;white-space:normal;flex:1 1 140px;margin:0}
 #console .nav{line-height:1.5;text-decoration:none}
+#console .nav-icon{width:15px;height:15px;flex:0 0 15px;border:1.5px solid currentColor;border-radius:4px;opacity:.88;position:relative}
+#console .icon-overview{border-radius:50%}
+#console .icon-transactions::after,#console .icon-operations::after{content:'';position:absolute;left:3px;right:3px;top:6px;border-top:1.5px solid currentColor}
+#console .icon-merchants::after,#console .icon-staff::after{content:'';position:absolute;width:4px;height:4px;border:1.3px solid currentColor;border-radius:50%;left:4px;top:2px}
+#console .icon-merchants::before,#console .icon-staff::before{content:'';position:absolute;width:7px;height:3px;border:1.3px solid currentColor;border-radius:5px 5px 2px 2px;left:2px;bottom:2px}
+#console .icon-keys{border-radius:50%}
+#console .icon-keys::after{content:'';position:absolute;width:7px;border-top:1.5px solid currentColor;right:-5px;top:6px}
+#console .icon-connections::after{content:'';position:absolute;width:5px;height:5px;border:1.3px solid currentColor;border-radius:50%;left:3px;top:3px}
+#console .icon-billing::after{content:'₹';position:absolute;font-size:10px;line-height:12px;left:3px;top:0;font-weight:700}
 #console .page-head>div{min-width:0}
 #console .topbar{height:auto;min-height:73px;padding-top:12px;padding-bottom:12px}
 #console .topbar>.actions{min-width:0}

@@ -3,18 +3,26 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 
-function checkout(status='ACTIVE') {
+function checkout(status='ACTIVE',overrides={}) {
   const html=fs.readFileSync(new URL('../views/checkout-premium.html',import.meta.url),'utf8');
   const elements=new Map();
   function element(id) {if(!elements.has(id))elements.set(id,{hidden:false,disabled:false,textContent:'',value:'',addEventListener(name,fn){this[name]=fn;},setAttribute(name,v){this[name]=v;},showModal(){this.open=true;},close(){this.open=false;}});return elements.get(id);}
   const apps=['gpay','phonepe','paytm','generic'].map(app=>({...element(app),dataset:{app}}));
   const state={paymentId:'payment-1',orderId:'ORDER-1',merchantName:'Merchant',amount:'123.45',status,payeeVpa:'merchant@upi',upiUri:'upi://pay?pa=merchant%40upi&pn=Merchant&am=123.45&tr=ORDER-1&cu=INR',enabledMethods:['UPI','COD'],timeRemainingSeconds:300};
+  Object.assign(state,overrides);
   const messages=[],requests=[];
   const window={parent:{postMessage:(...args)=>messages.push(args)},addEventListener(){}};
   const context={window,document:{getElementById:element,querySelectorAll:()=>apps,referrer:'https://store.example/product',addEventListener(){}},navigator:{userAgent:'Android',clipboard:{writeText:async()=>{}}},location:{href:'',assign(){}},setTimeout:()=>1,clearTimeout(){},setInterval:()=>1,URL,Intl,console,fetch:async(url,init)=>{requests.push({url,init});return {ok:true,json:async()=>state};}};
   vm.runInNewContext(html.match(/<script>([\s\S]*?)<\/script>/)[1].replace('{{INITIAL_STATE_JSON}}',JSON.stringify(state)),context);
   return {context,window,element,apps,messages,requests,state};
 }
+
+test('uncertain external collection hides payment actions and explains reconciliation',()=>{
+ const {element,apps}=checkout('ACTIVE',{upiUri:null,metadata:{externalCollection:{stage:'UNKNOWN'}}});
+ assert.ok(apps.every(a=>a.disabled));
+ assert.match(element('notice').textContent,/uncertain/i);
+ assert.match(element('notice').textContent,/do not pay/i);
+});
 test('UPI app links preserve the exact session amount, payee and reference',()=>{
   const {window,state}=checkout();
   const gpay=window.dynamoUpiLink('gpay',state.upiUri,'Android');

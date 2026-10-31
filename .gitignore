@@ -61,3 +61,6 @@ Thumbs.db
 *.jks
 **/local.properties
 /tmp/capacity-*.sqlite*
+
+# Read-only upstream source checkouts used for connector review
+/output/references/
