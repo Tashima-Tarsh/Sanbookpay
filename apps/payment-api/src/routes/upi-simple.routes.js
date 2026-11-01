@@ -88,6 +88,20 @@ export function registerUpiSimpleRoutes(server, ctx) {
     }
   });
 
+  server.post(`${base}/merchant/setup`, async (req, res) => {
+    try {
+      const body = await HttpServer.parseBody(req);
+      const { merchantId, upiVpa, callbackUrl, businessName, contactEmail, contactPhone } = body;
+      if (!merchantId || !upiVpa || !callbackUrl) {
+        return HttpServer.json(res, 400, { error: 'merchantId, upiVpa and callbackUrl are required' });
+      }
+      const result = upiSimple.setupMerchantFromPlatform(merchantId, upiVpa, callbackUrl, businessName, contactEmail, contactPhone);
+      return HttpServer.json(res, 201, result);
+    } catch (error) {
+      return HttpServer.json(res, error.statusCode || 500, { error: error.message });
+    }
+  });
+
   server.post(`${base}/notify`, async (req, res) => {
     try {
       const merchant = requireMerchantSecret(req);

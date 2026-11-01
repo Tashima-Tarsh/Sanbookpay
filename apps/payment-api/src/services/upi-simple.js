@@ -132,6 +132,33 @@ export function createUpiSimpleService(ctx) {
       return { id: row.id, upiVpa: row.upi_vpa, callbackUrl: row.callback_url, secret: row.callback_secret };
     },
 
+    setupMerchantFromPlatform(merchantId, upiVpa, callbackUrl, businessName, contactEmail, contactPhone) {
+      if (!isValidVpa(upiVpa)) fail('Invalid UPI VPA');
+      if (!callbackUrl) fail('Callback URL is required');
+      const check = validateOutboundWebhookUrl(callbackUrl);
+      if (!check.valid) fail('Invalid callback URL');
+      const id = merchantId;
+      const secret = crypto.randomBytes(32).toString('base64url');
+      const accessToken = crypto.randomBytes(32).toString('base64url');
+      return db.transaction(() => {
+        db.execute(
+          'INSERT INTO upi_simple_merchants (id, upi_vpa, callback_url, callback_secret, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET upi_vpa=excluded.upi_vpa, callback_url=excluded.callback_url, callback_secret=excluded.callback_secret, updated_at=excluded.updated_at',
+          [id, upiVpa.trim().toLowerCase(), callbackUrl, secret, now(), now()]
+        );
+        return {
+          merchantId: id,
+          businessName: businessName || 'Merchant',
+          upiVpa: upiVpa.trim().toLowerCase(),
+          callbackUrl,
+          webhookSecret: secret,
+          accessToken,
+          accessLink: `/merchant/${id}`,
+          apiBaseUrl: process.env.DYNAMO_PUBLIC_URL || 'http://localhost:6100',
+          createdAt: now()
+        };
+      });
+    },
+
     createOrder({ merchantId, orderId, amount, currency = 'INR', callbackUrl }) {
       const paise = toPaise(amount);
       const merchant = db.queryOne('SELECT * FROM upi_simple_merchants WHERE id = ?', [merchantId]);
