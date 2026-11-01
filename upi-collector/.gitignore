@@ -1,0 +1,10 @@
+.env
+node_modules/
+package-lock.json
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+data/
+logs/
+.DS_Thumbs
+Thumbs.db

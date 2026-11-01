@@ -1,0 +1,33 @@
+{
+  "name": "upi-collector",
+  "version": "1.0.0",
+  "description": "Free open-source UPI collection-notification backend",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "dev": "node src/server.js",
+    "start": "node src/server.js",
+    "seed": "node test/seed.js",
+    "gmail-auth": "node scripts/gmail-auth.js",
+    "gen-secrets": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/gen-secrets.ps1",
+    "bootstrap": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/bootstrap.ps1",
+    "test-webhook": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/test-webhook.ps1",
+    "heartbeat": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/heartbeat.ps1"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "csv-parse": "^5.5.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "express-rate-limit": "^7.2.0",
+    "googleapis": "^135.0.0",
+    "helmet": "^7.1.0",
+    "node-cron": "^3.0.3",
+    "nodemailer": "^6.9.14",
+    "sqlite": "^5.1.1",
+    "sqlite3": "^5.1.7"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
