@@ -27,7 +27,7 @@ const receiver=http.createServer(async(req,res)=>{
   const chunks=[];for await(const chunk of req)chunks.push(chunk);const raw=Buffer.concat(chunks).toString();
   const arrival=performance.now(),payload=JSON.parse(raw),deliveryId=req.headers['x-gateway-delivery-id'];
   assert.equal(req.headers['x-gateway-signature'],'sha256='+generateHmac(raw,webhookSecret));
-  assert.equal(payload.event,'SUCCESS');assert.equal(payload.status,'SUCCESS');assert.equal(payload.confirmationSource,'NOTIFICATION');assert.equal(payload.bankVerified,false);
+  assert.equal(payload.event,'SUCCESS');assert.equal(payload.status,'SUCCESS');assert.equal(payload.confirmationSource,'NOTIFICATION');assert.equal(payload.bankVerified,undefined);assert.ok(!raw.includes('"bankVerified"'));
   assert.equal(payload.merchantId,mid);assert.equal(payload.currency,'INR');assert.equal(payload.amountPaise,10000);assert.equal(payload.playerReference,'test-player');
   const n=(attempts.get(payload.orderId)||0)+1;attempts.set(payload.orderId,n);
   received.push({orderId:payload.orderId,deliveryId,raw,arrival,attempt:n});

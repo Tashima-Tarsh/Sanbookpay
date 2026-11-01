@@ -3,7 +3,7 @@
   "info": {
     "title": "Dynamo Pay Customer API",
     "version": "2.0.0",
-    "description": "Preferred integration: scoped bearer /v1/payments. Legacy Client-ID routes remain separate. Positive INR amounts are subject to saved limits. Notification acceptance is labelled NOTIFICATION and bankVerified=false, not independent bank verification."
+    "description": "Preferred integration: scoped bearer /v1/payments. Legacy Client-ID routes remain separate. Positive INR amounts are subject to saved limits. Notification acceptance is labelled NOTIFICATION, not independent bank verification."
   },
   "servers": [
     {
@@ -1127,10 +1127,6 @@
           "confirmationSource": {
             "type": "string",
             "nullable": true
-          },
-          "bankVerified": {
-            "type": "boolean",
-            "description": "false for notification acceptance"
           }
         }
       }

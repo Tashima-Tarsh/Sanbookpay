@@ -54,6 +54,8 @@ export class WebhookEngine {
 
     const bank=session.attributedObservationId?this.db.queryOne('SELECT bank_reference_number,sender_vpa FROM payment_observations WHERE id=?',[session.attributedObservationId]):null;
     const snapshot=session.metadata?.receivingAccountSnapshot||{};
+    const metadata={...(session.metadata||{})};
+    if(metadata.notificationConfirmation){const {bankVerified,...notificationConfirmation}=metadata.notificationConfirmation;metadata.notificationConfirmation=notificationConfirmation;}
     const payloadObj = {
       event: publicOutcome,
       merchantId:session.merchantId,
@@ -76,9 +78,8 @@ export class WebhookEngine {
       payeeVpa:snapshot.upiId||null,
       beneficiary:{name:snapshot.payeeName||null,upiId:snapshot.upiId||null},
       confirmationSource:session.confirmationSource||(session.verificationTag==='NOTIFICATION_CONFIRMED'?'NOTIFICATION':session.verificationTag==='MERCHANT_CONFIRMED'?'MERCHANT':session.verificationLevel?'BANK_OBSERVER':null),
-      ...(session.confirmationSource==='NOTIFICATION'||session.verificationTag==='NOTIFICATION_CONFIRMED'?{bankVerified:false}:{}),
       completedAt: publicOutcome==='PAYMENT_DETECTED'?null:session.completedAt ? session.completedAt.toISOString() : new Date().toISOString(),
-      metadata: session.metadata || {}
+      metadata
     };
 
     const payloadString = JSON.stringify(payloadObj);

@@ -1,5 +1,5 @@
 {
-  "checkedAt": "2026-11-01T07:37:26.419Z",
+  "checkedAt": "2026-11-01T07:46:14.914Z",
   "scope": "In-memory synthetic merchant; mocked email/mobile delivery; seeded root MFA session; no physical phone, real bank or customer data",
   "stepsPassed": [
     "Super Admin creates independent merchant and owner invitation",

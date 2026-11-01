@@ -43,7 +43,7 @@ Dynamo sends JSON with paymentId, merchantId, orderId, playerReference, amountPa
 
 In one durable game-database transaction, record the delivery ID and enforce a unique credited payment/order, then credit the mapped player once. Return 2xx only after committing. Both duplicate delivery IDs and a second delivery referring to an already credited payment must be harmless.
 
-Approved receiving-alert SUCCESS is NOTIFICATION with bankVerified=false. The platform accepts that source under its explicit policy; it is not independent bank verification. Optional PAYMENT_DETECTED is PENDING and must not credit. Provider success remains PROVIDER; authorized bank review remains MERCHANT.
+Approved receiving-alert SUCCESS is NOTIFICATION with the actual captured UTR. The platform accepts that source under its explicit policy; it is not independent bank verification. Optional PAYMENT_DETECTED is PENDING and must not credit. Provider success remains PROVIDER; authorized bank review remains MERCHANT.
 
 Callbacks are reserved with state/ledger updates, attempted immediately after commit and retried from the database. A missing callback URL retains a pending event; restoring a valid URL lets the worker recover it. A slow merchant no longer serializes all other merchants: callback concurrency is bounded at 20 overall and 5 per merchant within this process. Default: five total attempts, 10-second attempt timeout, retry delays 5 seconds, 30 seconds, 2 minutes, 10 minutes plus sweep/network time. No instant bank-alert or hosted SLA is promised.
 
