@@ -97,6 +97,8 @@ import { registerSuperAdminUpiMirrorRoutes } from './routes/super-admin-upi-mirr
 import { registerUpiMirrorRoutes } from './routes/upi-mirror.routes.js';
 import { registerPaymentLinkRoutes } from './routes/payment-link.routes.js';
 import { registerCallbackWalletRoutes } from './routes/callback-wallet.routes.js';
+import { createUpiSimpleService } from './services/upi-simple.js';
+import { registerUpiSimpleRoutes } from './routes/upi-simple.routes.js';
 import { getWhatsAppBerryService, WhatsAppBerryService } from './services/whatsapp-berry.service.js';
 import { ReceiptNotificationService } from './services/receipt-notification.service.js';
 
@@ -634,6 +636,9 @@ export function createPaymentApp(customDb = null, options = {}) {
   // Smart Routing Engine (created after context is available)
   context.routingEngine = new SmartRoutingEngine(context);
 
+  const upiSimple = createUpiSimpleService(context);
+  context.upiSimple = upiSimple;
+
   const platformIdentity=registerPlatformIdentity(server,context);
   const platformPayments=registerPlatformPayments(server,context,platformIdentity);
   context.platformIdentity=platformIdentity;
@@ -671,6 +676,8 @@ export function createPaymentApp(customDb = null, options = {}) {
   registerSplitSettlementRoutes(server, context);
   registerOperationsRoutes(server, context);
   registerDynamoPayRoutes(server, context);
+
+  registerUpiSimpleRoutes(server, context);
 
   // Super Admin authentication routes
   registerSuperAdminRoutes(server, context);
