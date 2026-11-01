@@ -1,5 +1,7 @@
 # Dynamo Pay merchant launch and integration
 
+Dynamo Pay is the platform, never an onboarded customer. The reserved bootstrap account is internal storage only: it is excluded from customer listings/counts, cannot receive a customer integration pack, and its former merchant URL redirects to /platform. Only newly onboarded independent businesses receive merchant workspaces. Historical internal records are preserved.
+
 ## One-time setup by Super Admin
 
 1. Create the independent merchant and send its owner invitation (24-hour single-use link).

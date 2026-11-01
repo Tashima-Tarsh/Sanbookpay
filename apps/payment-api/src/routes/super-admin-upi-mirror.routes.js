@@ -1,5 +1,6 @@
 import { HttpServer } from '../server.js';
 import {
+  PLATFORM_ACCOUNT_ID,
   UpiConnectionState,
   ObserverDevicePairingState,
   ObservationClassification,
@@ -51,7 +52,7 @@ export function registerSuperAdminUpiMirrorRoutes(server, ctx) {
   // GET /api/platform/v1/upi-mirror/admin/subscriptions — List all merchant subscriptions
   server.get(`${base}/admin/subscriptions`, async (req, res) => {
     if (!(await requirePlatform(req, res))) return;
-    const merchants = ctx.merchantRepo.findAll();
+    const merchants = ctx.merchantRepo.findAll().filter(m=>m.id!==PLATFORM_ACCOUNT_ID);
     const result = [];
     for (const m of merchants) {
       const ent = ctx.subscriptionEntitlementRepo.findByMerchant(m.id);

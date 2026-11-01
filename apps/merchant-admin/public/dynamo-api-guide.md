@@ -1,5 +1,7 @@
 # Dynamo Pay merchant launch and integration
 
+Dynamo Pay is the platform. Customer businesses receive separate merchant workspaces; the reserved internal bootstrap account is not a customer and is excluded from the merchant directory.
+
 ## One-time setup by Super Admin
 
 1. Create the independent merchant and send its owner invitation (24-hour single-use link).

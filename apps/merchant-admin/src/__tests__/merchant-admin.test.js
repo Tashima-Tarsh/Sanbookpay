@@ -96,6 +96,7 @@ describe('Merchant Admin Integration Tests', () => {
     assert.equal((await fetch(baseUrl+'/api/console/v1/admin/merchant-settings')).status,401);
     assert.equal((await fetch(baseUrl+'/api/v1/admin/merchant-settings')).status,401);
   });
+  test('reserved platform account URL redirects to the platform, not a merchant login',async()=>{const r=await fetch(baseUrl+'/merchant/00000000-0000-0000-0000-000000000001',{redirect:'manual'});assert.equal(r.status,302);assert.equal(r.headers.get('location'),'/platform');});
   test('customer API guide and downloadable specification are publicly available',async()=>{
     const guide=await get('/developers');assert.equal(guide.status,200);assert.ok(guide.text.includes('Dynamo Pay API'));
     const spec=await get('/developers/openapi.json');assert.equal(spec.status,200);assert.ok(JSON.parse(spec.text).paths['/v1.0/collect/upi']);

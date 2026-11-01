@@ -1,3 +1,4 @@
+import {PLATFORM_ACCOUNT_ID} from '@youpi/common';
 /** Additive platform schema: existing merchant and financial rows are never rewritten. */
 export function initializePlatform(db) {
   const statements = [
@@ -13,4 +14,6 @@ export function initializePlatform(db) {
     `CREATE INDEX IF NOT EXISTS pp_audit_tenant ON pp_audit(merchant_id,created_at)`
   ];
   for (const sql of statements) db.execute(sql);
+  db.execute('CREATE TABLE IF NOT EXISTS pp_platform_accounts(account_id TEXT PRIMARY KEY,purpose TEXT NOT NULL)');
+  db.execute('INSERT INTO pp_platform_accounts(account_id,purpose) VALUES(?,?) ON CONFLICT(account_id) DO NOTHING',[PLATFORM_ACCOUNT_ID,'PLATFORM_INTERNAL_BOOTSTRAP']);
 }

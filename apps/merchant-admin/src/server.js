@@ -1,4 +1,4 @@
-import {isCurrentAndroidRelease} from '@youpi/common';
+import {isCurrentAndroidRelease,PLATFORM_ACCOUNT_ID} from '@youpi/common';
 import http from 'node:http';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -314,6 +314,7 @@ export class AdminServer {
 
       // Dashboard View: GET / or GET /admin
       if(pathname==='/super-admin'||pathname.startsWith('/super-admin/')){res.writeHead(302,{'Location':'/platform','Cache-Control':'no-store',...BASE_SECURITY_HEADERS});res.end();return;}
+      if(pathname==='/merchant/'+PLATFORM_ACCOUNT_ID){res.writeHead(302,{'Location':'/platform','Cache-Control':'no-store',...BASE_SECURITY_HEADERS});res.end();return;}
       if (pathname === '/platform' || /^\/merchant\/[a-zA-Z0-9-]+$/.test(pathname)) {
         const html = fs.readFileSync(path.join(__dirname, '../public/platform.html'), 'utf8');
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache', ...BASE_SECURITY_HEADERS });

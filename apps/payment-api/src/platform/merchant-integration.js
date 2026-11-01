@@ -1,4 +1,4 @@
-import {validateOutboundWebhookUrl} from '@youpi/common';
+import {validateOutboundWebhookUrl,PLATFORM_ACCOUNT_ID} from '@youpi/common';
 
 export function merchantIntegrationReadiness(ctx,mid){
  const merchant=ctx.merchantRepo.findById(mid),db=ctx.db,account=ctx.accountRepo.findActiveForMerchant(mid);
@@ -6,6 +6,7 @@ export function merchantIntegrationReadiness(ctx,mid){
  const owner=db.queryOne("SELECT email_verified,mobile_verified FROM pp_users WHERE merchant_id=? AND role='OWNER'",[mid]);
  const callback=merchant?.webhookUrl&&validateOutboundWebhookUrl(merchant.webhookUrl);
  const checks=[
+  {id:'customer',label:'Independent customer merchant workspace',ready:mid!==PLATFORM_ACCOUNT_ID,next:'Dynamo Pay is the platform. Create a separate customer business workspace.'},
   {id:'owner',label:'Owner email and mobile verified',ready:Boolean(owner?.email_verified&&owner?.mobile_verified),next:'Complete owner invitation and contact verification'},
   {id:'active',label:'Merchant approved and active',ready:state?.status==='ACTIVE',next:'Review the submitted profile, approve and activate the merchant'},
   {id:'callback',label:'Public HTTPS merchant callback configured',ready:Boolean(callback?.valid&&callback.url.protocol==='https:'),next:'Save the game backend HTTPS callback URL'},
