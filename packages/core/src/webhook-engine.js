@@ -71,14 +71,15 @@ export class WebhookEngine {
       method: session.method || 'UPI',
       transaction:session.id,
       uniquetransactionid:session.orderId,
-      status:publicOutcome==='SUCCESS'?'SUCCESS':'FAILED',
+      status:publicOutcome==='SUCCESS'?'SUCCESS':publicOutcome==='PAYMENT_DETECTED'?'PENDING':'FAILED',
       bankReferenceNumber:bank?.bank_reference_number||session.bankReference||null,
       utr:bank?.bank_reference_number||session.bankReference||null,
       senderVpa:bank?.sender_vpa||null,
       payeeVpa:snapshot.upiId||null,
       beneficiary:{name:snapshot.payeeName||null,upiId:snapshot.upiId||null},
-      confirmationSource:session.confirmationSource||(session.verificationTag==='MERCHANT_CONFIRMED'?'MERCHANT':session.verificationLevel?'BANK_OBSERVER':null),
-      completedAt: session.completedAt ? session.completedAt.toISOString() : new Date().toISOString(),
+      confirmationSource:session.confirmationSource||(session.verificationTag==='NOTIFICATION_CONFIRMED'?'NOTIFICATION':session.verificationTag==='MERCHANT_CONFIRMED'?'MERCHANT':session.verificationLevel?'BANK_OBSERVER':null),
+      ...(session.confirmationSource==='NOTIFICATION'||session.verificationTag==='NOTIFICATION_CONFIRMED'?{bankVerified:false}:{}),
+      completedAt: publicOutcome==='PAYMENT_DETECTED'?null:session.completedAt ? session.completedAt.toISOString() : new Date().toISOString(),
       metadata: session.metadata || {}
     };
 

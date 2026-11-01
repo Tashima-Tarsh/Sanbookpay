@@ -19,6 +19,7 @@ export class LedgerRepository {
   static STANDARD_ACCOUNTS = [
     { code: 'MERCHANT_RECEIVABLES', name: 'Merchant Receivables', type: 'ASSET' },
     { code: 'PROVIDER_CLEARING', name: 'Provider Clearing Account', type: 'ASSET' },
+    { code: 'NOTIFICATION_CLEARING', name: 'Notification-confirmed funds awaiting bank reconciliation', type: 'ASSET' },
     { code: 'SETTLEMENT_RECEIVABLE', name: 'Settlement Receivable Account', type: 'ASSET' },
     { code: 'BANK_CASH', name: 'Settled Bank Cash', type: 'ASSET' },
     { code: 'PAYOUT_FUNDING', name: 'Payout Funding Account', type: 'ASSET' },

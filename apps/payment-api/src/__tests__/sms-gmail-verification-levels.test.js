@@ -123,7 +123,7 @@ describe('2-Level Verification (SMS Gateway + Gmail) & Queue Management Tests', 
     sessionRepo.transitionToTerminal(session2.id, PaymentStatus.CANCELLED);
   });
 
-  test('Android SMS Gateway pairs via QR, sends HMAC-signed bank SMS and completes payment', async () => {
+  test('paired phone and Gmail detect a payment without treating two alerts as settlement', async () => {
     // 1. Get pairing QR from admin
     const qrRes = await authFetch(`${baseUrl}/api/v1/admin/sms-gateway/pair-qr`);
     assert.equal(qrRes.status, 200);
@@ -183,11 +183,9 @@ describe('2-Level Verification (SMS Gateway + Gmail) & Queue Management Tests', 
     assert.equal(smsRes.status, 200);
     const smsResult = await smsRes.json();
     assert.equal(smsResult.accepted, true);
-    assert.equal(smsResult.attribution.attributed, true);
-    assert.equal(smsResult.attribution.paymentSessionId, s450.id);
-
-    // 1st hit (SMS Gateway) -> Level 1 verification recorded
-    assert.equal(smsResult.attribution.verificationLevel, 1);
+    assert.equal(smsResult.status,'VERIFICATION_PENDING');
+    assert.equal(smsResult.detection.paymentId,s450.id);
+    assert.equal(smsResult.detection.matchStatus,'DETECTED');
 
     // 2nd hit arrives from Gmail poller within 5s grace window -> upgrades to Level 2 Dual Verification
     const gmailRes = await authFetch(`${baseUrl}/api/v1/pollers/events`, {
@@ -195,6 +193,7 @@ describe('2-Level Verification (SMS Gateway + Gmail) & Queue Management Tests', 
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         source: 'GMAIL',
+        rawText: 'Rs 450.00 credited by UPI Ref 630414503474',
         receivingAccountId,
         amountPaise: '45000',
         amount: '450.00',
@@ -204,14 +203,10 @@ describe('2-Level Verification (SMS Gateway + Gmail) & Queue Management Tests', 
     assert.equal(gmailRes.status, 200);
     const gmailResult = await gmailRes.json();
     assert.equal(gmailResult.accepted, true);
-    assert.equal(gmailResult.attribution.attributed, true);
-    assert.equal(gmailResult.attribution.verificationLevel, 2);
-    assert.ok(gmailResult.attribution.verificationTag.includes('Dual Verification'));
-
-    // Verify session in DB is now SUCCESS and Level 2
-    const sUpdated = sessionRepo.findById(s450.id);
-    assert.equal(sUpdated.status, PaymentStatus.SUCCESS);
-    assert.equal(sUpdated.verificationLevel, 2);
+    assert.equal(gmailResult.status,'VERIFICATION_PENDING');
+    assert.equal(gmailResult.detection.duplicate,true);
+    assert.notEqual(sessionRepo.findById(s450.id).status,PaymentStatus.SUCCESS);
+    assert.equal(testDb.query('SELECT * FROM ledger_transactions').length,0);
   });
 
   test('Gmail credentials can be saved and connection tested via Admin API', async () => {

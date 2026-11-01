@@ -14,8 +14,8 @@ export class ReceiptNotificationService {
     const provider=this.db.queryOne("SELECT bank_reference FROM payment_orders WHERE payment_session_id=? AND status='SUCCESS'",[session.id]);
     const manual=session.verificationTag==='MERCHANT_CONFIRMED'?this.db.queryOne('SELECT bank_reference FROM manual_payment_references WHERE payment_id=?',[session.id]):null;
     const isCod=session.method==='COD';
-    const utr=isCod?null:(bank?.bank_reference_number||provider?.bank_reference||manual?.bank_reference||session.bankReference||session.bank_reference||null);
-    const confirmationSource=isCod?'ORDER_PLACED':provider?'PROVIDER':session.verificationTag==='MERCHANT_CONFIRMED'?'MERCHANT':bank?'BANK_OBSERVER':'RECORDED';
+    const utr=isCod?null:(bank?.bank_reference_number||provider?.bank_reference||manual?.bank_reference||session.bankReference||session.bank_reference||(session.verificationTag==='NOTIFICATION_CONFIRMED'?session.metadata?.reportedUtr:null)||null);
+    const confirmationSource=isCod?'ORDER_PLACED':provider?'PROVIDER':session.verificationTag==='NOTIFICATION_CONFIRMED'?'NOTIFICATION':session.verificationTag==='MERCHANT_CONFIRMED'?'MERCHANT':bank?'BANK_OBSERVER':'RECORDED';
     const orderId=session.orderId||session.order_id;
     const merchantName=merchant?.businessName||merchant?.business_name||'Dynamo Pay merchant';
     const phone=customer?.mobileNumber||customer?.mobile_number||session.metadata?.customerPhone;

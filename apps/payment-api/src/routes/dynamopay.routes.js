@@ -298,7 +298,7 @@ export function registerDynamoPayRoutes(server, ctx) {
       upiTransactionId: upiTxn,
       bankReferenceNumber: upiTxn,
       senderVpa: bank?.sender_vpa || null,
-      confirmationSource:session.verificationTag==='MERCHANT_CONFIRMED'?'MERCHANT':session.verificationLevel?'BANK_OBSERVER':null,
+      confirmationSource:session.verificationTag==='NOTIFICATION_CONFIRMED'?'NOTIFICATION':session.verificationTag==='MERCHANT_CONFIRMED'?'MERCHANT':session.verificationLevel?'BANK_OBSERVER':null,
       reportedUtr:session.metadata?.reportedUtr||null,
       senderName: session.metadata?.senderName || null,
       payeeVpa: session.metadata?.receivingAccountSnapshot?.upiId || null,

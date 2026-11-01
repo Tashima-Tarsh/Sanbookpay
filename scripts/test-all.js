@@ -68,6 +68,7 @@ const testFiles = [
   'apps/payment-api/src/__tests__/external-banking.test.js',
   'apps/payment-api/src/__tests__/secure-platform-boundaries.test.js',
   'apps/payment-api/src/__tests__/provider-ingress.test.js',
+  'apps/payment-api/src/__tests__/receiving-mirror.test.js',
   'apps/merchant-admin/src/__tests__/platform-ui.test.js',
   'scripts/chaos-concurrency.test.js',
   'scripts/postgres-acceptance.test.js',
@@ -79,6 +80,7 @@ const testFiles = [
 // Some suites crash with --test-force-exit on Windows (libuv async handle double-close).
 // Their logic passes; they just can't be force-terminated. Run them without that flag.
 const noForceExit = new Set([
+  'apps/payment-api/src/__tests__/receiving-mirror.test.js',
   'apps/payment-api/src/__tests__/provider-ingress.test.js',
   'packages/core/src/__tests__/webhook-engine.test.js',
   'packages/core/src/__tests__/webhook-failure-matrix.test.js'

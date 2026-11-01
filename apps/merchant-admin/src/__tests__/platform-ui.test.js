@@ -37,6 +37,7 @@ function harness(authenticated = true, platformOwner = false) {
     '/me': { user, csrfToken: 'session-csrf' }, '/analytics': { transactions: 1, successful: 1, pending: 0, successfulAmountPaise: '450' },
     '/balance': { accounts: [{ code: 'CASH', balancePaise: '450' }] }, '/api-keys': { keys: [] }, '/webhook-deliveries': { deliveries: [] },
     '/transactions': { items: [], total: 0 }, '/settings': { businessName: 'Business', apiIpWhitelist: [], channel: { allowedVpas: [] } },
+    '/receiving-mirror':{devices:[],events:[],setup:{receivingUpi:'receiver@bank',callbackConfigured:true,phonePaired:false},confirmationPolicy:'Alerts are evidence, not settlement.'},
     '/staff': { users: [] }, '/connections': { connections: [] }, '/receiving-accounts': { accounts: [] }, '/rules': { rules: [] },
     '/onboarding': { profile: {}, status: 'PROFILE_INCOMPLETE' }, '/cases': { items: [] }, '/operations/health': {},
     '/billing/invoices': { items: [] }, '/billing/subscriptions': { items: [] }, '/billing/plans': {items:[]},
@@ -74,7 +75,7 @@ test('platform renders role-scoped routes with safe text and numeric-string ledg
   assert.match(app.get('view').textContent, /4\.50/);
   assert.equal(app.get('accountName').textContent, '<img src=x onerror=alert(1)>');
   assert.doesNotMatch(source, /innerHTML|insertAdjacentHTML|localStorage|sessionStorage|document\.cookie/);
-  for (const route of ['transactions', 'keys', 'settings', 'onboarding', 'staff', 'connections', 'operations', 'billing']) {
+  for (const route of ['transactions', 'keys', 'settings', 'onboarding', 'staff', 'connections', 'mirror', 'operations', 'billing']) {
     app.context.location.hash = '#' + route; app.windowEvents.hashchange(); await flush();
     assert.doesNotMatch(app.get('view').textContent, /Could not load this view/, route);
   }

@@ -85,6 +85,18 @@ export function registerPollerRoutes(server, ctx) {
       return;
     }
 
+    if(ctx.receivingMirror&&rawText&&['GMAIL','EMAIL'].includes(body.source)){
+      try{
+        const observedAt=body.observedAt?new Date(body.observedAt):new Date();
+        const parsed=BankEmailParser.parse({subject:body.subject||body.rawPayload?.subject||'',body:rawText,date:observedAt,from:sender});
+        if(parsed){
+          const detection=ctx.receivingMirror.record({accountId:body.receivingAccountId,source:'GMAIL',rawText,observedAt,amountPaise:parsed.amountPaise,bankReference:parsed.bankReferenceNumber||null});
+          const paired=ctx.db.queryOne('SELECT b.device_id FROM pp_receiver_devices b JOIN android_devices d ON d.id=b.device_id WHERE b.account_id=? AND d.is_active=1',[body.receivingAccountId]);
+          if(paired)return HttpServer.json(res,200,{accepted:true,status:detection.matchStatus==='NOTIFICATION_CONFIRMED'?'SUCCESS':'VERIFICATION_PENDING',detection});
+        }
+      }catch(error){return HttpServer.json(res,error.statusCode||503,{error:'Email mirror could not persist this event; retry required'});}
+    }
+
     if (ctx.pipeline && rawText) {
       const pipeResult = ctx.pipeline.process({
         source: body.source,
@@ -177,7 +189,8 @@ export function registerPollerRoutes(server, ctx) {
     const deviceModel = body.deviceModel || 'Android Device';
 
     // Verify enrollment token against system secret or merchant token
-    if (!token || !safeEqual(String(token), enrollmentSecret)) {
+    const scopedPairing=Boolean(token)&&!safeEqual(String(token),enrollmentSecret);
+    if (!token || (scopedPairing&&!ctx.receivingMirror)) {
       HttpServer.json(res, 401, { error: 'Invalid or expired device pairing enrollment token.' });
       return;
     }
@@ -197,10 +210,14 @@ export function registerPollerRoutes(server, ctx) {
     const nowIso = new Date().toISOString();
 
     try {
+      ctx.db.transaction(()=>{
+      const binding=scopedPairing?ctx.receivingMirror.consumePairing(String(token),merchantId):null;
       ctx.db.execute(`
         INSERT INTO android_devices (id, merchant_id, device_name, device_model, signing_key_hash, is_active, last_heartbeat_at, created_at)
         VALUES (?, ?, ?, ?, ?, 1, ?, ?)
       `, [deviceId, merchantId, deviceName, deviceModel, signingKey, nowIso, nowIso]);
+      if(binding)ctx.receivingMirror.bindDevice(deviceId,binding);
+      });
 
       if (ctx.auditRepo) {
         ctx.auditRepo.log({
@@ -213,6 +230,8 @@ export function registerPollerRoutes(server, ctx) {
         });
       }
 
+      server.broadcastSse('platform:operations','invalidate',{changed:true});
+      server.broadcastSse('platform:merchant:'+merchantId,'invalidate',{changed:true});
       HttpServer.json(res, 200, {
         paired: true,
         deviceId,
@@ -221,7 +240,7 @@ export function registerPollerRoutes(server, ctx) {
         message: 'Android SMS Gateway paired successfully.'
       });
     } catch (err) {
-      HttpServer.json(res, 500, { error: `Failed to register Android device: ${err.message}` });
+      HttpServer.json(res, err.statusCode||500, { error: err.statusCode?err.message:'Failed to register Android device' });
     }
   };
 
@@ -230,11 +249,9 @@ export function registerPollerRoutes(server, ctx) {
 
   // --- ANDROID SMS GATEWAY OBSERVATION INGESTION ---
   const handleAndroidSmsEvents = async (req, res) => {
-    const rawBodyText = await new Promise(resolve => {
-      let data = '';
-      req.on('data', chunk => { data += chunk; });
-      req.on('end', () => resolve(data));
-    });
+    let rawBodyText;
+    try{rawBodyText=await HttpServer.parseRawBody(req);}catch{return HttpServer.json(res,413,{error:'Observation body is too large or incomplete'});}
+    if(rawBodyText.length>MAX_OBSERVATION_TEXT_CHARS)return HttpServer.json(res,413,{error:'Observation exceeds the notification size limit'});
 
     let body = {};
     try {
@@ -284,7 +301,9 @@ export function registerPollerRoutes(server, ctx) {
     }
 
     // Resolve Receiving Account for this merchant
-    let receivingAccountId = body.receivingAccountId;
+    const receiverBinding=ctx.receivingMirror?.binding(deviceId);
+    if(receiverBinding&&body.receivingAccountId&&body.receivingAccountId!==receiverBinding.account_id)return HttpServer.json(res,403,{error:'Device receiving account binding mismatch'});
+    let receivingAccountId = receiverBinding?.account_id || body.receivingAccountId;
     if (!receivingAccountId) {
       const activeAccount = ctx.accountRepo
         ? ctx.accountRepo.findActiveForMerchant(device.merchant_id)
@@ -296,7 +315,8 @@ export function registerPollerRoutes(server, ctx) {
     if(!boundAccount || boundAccount.merchant_id!==device.merchant_id) return HttpServer.json(res,403,{error:'Receiving account does not belong to this device merchant.'});
 
     // Extract amount and details: either pre-parsed or from raw bank SMS
-    let amountPaise = body.amountPaise ? BigInt(body.amountPaise) : undefined;
+    let amountPaise;
+    try{amountPaise=body.amountPaise?BigInt(body.amountPaise):undefined;}catch{return HttpServer.json(res,400,{error:'Invalid observation amount'});}
     let bankRef = body.bankReferenceNumber || body.utr;
     let senderVpa = body.senderVpa;
     let observedAt = body.observedAt ? new Date(body.observedAt) : new Date();
@@ -321,6 +341,16 @@ export function registerPollerRoutes(server, ctx) {
       try {
         amountPaise = toPaise(body.amount);
       } catch {}
+    }
+
+    if(receiverBinding&&ctx.receivingMirror){
+      try{
+        const parsed=rawText?BankSmsParser.parse({text:rawText,sender:body.sender||'ANDROID_NOTIFICATION',timestamp:observedAt}):null;
+        if(!parsed)return HttpServer.json(res,200,{accepted:true,status:'NON_PAYMENT_ALERT'});
+        const detection=ctx.receivingMirror.record({device,accountId:receivingAccountId,source:'ANDROID_OBSERVER',rawText,observedAt,amountPaise:parsed.amountPaise,bankReference:parsed.bankReferenceNumber||null});
+        ctx.db.execute('UPDATE android_devices SET last_observation_at=? WHERE id=?',[new Date().toISOString(),deviceId]);
+        return HttpServer.json(res,200,{accepted:true,status:detection.matchStatus==='NOTIFICATION_CONFIRMED'?'SUCCESS':'VERIFICATION_PENDING',detection});
+      }catch(error){return HttpServer.json(res,error.statusCode||503,{error:error.statusCode?error.message:'Receiving mirror unavailable; retry the same observation'});}
     }
 
     // Evaluate through Security & Fraud Verification Pipeline for Android Ingest
@@ -419,6 +449,10 @@ export function registerPollerRoutes(server, ctx) {
     if(!device||!timestamp||!signature||!Number.isFinite(Number(timestamp))||Math.abs(Date.now()-Number(timestamp))>60000||!verifyHmac(`${raw}:${timestamp}`,device.signing_key_hash,signature))return HttpServer.json(res,401,{error:'A paired device signature and current timestamp are required.'});
     ctx.db.execute("UPDATE android_devices SET last_heartbeat_at=datetime('now') WHERE id=?",[deviceId]);
 
+    if(ctx.receivingMirror?.binding(deviceId)){
+      server.broadcastSse('platform:operations','invalidate',{changed:true});
+      server.broadcastSse('platform:merchant:'+device.merchant_id,'invalidate',{changed:true});
+    }
     HttpServer.json(res, 200, {
       status: 'HEARTBEAT_ACK',
       timestamp: Date.now()
@@ -445,7 +479,9 @@ export function registerPollerRoutes(server, ctx) {
         baseUrl=requested.origin;
       }catch{return HttpServer.json(res,400,{error:'Enter the public HTTPS gateway origin, without a path or credentials.'});}
     }
-    const token = enrollmentSecret;
+    const account=ctx.accountRepo.findActiveForMerchant(merchantId);
+    if(!account)return HttpServer.json(res,409,{error:'Assign an active receiving account before phone pairing'});
+    const token = ctx.receivingMirror?ctx.receivingMirror.issuePairing(merchantId,account.id,false).token:enrollmentSecret;
     const sessionId = crypto.randomUUID();
     const expiresAt = Date.now() + (10 * 60 * 1000); // 10 minutes
 
@@ -469,7 +505,7 @@ export function registerPollerRoutes(server, ctx) {
     const rawDevices = ctx.db.query(`
       SELECT id, device_name, device_model, is_active, last_heartbeat_at, last_observation_at, created_at
       FROM android_devices
-      WHERE merchant_id = ? OR merchant_id = '00000000-0000-0000-0000-000000000001'
+      WHERE merchant_id = ?
       ORDER BY created_at DESC
     `, [merchantId]);
 
@@ -516,7 +552,7 @@ export function registerPollerRoutes(server, ctx) {
     const rawDevices = ctx.db.query(`
       SELECT id, device_name, device_model, is_active, last_heartbeat_at, last_observation_at, created_at
       FROM android_devices
-      WHERE merchant_id = ? OR merchant_id = '00000000-0000-0000-0000-000000000001'
+      WHERE merchant_id = ?
       ORDER BY created_at DESC
     `, [merchantId]);
 

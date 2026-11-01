@@ -312,7 +312,7 @@ export function createPaymentApp(customDb = null, options = {}) {
     if (session) {
       server.broadcastSse(session.id, 'status_change', {
         status: PaymentStatus.SUCCESS,
-        verificationLevel: data.verificationLevel || session.verificationLevel || 1,
+        verificationLevel: data.verificationLevel ?? session.verificationLevel ?? 1,
         verificationTag: data.verificationTag || session.verificationTag,
         sources: data.sources || session.verificationSources
       });
@@ -638,7 +638,7 @@ export function createPaymentApp(customDb = null, options = {}) {
   const platformPayments=registerPlatformPayments(server,context,platformIdentity);
   context.platformIdentity=platformIdentity;
   context.platformPayments=platformPayments;
-  context.canActivateMerchant=id=>Boolean(db.queryOne("SELECT c.id FROM provider_connections c JOIN pp_connection_policy p ON p.connection_id=c.id WHERE c.merchant_id=? AND c.environment='PRODUCTION' AND p.approved=1 AND p.enabled=1 AND c.is_active=1",[id]));
+  context.canActivateMerchant=id=>Boolean(db.queryOne("SELECT c.id FROM provider_connections c JOIN pp_connection_policy p ON p.connection_id=c.id WHERE c.merchant_id=? AND c.environment='PRODUCTION' AND p.approved=1 AND p.enabled=1 AND c.is_active=1",[id])||db.queryOne("SELECT p.merchant_id FROM pp_receiver_policies p JOIN payment_receiving_accounts a ON a.id=p.account_id AND a.merchant_id=p.merchant_id JOIN merchants m ON m.id=p.merchant_id WHERE p.merchant_id=? AND p.auto_success=1 AND a.is_active=1 AND m.webhook_url IS NOT NULL AND m.webhook_url<>'' AND EXISTS(SELECT 1 FROM pp_receiver_devices b JOIN android_devices d ON d.id=b.device_id JOIN payment_receiving_accounts bound ON bound.id=b.account_id WHERE d.is_active=1 AND lower(bound.upi_id)=lower(a.upi_id))",[id]));
   // Existing merchants retain their current operational state; registration never creates this grant.
   for(const legacy of merchantRepo.findAll())if(!db.queryOne('SELECT merchant_id FROM pp_merchants WHERE merchant_id=?',[legacy.id]))db.execute('INSERT INTO pp_merchants(merchant_id,status,profile,created_at,updated_at) VALUES(?,?,?,?,?)',[legacy.id,'ACTIVE',JSON.stringify({businessName:legacy.businessName,legacyInstallation:true}),legacy.createdAt?.toISOString?.()||new Date().toISOString(),new Date().toISOString()]);
   server.use(platformPayments.guard);
