@@ -1,0 +1,9 @@
+id,item,current_status,needed
+M01,Direct-UPI return URL,Confirmed code gap,Persist/validate returnUrl and test returning to game
+M02,Merchant name after success,Confirmed code gap,Return merchantName on terminal states; test reload
+M03,Full merchant co-branding,Confirmed incomplete UI/template,Apply branding fields and expose intended controls
+M04,Canonical downloadable OpenAPI,Confirmed documentation gap,Publish /v1/payments bearer contract
+M05,One customer handover pack,Separate UI actions today,Generate merchant-specific secure handover with no platform secrets
+M06,Real invitation/contact delivery,Not accepted; mocked in test,Configure delivery and prove real email/mobile verification
+M07,Current signed observer APK / phone,Blocked / unaccepted,"Build, sign, install and perform genuine Vivo acceptance"
+M08,Production correctness and customer wallet UAT,Earlier audit blockers open,Fix F01-F09 and pass customer-specific wallet/callback acceptance

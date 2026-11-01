@@ -1,0 +1,27 @@
+id,actor,acceptance_case,automated_evidence,uat_status,next_required_evidence
+U01,Super Admin,Sign in and verify MFA,Automated identity tests pass,BLOCKED,Browser host unavailable; actual root MFA session not exercised
+U02,Super Admin / merchant,"Create invite, deliver email/mobile, accept and submit profile",Automated identity tests pass,NOT RUN,Use a real customer contact and configured delivery adapters
+U03,Super Admin,Approve and activate intended merchant with correct route,Automated state/tenant tests pass,NOT RUN,No new live customer onboarding performed
+U04,Super Admin,"Issue merchant-scoped key, store secret, revoke test key",Automated key tests pass,NOT RUN,Hosted scoped key count is zero; do not issue customer credentials during read-only audit
+U05,Super Admin,Assign receiving UPI and acceptance policy,Synthetic policy tests pass,NOT RUN,Hosted acceptance-policy count is zero
+U06,Receiving phone,Build/sign APK and scan one-time QR,JS protocol tests only,BLOCKED,No native toolchain/device acceptance; hosted APK download returns 503
+U07,Receiving phone,Reject notifications from an unrelated installed app,F01 reproduced,FAIL IN ISOLATED PROBE,Add source-package/signing provenance; then native-device test
+U08,Receiving phone,Accept title/body split incoming alert,F02 reproduced,FAIL IN ISOLATED PROBE,Normalize and test actual notification formats
+U09,Receiving phone / platform,Accept permitted real Slice/GPay/PhonePe credit with UTR,Synthetic success tests pass,NOT RUN,No physical phone or real bank transfer used
+U10,Merchant developer,"Create payment, render checkout/QR, read Paid status",50-sample local HTTP benchmark passes,NOT RUN ON HOSTED MERCHANT,No hosted customer financial records created
+U11,Merchant developer,Verify raw signature and credit wallet exactly once,Local durable wallet benchmark passes,NOT RUN WITH CUSTOMER,Requires customer game backend and wallet database
+U12,Merchant developer,"Return 503 once, then receive automatic retry",Local retry observed in 6.59 seconds,NOT RUN WITH CUSTOMER,Need customer endpoint outage and recovery acceptance
+U13,Merchant developer,Same refund key retry creates only one refund,F06 reproduced,FAIL IN ISOLATED PROBE,Implement refund request claim before provider submission
+U14,Platform / merchant,Callback URL removal does not lose success delivery,F03 reproduced,FAIL IN ISOLATED PROBE,Persist recoverable event before enabling real collections
+U15,Receiving phone,One-to-two-minute-late credit reaches pending order safely,F04 reproduced,FAIL IN ISOLATED PROBE,Define late-order correlation and reconciliation
+U16,Super Admin,Reject hostname resolving to private callback destination,F05 validation/DNS probe reproduced,FAIL IN ISOLATED PROBE,Need DNS-safe outbound transport; no production exploit sent
+U17,Merchant developer,Legacy API accepts low amount under zero-minimum policy,F07 reproduced,FAIL IN ISOLATED PROBE,Use canonical validation or retire/document legacy behavior
+U18,Merchant developer,New merchant legacy API works without restarting,F08 reproduced,FAIL IN ISOLATED PROBE,Remove stale map dependency
+U19,Finance,Notification-clearing amount appears separately in balance,F09 reproduced,FAIL IN ISOLATED PROBE,Expose separate balance and perform genuine statement reconciliation
+U20,Platform / merchant,"Shared UPI, identical amount, overlapping orders",Ambiguity rejection tests pass,NOT RUN WITH CUSTOMERS,No safe payer/order disambiguation claimed
+U21,Receiving phone,"Offline queue, reconnect, revoked phone",Synthetic retry/revocation tests pass,NOT RUN ON DEVICE,"Test Vivo background restrictions, queue capacity and original event time"
+U22,Gmail owner,"OAuth consent, inbox binding, real credit email",Mock tests pass,NOT RUN,Requires Google consent and real inbox; no per-merchant inbox orchestration certification
+U23,Finance,Provider collection/refund/payout and settlement reconciliation,Protocol and reservation mocks pass,NOT RUN,Hosted provider connections zero; bank/provider approval and actual acceptance required
+U24,Operations,Restore backup and restart with outstanding callback,Synthetic DB/outbox tests pass,NOT RUN IN HOSTED RECOVERY,Isolated restore drill and always-on hosting decision required
+U25,Owner / merchant,"Desktop/mobile form, navigation, accessibility and errors",DOM harness tests pass,BLOCKED,Browser host unavailable; no screenshot/manual UAT pass
+U26,Operations,Measure actual bank-to-phone-to-host-to-wallet p50/p95,Local timing available only,NOT RUN,"Collect genuine timestamps on phone, server, callback and customer wallet"

@@ -1,0 +1,41 @@
+{
+  "sourceCommit": "8edffa388ab9bcc287bf6fddfc17149c464959c5",
+  "branch": "main",
+  "deployment": "Live on Render",
+  "regression": {
+    "suites": 59,
+    "passed": 59,
+    "reportedTests": 421,
+    "durationSeconds": 221.42
+  },
+  "checks": {
+    "typecheck": "passed",
+    "runtimeBuild": "passed",
+    "secretPatternChecks": "passed",
+    "isolatedPostgres": "passed",
+    "independentCodeReview": "no remaining important issue in reviewed changes"
+  },
+  "callbackBenchmark": {
+    "scope": "Synthetic isolated SQLite and HTTP; not bank/phone/hosted latency",
+    "alertToCallbackP50Ms": 11.55,
+    "alertToCallbackP95Ms": 22.45,
+    "alertToWalletP95Ms": 25.39,
+    "retryMs": 5685.02
+  },
+  "externalAcceptanceRequired": [
+    "Current native APK compile/sign with owner identity and real Vivo source-certificate capture",
+    "Real bank credit/alert and customer callback/wallet test",
+    "Real contact verification delivery and Google consent if used",
+    "Always-on hosting, backup/restore and database expiry plan"
+  ],
+  "productionVerdict": "Code repairs verified; unrestricted live-production acceptance is not certified",
+  "renderDeployId": "dep-dbjercflk1mc7392084g",
+  "liveAtUtc": "2026-11-01T07:44:54.709919Z",
+  "liveChecks": {
+    "readiness": 200,
+    "canonicalOpenApi": 200,
+    "integrationPackUi": true,
+    "anonymousIntegrationEndpoint": 401,
+    "runtimeLogMarkers": "No fatal/database error markers in inspected recent logs"
+  }
+}

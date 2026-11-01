@@ -1,0 +1,18 @@
+flowchart TB
+  SA[Super Admin: MFA / merchant setup] --> UI[Platform workspace]
+  M[Merchant game backend: scoped API key] --> GW[Render HTTPS gateway]
+  U[Player browser] --> GW
+  UI --> GW
+  GW --> API[Payment API / identity / policies]
+  GW --> CO[Hosted checkout: QR / UPI intent]
+  U == pays outside Dynamo ==> BANK[Assigned receiving UPI / bank account]
+  BANK -. receiving alert .-> PHONE[Paired Android observer]
+  BANK -. bank email .-> GM[Gmail observer: OAuth / polling]
+  PHONE -->|signed event| API
+  GM -->|authenticated observation| API
+  P[Approved provider: separate integration] -->|verified webhook / inquiry| API
+  API --> DB[(PostgreSQL: tenant data / orders / ledger / outbox)]
+  DB --> CB[Callback dispatcher: immediate + retries]
+  CB -->|signed SUCCESS / delivery ID| M
+  M --> WALLET[Merchant credits player once]
+  API -. authenticated SSE .-> UI

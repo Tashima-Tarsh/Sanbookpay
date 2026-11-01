@@ -9,6 +9,10 @@
     "apps/*"
   ],
   "scripts": {
+    "gmail-auth": "node scripts/gmail-auth.js",
+    "notifications:setup": "node scripts/notifications.js --setup",
+    "notifications:status": "node scripts/notifications.js",
+    "notifications:test": "node scripts/notifications.js --test",
     "build": "node scripts/check-runtime.js",
     "build:typescript": "tsc -b",
     "clean": "node scripts/clean.js",

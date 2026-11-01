@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE svg
+  PUBLIC '-//W3C//DTD SVG 1.0//EN'
+  'http://www.w3.org/TR/2001/REC-SVG-20010904/DTD/svg10.dtd'>
+<svg width="480" height="500" preserveAspectRatio="xMinYMin meet" viewBox="0 0 480 500" xmlns="http://www.w3.org/2000/svg" version="1.0" fill-rule="evenodd" xmlns:xlink="http://www.w3.org/1999/xlink">
+	<title>...</title>
+	<desc>...</desc>
+	<clipPath id="clip">
+		<rect x="0" y="0" width="480" height="500"/>
+	</clipPath>
+	<g id="group" transform="scale(1,-1) translate(0,-500)" style="clip-path: url(#clip)">
+		<g transform="">
+			<rect x="0" y="430" width="145" height="60" rx="7" ry="7" style="stroke: rgb(9%,40%,30%); stroke-linecap: butt; stroke-width: 0.8; fill: rgb(93%,96%,94%); fill-rule: evenodd;"/>
+			<text x="22.6806640625" y="472" style="font-family: Bold; font-size: 10px;fill: rgb(9%,23%,20%); stroke:none;" transform="translate(0,944) scale(1,-1)">Super Admin / portal</text>
+			<text x="17.33808593749999" y="457" style="font-family: Regular; font-size: 8.4px;fill: rgb(32%,39%,36%); stroke:none;" transform="translate(0,914) scale(1,-1)">MFA, merchant and UPI setup</text>
+			<rect x="167" y="430" width="145" height="60" rx="7" ry="7" style="stroke: rgb(9%,40%,30%); stroke-linecap: butt; stroke-width: 0.8; fill: rgb(93%,96%,94%); fill-rule: evenodd;"/>
+			<text x="181.306640625" y="472" style="font-family: Bold; font-size: 10px;fill: rgb(9%,23%,20%); stroke:none;" transform="translate(0,944) scale(1,-1)">Merchant game backend</text>
+			<text x="197.86298828125" y="457" style="font-family: Regular; font-size: 8.4px;fill: rgb(32%,39%,36%); stroke:none;" transform="translate(0,914) scale(1,-1)">Scoped bearer API key</text>
+			<rect x="334" y="430" width="145" height="60" rx="7" ry="7" style="stroke: rgb(9%,40%,30%); stroke-linecap: butt; stroke-width: 0.8; fill: rgb(93%,96%,94%); fill-rule: evenodd;"/>
+			<text x="369.21484375" y="472" style="font-family: Bold; font-size: 10px;fill: rgb(9%,23%,20%); stroke:none;" transform="translate(0,944) scale(1,-1)">Player checkout</text>
+			<text x="364.09599609375" y="457" style="font-family: Regular; font-size: 8.4px;fill: rgb(32%,39%,36%); stroke:none;" transform="translate(0,914) scale(1,-1)">Hosted QR / UPI intent</text>
+			<rect x="160" y="330" width="160" height="65" rx="7" ry="7" style="stroke: rgb(9%,40%,30%); stroke-linecap: butt; stroke-width: 0.8; fill: rgb(93%,96%,94%); fill-rule: evenodd;"/>
+			<text x="185.087890625" y="377" style="font-family: Bold; font-size: 10px;fill: rgb(9%,23%,20%); stroke:none;" transform="translate(0,754) scale(1,-1)">Render HTTPS gateway</text>
+			<text x="191.11552734375" y="362" style="font-family: Regular; font-size: 8.4px;fill: rgb(32%,39%,36%); stroke:none;" transform="translate(0,724) scale(1,-1)">API + Checkout + Console</text>
+			<text x="194.98330078125" y="350" style="font-family: Regular; font-size: 8.4px;fill: rgb(32%,39%,36%); stroke:none;" transform="translate(0,700) scale(1,-1)">One hosted deployment</text>
+			<rect x="0" y="225" width="145" height="70" rx="7" ry="7" style="stroke: rgb(9%,40%,30%); stroke-linecap: butt; stroke-width: 0.8; fill: rgb(93%,96%,94%); fill-rule: evenodd;"/>
+			<text x="23.515625" y="277" style="font-family: Bold; font-size: 10px;fill: rgb(9%,23%,20%); stroke:none;" transform="translate(0,554) scale(1,-1)">Receiving UPI / bank</text>
+			<text x="40.218652343749994" y="262" style="font-family: Regular; font-size: 8.4px;fill: rgb(32%,39%,36%); stroke:none;" transform="translate(0,524) scale(1,-1)">Money goes here</text>
+			<text x="34.37802734374999" y="250" style="font-family: Regular; font-size: 8.4px;fill: rgb(32%,39%,36%); stroke:none;" transform="translate(0,500) scale(1,-1)">outside Dynamo Pay</text>
+			<rect x="169" y="225" width="145" height="70" rx="7" ry="7" style="stroke: rgb(9%,40%,30%); stroke-linecap: butt; stroke-width: 0.8; fill: rgb(93%,96%,94%); fill-rule: evenodd;"/>
+			<text x="211.2412109375" y="277" style="font-family: Bold; font-size: 10px;fill: rgb(9%,23%,20%); stroke:none;" transform="translate(0,554) scale(1,-1)">Payment API</text>
+			<text x="192.0556640625" y="262" style="font-family: Regular; font-size: 8.4px;fill: rgb(32%,39%,36%); stroke:none;" transform="translate(0,524) scale(1,-1)">Identity, matching, policies</text>
+			<text x="186.91640625" y="250" style="font-family: Regular; font-size: 8.4px;fill: rgb(32%,39%,36%); stroke:none;" transform="translate(0,500) scale(1,-1)">Notification / provider source</text>
+			<rect x="334" y="225" width="145" height="70" rx="7" ry="7" style="stroke: rgb(9%,40%,30%); stroke-linecap: butt; stroke-width: 0.8; fill: rgb(93%,96%,94%); fill-rule: evenodd;"/>
+			<text x="361.7783203125" y="277" style="font-family: Bold; font-size: 10px;fill: rgb(9%,23%,20%); stroke:none;" transform="translate(0,554) scale(1,-1)">Approved provider</text>
+			<text x="369.07939453125" y="262" style="font-family: Regular; font-size: 8.4px;fill: rgb(32%,39%,36%); stroke:none;" transform="translate(0,524) scale(1,-1)">Separate credentials</text>
+			<text x="357.28740234375" y="250" style="font-family: Regular; font-size: 8.4px;fill: rgb(32%,39%,36%); stroke:none;" transform="translate(0,500) scale(1,-1)">Verified webhook / inquiry</text>
+			<rect x="0" y="110" width="145" height="72" rx="7" ry="7" style="stroke: rgb(9%,40%,30%); stroke-linecap: butt; stroke-width: 0.8; fill: rgb(93%,96%,94%); fill-rule: evenodd;"/>
+			<text x="25.7177734375" y="164" style="font-family: Bold; font-size: 10px;fill: rgb(9%,23%,20%); stroke:none;" transform="translate(0,328) scale(1,-1)">Receiving observers</text>
+			<text x="17.22529296874999" y="149" style="font-family: Regular; font-size: 8.4px;fill: rgb(32%,39%,36%); stroke:none;" transform="translate(0,298) scale(1,-1)">Paired Android: signed events</text>
+			<text x="32.823535156249996" y="137" style="font-family: Regular; font-size: 8.4px;fill: rgb(32%,39%,36%); stroke:none;" transform="translate(0,274) scale(1,-1)">Gmail: OAuth, polling</text>
+			<rect x="169" y="110" width="145" height="72" rx="7" ry="7" style="stroke: rgb(9%,40%,30%); stroke-linecap: butt; stroke-width: 0.8; fill: rgb(93%,96%,94%); fill-rule: evenodd;"/>
+			<text x="214.28564453125" y="164" style="font-family: Bold; font-size: 10px;fill: rgb(9%,23%,20%); stroke:none;" transform="translate(0,328) scale(1,-1)">PostgreSQL</text>
+			<text x="192.86162109375" y="149" style="font-family: Regular; font-size: 8.4px;fill: rgb(32%,39%,36%); stroke:none;" transform="translate(0,298) scale(1,-1)">Orders / evidence / ledger</text>
+			<text x="195.37998046874998" y="137" style="font-family: Regular; font-size: 8.4px;fill: rgb(32%,39%,36%); stroke:none;" transform="translate(0,274) scale(1,-1)">Policies / durable outbox</text>
+			<rect x="334" y="110" width="145" height="72" rx="7" ry="7" style="stroke: rgb(9%,40%,30%); stroke-linecap: butt; stroke-width: 0.8; fill: rgb(93%,96%,94%); fill-rule: evenodd;"/>
+			<text x="363.65087890625" y="164" style="font-family: Bold; font-size: 10px;fill: rgb(9%,23%,20%); stroke:none;" transform="translate(0,328) scale(1,-1)">Merchant callback</text>
+			<text x="353.99794921875" y="149" style="font-family: Regular; font-size: 8.4px;fill: rgb(32%,39%,36%); stroke:none;" transform="translate(0,298) scale(1,-1)">Signed SUCCESS, delivery ID</text>
+			<text x="359.63759765625" y="137" style="font-family: Regular; font-size: 8.4px;fill: rgb(32%,39%,36%); stroke:none;" transform="translate(0,274) scale(1,-1)">Game credits player once</text>
+			<path d="M 73,430 L 185,395 Z" style="stroke: rgb(9%,40%,30%); stroke-linecap: butt; stroke-width: 1;"/>
+			<polygon points="185 395, 179.892 399.7862, 178.0756 393.9739" style="stroke: rgb(9%,40%,30%); stroke-linecap: butt; stroke-width: 1; fill: rgb(9%,40%,30%); fill-rule: evenodd;"/>
+			<path d="M 240,430 L 240,395 Z" style="stroke: rgb(9%,40%,30%); stroke-linecap: butt; stroke-width: 1;"/>
+			<polygon points="240 395, 243.0448 401.3031, 236.9552 401.3031" style="stroke: rgb(9%,40%,30%); stroke-linecap: butt; stroke-width: 1; fill: rgb(9%,40%,30%); fill-rule: evenodd;"/>
+			<path d="M 405,430 L 295,395 Z" style="stroke: rgb(9%,40%,30%); stroke-linecap: butt; stroke-width: 1;"/>
+			<polygon points="295 395, 301.9296 394.0097, 300.0832 399.8126" style="stroke: rgb(9%,40%,30%); stroke-linecap: butt; stroke-width: 1; fill: rgb(9%,40%,30%); fill-rule: evenodd;"/>
+			<path d="M 240,330 L 240,295 Z" style="stroke: rgb(9%,40%,30%); stroke-linecap: butt; stroke-width: 1;"/>
+			<polygon points="240 295, 243.0448 301.3031, 236.9552 301.3031" style="stroke: rgb(9%,40%,30%); stroke-linecap: butt; stroke-width: 1; fill: rgb(9%,40%,30%); fill-rule: evenodd;"/>
+			<path d="M 334,260 L 314,260 Z" style="stroke: rgb(9%,40%,30%); stroke-linecap: butt; stroke-width: 1;"/>
+			<polygon points="314 260, 320.3031 256.9552, 320.3031 263.0448" style="stroke: rgb(9%,40%,30%); stroke-linecap: butt; stroke-width: 1; fill: rgb(9%,40%,30%); fill-rule: evenodd;"/>
+			<path d="M 72,225 L 72,182 Z" style="stroke: rgb(9%,40%,30%); stroke-linecap: butt; stroke-width: 1;"/>
+			<polygon points="72 182, 75.04476 188.3031, 68.95524 188.3031" style="stroke: rgb(9%,40%,30%); stroke-linecap: butt; stroke-width: 1; fill: rgb(9%,40%,30%); fill-rule: evenodd;"/>
+			<text x="75.0" y="208.5" style="font-family: Regular; font-size: 7.5px;fill: rgb(32%,39%,36%); stroke:none;" transform="translate(0,417) scale(1,-1)">alert only</text>
+			<path d="M 145,148 L 169,248 Z" style="stroke: rgb(9%,40%,30%); stroke-linecap: butt; stroke-width: 1;"/>
+			<polygon points="169 248, 164.5683 242.5815, 170.4897 241.1604" style="stroke: rgb(9%,40%,30%); stroke-linecap: butt; stroke-width: 1; fill: rgb(9%,40%,30%); fill-rule: evenodd;"/>
+			<path d="M 240,225 L 240,182 Z" style="stroke: rgb(9%,40%,30%); stroke-linecap: butt; stroke-width: 1;"/>
+			<polygon points="240 182, 243.0448 188.3031, 236.9552 188.3031" style="stroke: rgb(9%,40%,30%); stroke-linecap: butt; stroke-width: 1; fill: rgb(9%,40%,30%); fill-rule: evenodd;"/>
+			<path d="M 314,145 L 334,145 Z" style="stroke: rgb(9%,40%,30%); stroke-linecap: butt; stroke-width: 1;"/>
+			<polygon points="334 145, 327.6969 148.0448, 327.6969 141.9552" style="stroke: rgb(9%,40%,30%); stroke-linecap: butt; stroke-width: 1; fill: rgb(9%,40%,30%); fill-rule: evenodd;"/>
+			<text x="0" y="66" style="font-family: Bold; font-size: 9px;fill: rgb(9%,23%,20%); stroke:none;" transform="translate(0,132) scale(1,-1)">Money: player -&gt; receiving UPI. Messages: observers -&gt; API -&gt; merchant.</text>
+			<text x="0" y="49" style="font-family: Regular; font-size: 9px;fill: rgb(32%,39%,36%); stroke:none;" transform="translate(0,98) scale(1,-1)">Notification SUCCESS is platform acceptance; bankVerified=false.</text>
+			<text x="0" y="32" style="font-family: Regular; font-size: 8.3px;fill: rgb(32%,39%,36%); stroke:none;" transform="translate(0,64) scale(1,-1)">Render Free, current phone APK and real-payment acceptance remain operational gates.</text>
+		</g>
+	</g>
+</svg>
