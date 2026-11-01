@@ -100,6 +100,7 @@ import { registerPaymentLinkRoutes } from './routes/payment-link.routes.js';
 import { registerCallbackWalletRoutes } from './routes/callback-wallet.routes.js';
 import { createUpiSimpleService } from './services/upi-simple.js';
 import { registerUpiSimpleRoutes } from './routes/upi-simple.routes.js';
+import { registerUpiIntentRoutes } from './routes/upi-intent.routes.js';
 import { getWhatsAppBerryService, WhatsAppBerryService } from './services/whatsapp-berry.service.js';
 import { ReceiptNotificationService } from './services/receipt-notification.service.js';
 import { NotificationDeliveryService } from './services/notification-delivery.service.js';
@@ -244,10 +245,18 @@ export function createPaymentApp(customDb = null, options = {}) {
   const dynamoGmail = new DynamoPayGmailVerification();
   const dynamoSMS = new DynamoPaySMSGateway();
 
-  // Connect Dynamo Pay queue to Redis
-  dynamoQueue.connect().catch((err) => {
-    console.warn('[DynamoPay Queue] Redis connection failed:', err.message);
-    console.warn('[DynamoPay Queue] Running without Redis queue - using in-memory fallback');
+  // Connect Dynamo Pay queue to Redis (auxiliary job queue only).
+  // Durable financial event persistence is provided by the database-backed callback_outbox
+  // (callback_outbox / callback_delivery_attempts tables), NOT by an in-memory queue.
+  // An in-memory fallback must never silently replace durable financial processing.
+  let dynamoQueueRedisAvailable = false;
+  dynamoQueue.connect().then(() => {
+    dynamoQueueRedisAvailable = true;
+  }).catch((err) => {
+    dynamoQueueRedisAvailable = false;
+    console.warn('[DynamoPay Queue] Redis unavailable:', err.message);
+    console.warn('[DynamoPay Queue] Durable financial events remain persisted in callback_outbox (PostgreSQL/SQLite).');
+    console.warn('[DynamoPay Queue] No in-memory queue is used as a durable substitute for financial events.');
   });
 
   // Connect Gmail verification if credentials available
@@ -612,6 +621,7 @@ export function createPaymentApp(customDb = null, options = {}) {
     webhookEngine,
     providerWebhookEngine,
     dynamoQueue,
+    dynamoQueueRedisAvailable: () => dynamoQueueRedisAvailable,
     dynamoWebhooks,
     paiseOffsetAllocator,
     vpaRotationGuard,
@@ -683,6 +693,9 @@ registerHyperswitchRoutes(server, context);
   registerDynamoPayRoutes(server, context);
 
   registerUpiSimpleRoutes(server, context);
+
+  // Universal UPI Intent Return API (Phase 1 & 3)
+  registerUpiIntentRoutes(server, context);
 
   // Super Admin authentication routes
   registerSuperAdminRoutes(server, context);

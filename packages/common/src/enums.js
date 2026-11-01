@@ -2,15 +2,22 @@
  * Internal high-resolution payment session lifecycle states.
  */
 export const PaymentStatus = Object.freeze({
+  CREATED: 'CREATED',
   INITIATED: 'INITIATED',
   QUEUED: 'QUEUED',
   ACTIVE: 'ACTIVE',
+  INTENT_OPENED: 'INTENT_OPENED',
   PROCESSING: 'PROCESSING',
+  CLIENT_REPORTED_SUCCESS: 'CLIENT_REPORTED_SUCCESS',
+  CREDIT_OBSERVED: 'CREDIT_OBSERVED',
   VERIFICATION_PENDING: 'VERIFICATION_PENDING',
+  MULTI_SIGNAL_MATCHED: 'MULTI_SIGNAL_MATCHED',
+  PAID_VERIFIED: 'PAID_VERIFIED',
   SUCCESS: 'SUCCESS',
   FAILED: 'FAILED',
   EXPIRED: 'EXPIRED',
-  CANCELLED: 'CANCELLED'
+  CANCELLED: 'CANCELLED',
+  RECONCILIATION_REQUIRED: 'RECONCILIATION_REQUIRED'
 });
 
 /**
@@ -53,6 +60,7 @@ export const ObserverSource = Object.freeze({
   GOOGLE_MESSAGES: 'GOOGLE_MESSAGES',
   ANDROID_OBSERVER: 'ANDROID_OBSERVER',
   SMS_GATEWAY: 'SMS_GATEWAY',
+  INTENT_RETURN: 'INTENT_RETURN',
   MANUAL_COUNTER: 'MANUAL_COUNTER'
 });
 
@@ -184,5 +192,26 @@ export const UpiMirrorWebhookEvent = Object.freeze({
   PAYMENT_VERIFIED: 'payment.verified',
   PAYMENT_FAILED: 'payment.failed',
   PAYMENT_EXCEPTION: 'payment.exception',
-  PAYMENT_REVERSED: 'payment.reversed'
+  PAYMENT_REVERSED: 'payment.reversed',
+  PAYMENT_INTENT_OPENED: 'payment.intent_opened',
+  PAYMENT_CLIENT_RETURNED: 'payment.client_returned',
+  PAYMENT_CLIENT_REPORTED_SUCCESS: 'payment.client_reported_success',
+  PAYMENT_CREDIT_OBSERVED: 'payment.credit_observed',
+  PAYMENT_MULTI_SIGNAL_MATCHED: 'payment.multi_signal_matched',
+  PAYMENT_EXPIRED: 'payment.expired',
+  PAYMENT_RECONCILIATION_REQUIRED: 'payment.reconciliation_required'
+});
+
+/**
+ * Evidence level for a payment observation, reflecting how authoritative the source is.
+ * REPORTED = buyer/client-reported (not bank-confirmed).
+ * OBSERVED = Gmail/SMS notification observed (supplementary evidence).
+ * MATCHED = multiple signals correlated on reliable identifiers.
+ * VERIFIED = authoritative bank/PSP record confirmed.
+ */
+export const PaymentEvidenceLevel = Object.freeze({
+  REPORTED: 'REPORTED',
+  OBSERVED: 'OBSERVED',
+  MATCHED: 'MATCHED',
+  VERIFIED: 'VERIFIED'
 });

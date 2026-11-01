@@ -605,6 +605,13 @@ export class PaymentSessionRepository {
     });
   }
 
+  findByIdempotencyKey(idempotencyKey) {
+    if (!idempotencyKey) return null;
+    const row = this.db.queryOne('SELECT * FROM payment_sessions WHERE idempotency_key = ? ORDER BY created_at DESC LIMIT 1', [idempotencyKey]);
+    if (!row) return null;
+    return this.mapRow(row);
+  }
+
   bindDevice(sessionId, deviceId) {
     const now = new Date().toISOString();
     this.db.execute(

@@ -1,5 +1,8 @@
+import crypto from 'node:crypto';
 import { PaymentStatus, ObservationAttributionStatus, TicketStatus, SenderType } from '@youpi/common';
+import { assertValidTransition } from '@youpi/core';
 const BANK_SOURCES = ['GMAIL','GOOGLE_MESSAGES','ANDROID_OBSERVER','SMS_GATEWAY'];
+const INTENT_SOURCE = 'INTENT_RETURN';
 
 export class AttributionEngine {
   /**
@@ -642,6 +645,142 @@ export class AttributionEngine {
       lateMatch: false,
       observationId: savedObs.id,
       outcomeStatus: ObservationAttributionStatus.UNATTRIBUTED
+    };
+  }
+
+  /**
+   * Processes a client-reported UPI intent return as triple-signal input (Source A).
+   *
+   * Client-returns are REPORTED-level evidence (buyer-reported), NOT bank-confirmed settlement.
+   * Correlation: if an authoritative bank observation (Gmail/SMS/Android) already exists for the
+   * same payment (matched by UTR + receiving account + amount, never amount alone), the payment
+   * is upgraded to MULTI_SIGNAL_MATCHED. PAID_VERIFIED still requires an authoritative
+   * bank/provider verification event.
+   *
+   * @param {{ paymentId: string, attemptId: string?, correlationId: string?, upiTransactionReference?: string, amountPaise?: number, sourcePlatform?: string, appIdentity?: string, rawResult?: string, eventTimestamp?: Date, metadata?: Record<string,any> }} signal
+   * @returns {{ attributed: boolean, paymentSessionId?: string, outcomeStatus: string, matchedBankObservation?: boolean }}
+   */
+  processIntentReturnSignal(signal) {
+    const { paymentId, attemptId, correlationId, upiTransactionReference, amountPaise,
+      sourcePlatform, appIdentity, rawResult, eventTimestamp, metadata = {} } = signal;
+
+    const session = this.sessionRepo.findById(paymentId);
+    if (!session) {
+      return { attributed: false, paymentSessionId: undefined, outcomeStatus: 'PAYMENT_NOT_FOUND' };
+    }
+
+    // Persist the intent return as a REPORTED-level observation (supplementary evidence).
+    const obsId = `obs_intent_${crypto.randomUUID()}`;
+    try {
+      this.obsRepo.create({
+        id: obsId,
+        receivingAccountId: session.receivingAccountId || null,
+        source: INTENT_SOURCE,
+        amountPaise: Number(amountPaise || session.amountPaise),
+        observedAt: eventTimestamp || new Date(),
+        senderVpa: metadata.senderVpa || null,
+        bankReferenceNumber: upiTransactionReference || null,
+        fingerprintHash: crypto.createHash('sha256')
+          .update(`INTENT:${paymentId}:${signal.idempotencyKey || paymentId}:${Date.now()}`).digest('hex'),
+        rawPayload: JSON.stringify({
+          source: INTENT_SOURCE, attemptId, correlationId, upiTransactionReference,
+          sourcePlatform, appIdentity, rawResult, metadata
+        }),
+        attributionStatus: ObservationAttributionStatus.UNATTRIBUTED,
+        attributedPaymentId: paymentId
+      });
+    } catch (e) {
+      // Observation already recorded by the intent route; continue to correlation.
+    }
+
+    // Correlate with any existing bank observation for this payment (UTR + account + amount).
+    let matchedBankObservation = false;
+    if (upiTransactionReference && session.receivingAccountId) {
+      const bankObs = this.obsRepo.findByReceivingAccount(session.receivingAccountId, 100)
+        .filter(o => BANK_SOURCES.includes(o.source))
+        .filter(o => o.bankReferenceNumber && o.bankReferenceNumber === upiTransactionReference)
+        .filter(o => Number(o.amountPaise) === Number(amountPaise || session.amountPaise));
+      if (bankObs.length > 0) matchedBankObservation = true;
+    }
+
+    // Determine outcome status based on current session state + correlation.
+    let outcomeStatus = session.status;
+    if (matchedBankObservation) {
+      // Multiple signals matched (intent return + bank observation) but still awaiting
+      // authoritative bank/provider verification for PAID_VERIFIED.
+      outcomeStatus = PaymentStatus.MULTI_SIGNAL_MATCHED;
+    } else if (session.status === PaymentStatus.INTENT_OPENED ||
+               session.status === PaymentStatus.ACTIVE ||
+               session.status === PaymentStatus.PROCESSING) {
+      outcomeStatus = PaymentStatus.CLIENT_REPORTED_SUCCESS;
+    }
+
+    // Transition state if allowed (client-reported, non-terminal progression).
+    if (outcomeStatus !== session.status) {
+      try {
+        assertValidTransition(session.status, outcomeStatus);
+      } catch (e) {
+        // Transition not permitted; keep current status but record the signal.
+      }
+      if (outcomeStatus !== session.status) {
+        try {
+          const now = new Date().toISOString();
+          this.sessionRepo.db.execute(
+            'UPDATE payment_sessions SET status = ?, verification_tag = ?, updated_at = ? WHERE id = ?',
+            [outcomeStatus, `Intent return correlated${matchedBankObservation ? ' + bank signal' : ''}`, now, paymentId]
+          );
+        } catch (e) {
+          console.error('[Attribution] intent return status transition warning:', e.message);
+        }
+      }
+    }
+
+    // Audit log the triple-signal event.
+    this.auditRepo?.log({
+      merchantId: session.merchantId,
+      entityType: 'PAYMENT_SESSION',
+      entityId: paymentId,
+      action: 'INTENT_RETURN_SIGNAL_RECEIVED',
+      actorType: 'OBSERVER',
+      details: {
+        source: INTENT_SOURCE,
+        attemptId,
+        correlationId,
+        upiTransactionReference,
+        matchedBankObservation,
+        outcomeStatus,
+        sourcePlatform,
+        appIdentity
+      }
+    });
+
+    this.eventEmitter.emit('PAYMENT.INTENT_RETURN_SIGNAL', {
+      paymentId,
+      orderId: session.orderId,
+      merchantId: session.merchantId,
+      status: outcomeStatus,
+      matchedBankObservation,
+      evidenceLevel: 'REPORTED'
+    });
+
+    // If bank verification already finalized this session, emit verified status.
+    const updated = this.sessionRepo.findById(paymentId);
+    if (updated && updated.status === PaymentStatus.PAID_VERIFIED) {
+      this.eventEmitter.emit('PAYMENT.VERIFIED', {
+        paymentId: updated.id,
+        orderId: updated.orderId,
+        merchantId: updated.merchantId,
+        amountPaise: updated.amountPaise,
+        verificationLevel: updated.verificationLevel || 0,
+        verificationTag: updated.verificationTag
+      });
+    }
+
+    return {
+      attributed: matchedBankObservation,
+      paymentSessionId: paymentId,
+      outcomeStatus,
+      matchedBankObservation
     };
   }
 }

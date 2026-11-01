@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.sanbookpay.upiintent">
+
+    <!--
+      The Sanbookpay Universal UPI Intent SDK requires network access to submit buyer-reported
+      payment returns to Sanbookpay. No other dangerous permissions are required.
+      No accessibility services, screen overlays, or SMS/notification listener permissions are used.
+    -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <application>
+        <!-- WorkManager retry worker for reliable network retry after process death / backgrounding. -->
+        <service
+            android:name="androidx.work.impl.background.systemjob.SystemJobService"
+            android:exported="false"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
+    </application>
+
+</manifest>

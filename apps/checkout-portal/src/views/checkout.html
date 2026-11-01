@@ -3420,6 +3420,113 @@
       border-color: var(--dp-primary) !important;
       color: var(--dp-text) !important;
     }
+
+    /* --- UPI Intent Status Strip (client-reported vs verified) --- */
+    .ypg-intent-status-strip {
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      border-radius: 10px;
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 12.5px;
+      font-weight: 600;
+      color: #166534;
+      margin: 0 0 14px 0;
+    }
+    .ypg-intent-status-strip.is-verified {
+      background: #eff6ff;
+      border-color: #bfdbfe;
+      color: #1e40af;
+    }
+    .ypg-intent-status-strip .ypg-pulse-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #16a34a;
+      flex-shrink: 0;
+    }
+    .ypg-intent-status-strip.is-verified .ypg-pulse-dot {
+      background: #2563eb;
+    }
+
+    /* --- Pay by Any UPI App (Android mobile deep links) --- */
+    .ypg-pay-any-upi-card {
+      background: #ffffff;
+      border: 1px solid var(--ypg-border);
+      border-radius: 12px;
+      padding: 14px 16px;
+      margin: 14px 0 0 0;
+    }
+    .ypg-upi-app-launch-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+      gap: 10px;
+      margin: 8px 0 4px 0;
+    }
+    .ypg-upi-app-tile {
+      border: 1.5px solid var(--ypg-border);
+      border-radius: 10px;
+      padding: 10px 6px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      background: #f8fafc;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .ypg-upi-app-tile:hover {
+      border-color: var(--ypg-blue);
+      background: #eff6ff;
+    }
+    .ypg-upi-app-tile-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+    }
+    .ypg-upi-app-tile-icon img {
+      width: 24px;
+      height: 24px;
+      border-radius: 6px;
+    }
+    .ypg-upi-app-tile-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: #0f172a;
+      text-align: center;
+      line-height: 1.2;
+    }
+    .ypg-generic-upi-fallback {
+      border-top: 1px solid var(--ypg-border-light);
+      padding-top: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .ypg-btn-mini {
+      background: none;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      color: #334155;
+      padding: 6px 10px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .ypg-btn-mini:hover {
+      border-color: var(--ypg-blue);
+      color: var(--ypg-blue);
+    }
+
   </style>
 </head>
 
@@ -3889,6 +3996,13 @@
             <div class="ypg-pc-active-view">
               <!-- VIEW A: PURE UPI QR INTERFACE -->
               <div id="viewUpiContent">
+                <!-- UPI Intent Status Strip: shows client-reported vs verified state separately -->
+                <div id="upiIntentStatusStrip" class="ypg-intent-status-strip" hidden>
+                  <span class="ypg-pulse-dot" style="background:var(--ypg-blue);"></span>
+                  <span id="upiIntentStatusLabel">UPI app opened</span>
+                  <span id="upiIntentStatusSub" style="opacity:0.8;">Waiting for payment confirmation from your UPI app and bank observers.</span>
+                </div>
+
                 <h2 class="ypg-page-title">UPI QR Payment</h2>
 
                 <!-- Section Label & Countdown Timer -->
@@ -3975,6 +4089,26 @@
                   <div class="ypg-instruction-step">
                     <div class="ypg-step-num">3</div>
                     <div>Payment is detected automatically, or tap <strong>Continue</strong> below after paying.</div>
+                  </div>
+                </div>
+
+                <!-- Pay by Any UPI App (Android mobile web deep links) -->
+                <div id="payByAnyUpiApp" class="ypg-pay-any-upi-card" style="display:none;">
+                  <div class="ypg-section-label-row">
+                    <span class="ypg-section-heading">Pay by Any UPI App</span>
+                    <span id="payAnyUpiNote" style="font-size:11px; color:#64748b;">Android: tap an app to open it directly with the payment pre-filled.</span>
+                  </div>
+                  <div class="ypg-upi-app-launch-grid" id="upiAppLaunchGrid">
+                    <!-- Populated dynamically by launchUpiApp.js based on compatible installed apps -->
+                  </div>
+                  <div class="ypg-generic-upi-fallback" style="margin-top:10px;">
+                    <button type="button" class="ypg-btn-mini" id="btnGenericUpiIntent"
+                      onclick="launchGenericUpiIntent()">
+                      Open UPI App (Generic upi://pay)
+                    </button>
+                    <span id="genericUpiHint" style="font-size:11px; color:#64748b; margin-left:8px;">
+                      Uses generic upi://pay capability discovery — works with any compatible UPI app.
+                    </span>
                   </div>
                 </div>
               <!-- VIEW ONLINE CARD: CREDIT / DEBIT CARDS -->
@@ -6834,6 +6968,62 @@
         queuePollTimer = null;
       }
 
+      // --- NEW UNIVERSAL UPI INTENT STATES (client-reported vs verified shown separately) ---
+      // INTENT_OPENED: buyer launched a UPI app; awaiting return.
+      // CLIENT_REPORTED_SUCCESS: buyer reported success (buyer-reported, NOT bank-verified).
+      // CREDIT_OBSERVED: Gmail/SMS credit observed (supplementary evidence).
+      // MULTI_SIGNAL_MATCHED: multiple signals correlated (still awaiting authoritative verification).
+      // PAID_VERIFIED: authoritative bank/PSP confirmation (terminal verified state -> SUCCESS).
+      // RECONCILIATION_REQUIRED: signals conflict or insufficient; manual review needed.
+      const intentStates = [
+        'INTENT_OPENED', 'CLIENT_REPORTED_SUCCESS', 'CREDIT_OBSERVED',
+        'MULTI_SIGNAL_MATCHED', 'PAID_VERIFIED', 'RECONCILIATION_REQUIRED'
+      ];
+      if (intentStates.includes(data.status)) {
+        const bar = document.getElementById('paymentMethodSelectorBar');
+        if (bar) bar.style.display = 'none';
+
+        hideAllContent();
+        const upiView = document.getElementById('viewUpiContent');
+        if (upiView) upiView.hidden = false;
+        document.getElementById('ypgStickyFooter').style.display = 'flex';
+        loadQrSvg();
+
+        // Show a client-reported / verified status strip so the buyer sees progress without
+        // confusing a client report with a bank-verified settlement.
+        const intentStrip = document.getElementById('upiIntentStatusStrip');
+        if (intentStrip) {
+          intentStrip.hidden = false;
+          const label = document.getElementById('upiIntentStatusLabel');
+          const sub = document.getElementById('upiIntentStatusSub');
+          const isVerified = data.status === 'PAID_VERIFIED';
+          if (label) label.textContent = data.status === 'CLIENT_REPORTED_SUCCESS'
+            ? 'Payment reported by your UPI app'
+            : (data.status === 'CREDIT_OBSERVED' ? 'Payment credit observed'
+            : (data.status === 'MULTI_SIGNAL_MATCHED' ? 'Multiple signals matched'
+            : (data.status === 'RECONCILIATION_REQUIRED' ? 'Reconciliation required'
+            : (data.status === 'PAID_VERIFIED' ? 'Payment verified by bank'
+            : 'UPI app opened'))));
+          if (sub) sub.textContent = data.status === 'CLIENT_REPORTED_SUCCESS'
+            ? 'This is buyer-reported information. Final verification by the bank is in progress.'
+            : (data.status === 'PAID_VERIFIED'
+            ? 'Authoritative bank confirmation received. Order complete.'
+            : (data.status === 'RECONCILIATION_REQUIRED'
+            ? 'Signals could not be fully matched. Our team is reviewing.'
+            : 'Waiting for payment confirmation from your UPI app and bank observers.'));
+          intentStrip.className = 'ypg-intent-status-strip' + (isVerified ? ' is-verified' : '');
+        }
+
+        // Keep the 5:00 timer running for intent states so the session doesn't stall.
+        const remainingSec = (data.timeRemainingSeconds !== undefined && data.timeRemainingSeconds !== null) ? Number(data.timeRemainingSeconds) : 300;
+        const targetExpiry = data.expiresAt || new Date(Date.now() + remainingSec * 1000).toISOString();
+        runCountdown(remainingSec, sec => {
+          const el = document.getElementById('activeTimerText');
+          if (el) el.textContent = formatTime(sec);
+        }, () => loadState(), targetExpiry);
+        return;
+      }
+
       if (data.status === 'ACTIVE' || (data.status === 'INITIATED' && (data.timeRemainingSeconds > 0 || data.expiresAt))) {
         renderMethodSelectorBar(data);
 
@@ -6865,6 +7055,7 @@
           document.getElementById('viewUpiContent').hidden = false;
           document.getElementById('ypgStickyFooter').style.display = 'flex';
           loadQrSvg();
+          showPayByAnyUpiApp(data.upiDeepLinks, data.upiUri);
 
           const btnContinue = document.getElementById('btnContinuePayment');
 
@@ -6921,6 +7112,79 @@
       }
 
 
+    }
+
+    // --- UNIVERSAL UPI APP LAUNCH (Android mobile web deep links) ---
+    function isAndroidMobile() {
+      const ua = navigator.userAgent || '';
+      return /Android/i.test(ua) && /Mobile/i.test(ua);
+    }
+
+    function showPayByAnyUpiApp(upiDeepLinks, upiUri) {
+      const card = document.getElementById('payByAnyUpiApp');
+      const grid = document.getElementById('upiAppLaunchGrid');
+      const note = document.getElementById('payAnyUpiNote');
+      if (!card) return;
+      if (!upiDeepLinks || Object.keys(upiDeepLinks).length === 0) {
+        card.style.display = 'none';
+        return;
+      }
+      card.style.display = isAndroidMobile() ? 'block' : 'none';
+      if (!grid) return;
+      grid.innerHTML = '';
+      const appTiles = [
+        { key: 'gpay', name: 'Google Pay', icon: '/icons/gpay.png' },
+        { key: 'phonepe', name: 'PhonePe', icon: '/icons/phonepe.png' },
+        { key: 'paytm', name: 'Paytm', icon: '/icons/paytm.png' },
+        { key: 'bhim', name: 'BHIM UPI', icon: '/icons/bhim.png' },
+        { key: 'upi', name: 'Any UPI App', icon: '/icons/upi.png' }
+      ];
+      for (const tile of appTiles) {
+        const deepLink = upiDeepLinks[tile.key];
+        if (!deepLink) continue;
+        const tileEl = document.createElement('div');
+        tileEl.className = 'ypg-upi-app-tile';
+        tileEl.title = `Pay with ${tile.name}`;
+        tileEl.onclick = (e) => {
+          e.preventDefault();
+          launchUpiApp(deepLink, tile.name);
+        };
+        tileEl.innerHTML = `
+          <div class="ypg-upi-app-tile-icon">
+            <img src="${tile.icon}" alt="${tile.name}" onerror="this.style.display='none'; this.parentElement.style.background='#e2e8f0';" />
+          </div>
+          <div class="ypg-upi-app-tile-label">${tile.name}</div>
+        `;
+        grid.appendChild(tileEl);
+      }
+      if (note) note.textContent = isAndroidMobile()
+        ? 'Android: tap an app to open it directly with the payment pre-filled.'
+        : 'Desktop: use the dynamic QR code above with any UPI app.';
+    }
+
+    function launchUpiApp(deepLink, appName) {
+      if (!deepLink) return;
+      try {
+        window.location.href = deepLink;
+        setTimeout(() => { loadState(); }, 2500);
+      } catch (e) {
+        console.warn('launchUpiApp error:', e);
+        launchGenericUpiIntent();
+      }
+    }
+
+    function launchGenericUpiIntent() {
+      const upiUri = state?.upiUri || document.getElementById('upiUriHidden')?.value;
+      if (!upiUri) {
+        console.warn('No UPI URI available for generic launch');
+        return;
+      }
+      try {
+        window.location.href = upiUri;
+        setTimeout(() => { loadState(); }, 2500);
+      } catch (e) {
+        console.warn('launchGenericUpiIntent error:', e);
+      }
     }
 
     // --- PSYCHOLOGICAL TIME-SAVING CONVERSION BANNER ---
