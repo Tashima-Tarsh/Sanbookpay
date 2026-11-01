@@ -100,7 +100,7 @@ export function registerPlatformIdentity(server,ctx){
   route('GET','/merchants',async(req,res)=>{if(!req.platform.platform)fail(403,'Platform staff only');requirePermission(req,'merchants.read');const page=Math.max(1,parseInt(req.query.page)||1),limit=Math.max(1,Math.min(100,parseInt(req.query.limit)||25));const filters=['NOT EXISTS (SELECT 1 FROM pp_platform_accounts platform_account WHERE platform_account.account_id=pp_merchants.merchant_id)'],values=[];if(req.query.status){filters.push('status = ?');values.push(text(req.query.status));}const where=filters.length?' WHERE '+filters.join(' AND '):'';json(res,200,{merchants:db.query('SELECT * FROM pp_merchants'+where+' ORDER BY created_at DESC LIMIT ? OFFSET ?',[...values,limit,(page-1)*limit]).map(m=>({...m,profile:JSON.parse(m.profile)})),total:Number(db.queryOne('SELECT COUNT(*) AS n FROM pp_merchants'+where,values).n),page,limit});});
   route('POST','/merchants',async(req,res,body)=>{
     if(!req.platform.platform||req.platform.role!=='SUPER_ADMIN')fail(403,'Only the platform owner can create merchants');
-    requirePermission(req,'merchants.write');sensitive(req);
+    requirePermission(req,'merchants.write');
     const address=email(body.email),pass=body.password===undefined?random():password(body.password),profile=profileOf(body);
     if(!profile.businessName||!profile.contactName||!/^\+?[0-9]{10,15}$/.test(profile.mobile))fail(400,'Business, owner name and valid mobile required');
     if(db.queryOne('SELECT id FROM pp_users WHERE email = ?',[address]))fail(409,'This email already has an account');
