@@ -87,6 +87,7 @@ import { registerCollectionsRoutes } from './routes/collections.routes.js';
 import { registerPayoutsRoutes } from './routes/payouts.routes.js';
 import { registerBankingRoutes } from './routes/banking.routes.js';
 import { registerProviderWebhooksRoutes } from './routes/provider-webhooks.routes.js';
+import { registerHyperswitchRoutes } from './routes/hyperswitch.routes.js';
 import { registerSettlementsRoutes } from './routes/settlements.routes.js';
 import { registerRefundsRoutes } from './routes/refunds.routes.js';
 import { registerSplitSettlementRoutes } from './routes/split-settlement.routes.js';
@@ -674,6 +675,7 @@ export function createPaymentApp(customDb = null, options = {}) {
   registerPayoutsRoutes(server, context);
   registerBankingRoutes(server, context);
   registerProviderWebhooksRoutes(server, context);
+registerHyperswitchRoutes(server, context);
   registerSettlementsRoutes(server, context);
   registerRefundsRoutes(server, context);
   registerSplitSettlementRoutes(server, context);
