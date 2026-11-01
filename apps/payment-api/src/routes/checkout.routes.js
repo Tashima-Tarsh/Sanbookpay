@@ -419,6 +419,8 @@ export function registerCheckoutRoutes(server, ctx) {
         verificationTag: session.verificationTag,
         receiptConfirmation: session.metadata?.merchantReceiptConfirmation && !session.verificationLevel ? { source:'MERCHANT', reference:session.metadata.reportedUtr || null, bankObserverVerified:false } : null,
         branding,
+        merchantName: merchant?.businessName || 'Merchant',
+        returnUrl: session.returnUrl || null,
         // UPI payment details (where payment was sent)
         upiDetails,
         payeeVpa,

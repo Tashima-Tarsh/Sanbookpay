@@ -1,0 +1,30 @@
+{
+  "checkedAt": "2026-11-01T07:37:26.419Z",
+  "scope": "In-memory synthetic merchant; mocked email/mobile delivery; seeded root MFA session; no physical phone, real bank or customer data",
+  "stepsPassed": [
+    "Super Admin creates independent merchant and owner invitation",
+    "Owner accepts, signs in, verifies mobile, submits profile; platform approves",
+    "Assign account, callback, branding, policy, phone; merchant activates",
+    "Scoped merchant creates INR 1 payment; active checkout identifies Example Games",
+    "Signed synthetic notification accepts payment; terminal response preserves merchantName"
+  ],
+  "positiveChecks": {
+    "invitation": true,
+    "ownerLogin": true,
+    "mobileVerification": true,
+    "onboardingSubmission": true,
+    "approval": true,
+    "notificationRouteSetup": true,
+    "activation": true,
+    "scopedKey": true,
+    "paymentCreation": true,
+    "activeMerchantName": true
+  },
+  "fixedChecks": {
+    "directUpiReturnUrlPersisted": true,
+    "terminalMerchantName": true,
+    "premiumBranding": true,
+    "canonicalOpenApi": true
+  },
+  "callbackReservationCount": 1
+}

@@ -9,6 +9,7 @@ import {enforcePaymentControls} from '../payment-controls.js';
 import {validateUpiChannel,upiChannelSettings} from '../upi-channel.js';
 import {registerBankingIntegrations} from './banking-integrations.js';
 import {registerReceivingMirror} from './receiving-mirror.js';
+import {merchantIntegrationReadiness,merchantIntegrationDetails} from './merchant-integration.js';
 
 const ROOT='/api/platform/v1';
 const SCOPES=['payments.create','payments.read','refunds.create','refunds.read','transactions.read','reports.read','webhooks.manage'];
@@ -55,6 +56,13 @@ export function registerPlatformPayments(server,ctx,identity){
   return {key:publicKey(db.queryOne('SELECT * FROM pp_api_keys WHERE id=?',[id])),secret};
  }
  get('/api-keys','credentials.manage',(req,res)=>HttpServer.json(res,200,{keys:db.query('SELECT * FROM pp_api_keys WHERE merchant_id=? ORDER BY created_at DESC',[tenant(req)]).map(publicKey),supportedScopes:SCOPES}));
+ get('/integration-readiness','credentials.manage',(req,res)=>HttpServer.json(res,200,merchantIntegrationReadiness(ctx,tenant(req))));
+ post('/integration-pack','credentials.manage',async(req,res)=>{
+  need(req,'webhooks.manage');const body=await HttpServer.parseBody(req),mid=tenant(req),readiness=merchantIntegrationReadiness(ctx,mid);
+  if(!readiness.configurationReady)return HttpServer.json(res,409,{error:'Complete the merchant setup checklist before issuing the integration pack.',readiness});
+  const pack=db.transaction(()=>{const issued=makeKey(req,{label:body.label||'Game backend integration',environment:'PRODUCTION',scopes:['payments.create','payments.read'],rateLimit:body.rateLimit??300,ipAllowlist:body.ipAllowlist||[],expiresAt:body.expiresAt});identity.audit(req,'MERCHANT_INTEGRATION_PACK_ISSUED',mid,{keyId:issued.key.id});return {integration:merchantIntegrationDetails(ctx,mid),key:issued.key,apiSecret:issued.secret,webhookSecret:merchantRepo.findById(mid).webhookSecret,readiness};});
+  res.setHeader('Cache-Control','no-store');res.setHeader('Pragma','no-cache');HttpServer.json(res,201,pack);
+ });
  post('/api-keys','credentials.manage',async(req,res)=>HttpServer.json(res,201,makeKey(req,await HttpServer.parseBody(req))));
  post('/api-keys/:id/revoke','credentials.manage',(req,res,p)=>{const mid=tenant(req);const key=db.queryOne('SELECT * FROM pp_api_keys WHERE id=? AND merchant_id=?',[p.id,mid]);if(!key)throw error(404,'Key not found.');db.execute('UPDATE pp_api_keys SET revoked_at=? WHERE id=? AND merchant_id=?',[now(),p.id,mid]);identity.audit(req,'API_KEY_REVOKED',p.id,{});HttpServer.json(res,200,{revoked:true});});
  post('/api-keys/:id/rotate','credentials.manage',(req,res,p)=>{const key=db.queryOne('SELECT * FROM pp_api_keys WHERE id=? AND merchant_id=?',[p.id,tenant(req)]);if(!key||key.revoked_at)throw error(404,'Active key not found.');const made=db.transaction(()=>{const issued=makeKey(req,{label:key.label,scopes:JSON.parse(key.scopes),environment:key.environment,expiresAt:key.expires_at,rateLimit:Number(key.rate_limit),ipAllowlist:JSON.parse(key.ip_allowlist)});db.execute('UPDATE pp_api_keys SET revoked_at=? WHERE id=?',[now(),key.id]);return issued;});HttpServer.json(res,201,made);});
@@ -67,7 +75,7 @@ export function registerPlatformPayments(server,ctx,identity){
  post('/settings','settings.manage',async(req,res)=>{
   const body=await HttpServer.parseBody(req),mid=tenant(req),m=merchantRepo.findById(mid),updates={},branding={...m.branding};
   if(body.businessName!==undefined){if(typeof body.businessName!=='string'||body.businessName.trim().length<2||body.businessName.length>150)throw error(400,'Business name requires 2–150 characters.');updates.businessName=body.businessName.trim();}
-  if(body.webhookUrl!==undefined){if(body.webhookUrl)await validateOutboundWebhookUrl(body.webhookUrl);updates.webhookUrl=body.webhookUrl||null;}
+  if(body.webhookUrl!==undefined){if(body.webhookUrl){const check=validateOutboundWebhookUrl(body.webhookUrl);if(!check.valid||check.url.protocol!=='https:')throw error(400,'Callback must use a public HTTPS URL.');}updates.webhookUrl=body.webhookUrl||null;}
   if(body.timeZone!==undefined){try{new Intl.DateTimeFormat('en',{timeZone:body.timeZone}).format();}catch{throw error(400,'Invalid time zone.');}branding.timeZone=body.timeZone;}
   if(body.branding){if(body.branding.primaryColor&&!/^#[0-9a-f]{6}$/i.test(body.branding.primaryColor))throw error(400,'Use a six-digit hex color.');if(body.branding.logoUrl){const u=new URL(body.branding.logoUrl);if(u.protocol!=='https:')throw error(400,'Logo requires HTTPS.');}for(const field of ['appName','primaryColor','logoUrl'])if(body.branding[field]!==undefined)branding[field]=String(body.branding[field]).slice(0,500);}
   if(body.channel){const c=body.channel;if(typeof c.enabled!=='boolean'||!Number.isSafeInteger(c.minAmountPaise)||c.minAmountPaise<0||!Number.isSafeInteger(c.maxAmountPaise)||c.maxAmountPaise<c.minAmountPaise||!Array.isArray(c.allowedVpas)||c.allowedVpas.length>100||c.allowedVpas.some(x=>!isValidVpa(x)))throw error(400,'Provide valid payment limits and UPI IDs.');branding.upiChannel={...c,allowedVpas:[...new Set(c.allowedVpas.map(x=>x.trim().toLowerCase()))]};}
@@ -113,6 +121,7 @@ export function registerPlatformPayments(server,ctx,identity){
  function providerResponse(p){return {paymentId:p.id,orderId:p.merchant_order_id,amount:toRupeesString(BigInt(p.amount_paise)),amountPaise:String(p.amount_paise),currency:p.currency,status:p.status,checkoutUrl:p.checkout_url,provider:p.provider_name,confirmationSource:p.status==='SUCCESS'?'PROVIDER':null,createdAt:p.created_at};}
  const createPayment=wrap(async(req,res)=>{
   const mid=tenant(req),b=req.connectedPaymentBody??await HttpServer.parseBody(req);if(b.orderId===undefined){const key=req.headers['idempotency-key'];if(typeof key!=='string'||!/^[-A-Za-z0-9_:]{1,120}$/.test(key))throw error(400,'Supply a stable Idempotency-Key.');b.orderId='ORDER-'+hash(mid+':'+key).slice(0,40);}if(typeof b.orderId!=='string'||!/^[-A-Za-z0-9_]{1,120}$/.test(b.orderId))throw error(400,'Supply an orderId of 1–120 letters, digits, hyphens or underscores.');let paise;try{paise=toPaise(b.amount);}catch{throw error(400,'Amount must have at most two decimal places.');}if(paise<=0n||paise>BigInt(Number.MAX_SAFE_INTEGER)||b.currency&&b.currency!=='INR')throw error(400,'Supply a positive supported INR amount.');
+  if(b.returnUrl){let destination;try{destination=new URL(b.returnUrl);}catch{throw error(400,'Return URL must be an absolute HTTPS URL.');}if(destination.protocol!=='https:'||destination.username||destination.password)throw error(400,'Return URL must use HTTPS without embedded credentials.');}
   if(b.playerReference!==undefined&&(typeof b.playerReference!=='string'||!b.playerReference.trim()||b.playerReference.length>200))throw error(400,'Invalid opaque player reference.');
   const previousSession=sessionRepo.findByOrderId(mid,b.orderId);
   const integration=b.connectionId?null:previousSession?(previousSession.metadata?.externalCollection?banking.getForSession(previousSession):null):banking.getDefault(mid);
@@ -129,7 +138,7 @@ export function registerPlatformPayments(server,ctx,identity){
    const denied=enforcePaymentControls(ctx,mid,{RECEIVING_VPA:account.upiId,CUSTOMER_VPA:b.payerVpa,CUSTOMER:b.customer?.id});if(denied)throw error(403,denied.error,denied.code);
    const channel=validateUpiChannel(merchant,paise,account.upiId);if(channel)throw error(400,channel.error,channel.code);
    if(integration)banking.prepare(integration,account,paise);
-   const s=db.transaction(()=>{enforcePolicies(mid,{RECEIVING_VPA:account.upiId,CUSTOMER_VPA:b.payerVpa,CUSTOMER:b.customer?.id},Number(integration?paise+199n:paise));return sessionRepo.create({merchantId:mid,receivingAccountId:account.id,orderId:b.orderId,amountPaise:paise,currency:'INR',method:'UPI',status:'QUEUED',metadata:{...(integration?{externalCollection:{integrationId:integration.id,kind:integration.kind,stage:'SUBMITTING',requestedAmountPaise:String(paise)}}:{}),receivingAccountSnapshot:{id:account.id,upiId:account.upiId,payeeName:account.payeeName},platform:true,playerReference:b.playerReference||null}});});
+   const s=db.transaction(()=>{enforcePolicies(mid,{RECEIVING_VPA:account.upiId,CUSTOMER_VPA:b.payerVpa,CUSTOMER:b.customer?.id},Number(integration?paise+199n:paise));return sessionRepo.create({merchantId:mid,receivingAccountId:account.id,orderId:b.orderId,amountPaise:paise,currency:'INR',method:'UPI',status:'QUEUED',returnUrl:b.returnUrl||null,metadata:{...(integration?{externalCollection:{integrationId:integration.id,kind:integration.kind,stage:'SUBMITTING',requestedAmountPaise:String(paise)}}:{}),receivingAccountSnapshot:{id:account.id,upiId:account.upiId,payeeName:account.payeeName},platform:true,playerReference:b.playerReference||null}});});
    const queued=ctx.queueEngine.enqueueOrActivate(s.id,account.id);if(queued.expiresAt)ctx.timingEngine.startActiveTimer(s.id,queued.expiresAt);if(integration){const issued=await banking.issue(sessionRepo.findById(s.id),integration);ctx.timingEngine.startActiveTimer(issued.id,issued.expiresAt);}return HttpServer.json(res,201,response(sessionRepo.findById(s.id)));
   }
   let conn=connections.findById(b.connectionId);const policy=conn&&db.queryOne('SELECT * FROM pp_connection_policy WHERE connection_id=?',[conn.id]);

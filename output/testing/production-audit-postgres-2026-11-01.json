@@ -1,0 +1,15 @@
+{
+  "checkedAt": "2026-11-01T07:30:25.814Z",
+  "isolation": "Dedicated temporary schema; connection search_path set before adapter construction; no public financial data modified",
+  "checks": {
+    "schema": true,
+    "notificationSuccess": true,
+    "actualOutbox": true,
+    "ledger": true,
+    "sourceLabel": true,
+    "duplicateIdempotent": true,
+    "atomicRollback": true,
+    "retryAfterRollback": true
+  },
+  "durationMs": 38220
+}

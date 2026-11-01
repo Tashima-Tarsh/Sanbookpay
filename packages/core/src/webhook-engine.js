@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import { generateHmac, toRupeesString, validateOutboundWebhookUrl } from '@youpi/common';
+import { generateHmac, toRupeesString, validateOutboundWebhookUrl, fetchPublic } from '@youpi/common';
 import { isTerminalStatus, toPublicOutcome } from './state-machine.js';
 
 export class WebhookEngine {
@@ -20,6 +20,10 @@ export class WebhookEngine {
     this.controllers = new Set();
     this.timeouts = new Set();
     this.stopped = false;
+    this.transport=options.transport||fetchPublic;
+    this.maxConcurrency=20;
+    this.perMerchantConcurrency=5;
+    this.merchantInFlight=new Map();
   }
 
   stop() { this.stopped=true;for(const timeout of this.timeouts)clearTimeout(timeout);this.timeouts.clear();for(const controller of this.controllers)controller.abort(); }
@@ -41,16 +45,10 @@ export class WebhookEngine {
   enqueue(event, session) {
     if(this.stopped) throw new Error('Webhook engine is stopped');
     const merchant = this.merchantRepo.findById(session.merchantId);
-    if (!merchant || !merchant.webhookUrl) {
-      return { delivered: false, deliveryId: '', error: 'No webhook URL configured for merchant.' };
-    }
-
-    // Re-validate at dispatch time, not only on write: a URL persisted before validation
-    // existed must not be usable to reach loopback/private addresses (SSRF).
-    const endpointCheck = validateOutboundWebhookUrl(merchant.webhookUrl);
-    if (!endpointCheck.valid) {
-      return { delivered: false, deliveryId: '', error: `Webhook delivery blocked: ${endpointCheck.error}` };
-    }
+    if (!merchant) throw Error('Callback merchant no longer exists');
+    // Reserve even while configuration is missing; a later URL repair must have an event to recover.
+    const endpointCheck=merchant.webhookUrl?validateOutboundWebhookUrl(merchant.webhookUrl):{valid:false};
+    const endpoint=endpointCheck.valid?merchant.webhookUrl:'';
 
     const publicOutcome = isTerminalStatus(event) ? toPublicOutcome(event) : event;
 
@@ -97,7 +95,7 @@ export class WebhookEngine {
       session.id,
       publicOutcome,
       payloadString,
-      merchant.webhookUrl,
+      endpoint,
       null,
       null,
       0,
@@ -117,76 +115,37 @@ export class WebhookEngine {
    */
   async retryPending(deliveryId = null) {
     if(this.stopped)return [];
-    const nowIso = new Date().toISOString();
-    const pending = this.db.query(`
-      SELECT * FROM ${this.deliveryTable}
-      WHERE is_successful = 0 AND attempt_count < ? AND next_retry_at <= ?
-      ${deliveryId ? 'AND id = ?' : ''} ORDER BY created_at ASC LIMIT 20
-    `, deliveryId ? [this.maxRetries, nowIso, deliveryId] : [this.maxRetries, nowIso]);
-
-    const results = [];
-    const backoffs = [5000, 30000, 120000, 600000, 3600000];
-
-    for (const item of pending) {
-      if (this.inFlight.has(item.id)) continue;
-      const merchant = this.merchantRepo.findById(item.merchant_id);
-      if (!merchant || !item.endpoint_url) continue;
-
-      // Re-validate the stored endpoint before every retry (SSRF guard).
-      const retryEndpoint = validateOutboundWebhookUrl(item.endpoint_url);
-      if (!retryEndpoint.valid) continue;
-
-      this.inFlight.add(item.id);
+    const pending=this.db.query(`SELECT * FROM (SELECT *,ROW_NUMBER() OVER(PARTITION BY merchant_id ORDER BY created_at,id) AS merchant_rank FROM ${this.deliveryTable} WHERE is_successful=0 AND attempt_count<? AND next_retry_at<=? ${deliveryId?'AND id=?':''}) due WHERE merchant_rank<=5 ORDER BY merchant_rank,created_at,id LIMIT 100`,deliveryId?[this.maxRetries,new Date().toISOString(),deliveryId]:[this.maxRetries,new Date().toISOString()]);
+    const backoffs=[5000,30000,120000,600000,3600000];
+    const results=await Promise.all(pending.map(async item=>{
+      const count=this.merchantInFlight.get(item.merchant_id)||0;
+      if(this.stopped||this.inFlight.has(item.id)||this.inFlight.size>=this.maxConcurrency||count>=this.perMerchantConcurrency)return null;
+      const merchant=this.merchantRepo.findById(item.merchant_id);if(!merchant)return null;
+      const endpoint=item.endpoint_url||merchant.webhookUrl;
+      const checked=endpoint?validateOutboundWebhookUrl(endpoint):{valid:false};
+      if(!checked.valid){
+        this.db.execute(`UPDATE ${this.deliveryTable} SET response_body=?,next_retry_at=? WHERE id=?`,['Waiting for a valid merchant callback URL',new Date(Date.now()+30000).toISOString(),item.id]);
+        return null;
+      }
+      if(!item.endpoint_url)this.db.execute(`UPDATE ${this.deliveryTable} SET endpoint_url=? WHERE id=?`,[endpoint,item.id]);
+      this.inFlight.add(item.id);this.merchantInFlight.set(item.merchant_id,count+1);
       const controller=new AbortController();this.controllers.add(controller);
       const timeout=setTimeout(()=>controller.abort(),10000);this.timeouts.add(timeout);
-      try {
-
-      const signature = generateHmac(item.payload, merchant.webhookSecret);
-      const timestamp = Date.now().toString();
-
-      let isSuccess = false;
-      let respStatus = null;
-      let respBody = null;
-
-      try {
-        const res = await fetch(retryEndpoint.url.toString(), {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Gateway-Event': item.event_type,
-            'X-Gateway-Signature': `sha256=${signature}`,
-            'X-Gateway-Delivery-Id': item.id,
-            'X-Gateway-Timestamp': timestamp
-          },
-          body: item.payload,
-          redirect: 'manual',
-          signal: controller.signal
-        });
-        respStatus = res.status;
-        respBody = (await res.text()).substring(0, 1000);
-        isSuccess = res.ok;
-      } catch (err) {
-        respBody = err.message;
+      try{
+        let success=false,status=null,body=null;
+        try{
+          const response=await this.transport(checked.url.toString(),{method:'POST',headers:{'Content-Type':'application/json','X-Gateway-Event':item.event_type,'X-Gateway-Signature':'sha256='+generateHmac(item.payload,merchant.webhookSecret),'X-Gateway-Delivery-Id':item.id,'X-Gateway-Timestamp':String(Date.now())},body:item.payload,redirect:'manual',signal:controller.signal,maxResponseBytes:65536});
+          status=response.status;body=(await response.text()).substring(0,1000);success=response.ok;
+        }catch(error){body=error.message;}
+        if(this.stopped)return null;
+        const attempt=item.attempt_count+1,next=success||attempt>=this.maxRetries?null:new Date(Date.now()+backoffs[Math.min(attempt-1,backoffs.length-1)]).toISOString();
+        this.db.execute(`UPDATE ${this.deliveryTable} SET attempt_count=?,is_successful=?,response_status=?,response_body=?,next_retry_at=? WHERE id=?`,[attempt,success?1:0,status,body,next,item.id]);
+        return {id:item.id,success,attempt,status,error:success?undefined:body};
+      }finally{
+        clearTimeout(timeout);this.timeouts.delete(timeout);this.controllers.delete(controller);this.inFlight.delete(item.id);
+        const remaining=(this.merchantInFlight.get(item.merchant_id)||1)-1;if(remaining)this.merchantInFlight.set(item.merchant_id,remaining);else this.merchantInFlight.delete(item.merchant_id);
       }
-
-      if(this.stopped)break;
-      const nextAttempt = item.attempt_count + 1;
-      const nextRetryDelay = backoffs[Math.min(nextAttempt - 1, backoffs.length - 1)];
-      const nextRetryAt = isSuccess || nextAttempt >= this.maxRetries
-        ? null
-        : new Date(Date.now() + nextRetryDelay).toISOString();
-
-      this.db.execute(`
-        UPDATE ${this.deliveryTable}
-        SET attempt_count = ?, is_successful = ?, response_status = ?,
-            response_body = ?, next_retry_at = ?
-        WHERE id = ?
-      `, [nextAttempt, isSuccess ? 1 : 0, respStatus, respBody, nextRetryAt, item.id]);
-
-      results.push({ id: item.id, success: isSuccess, attempt: nextAttempt, status:respStatus, error:isSuccess?undefined:respBody });
-      } finally { clearTimeout(timeout);this.timeouts.delete(timeout);this.inFlight.delete(item.id);this.controllers.delete(controller); }
-    }
-
-    return results;
+    }));
+    return results.filter(Boolean);
   }
 }

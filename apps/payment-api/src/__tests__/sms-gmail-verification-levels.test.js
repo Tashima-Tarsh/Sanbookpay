@@ -159,7 +159,9 @@ describe('2-Level Verification (SMS Gateway + Gmail) & Queue Management Tests', 
 
     // 4. Mobile app captures bank SMS and dispatches to /api/v1/observers/sms
     const timestamp = Date.now();
+    apiInstance.app.context.receivingMirror.setPolicy('00000000-0000-0000-0000-000000000001',receivingAccountId,false,'Synthetic approved SMS source','test',{android:[],smsSenders:['HDFCBK']});
     const smsPayload = {
+      sourceEvidence:{kind:'SMS',sender:'HDFCBK'},
       deviceId: pairData.deviceId,
       sender: 'HDFCBK',
       body: 'Dear Customer, A/C *4321 credited by Rs 450.00 on 30-Sep-26 by UPI Ref 630414503474 - HDFC Bank',

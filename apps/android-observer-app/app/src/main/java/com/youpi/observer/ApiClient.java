@@ -98,6 +98,9 @@ public class ApiClient {
             json.put("body", body != null ? body : "");
             json.put("timestamp", timestamp > 0 ? timestamp : System.currentTimeMillis());
             json.put("observedAt", timestamp > 0 ? timestamp : System.currentTimeMillis());
+            JSONObject origin = new JSONObject();
+            origin.put("kind", "SMS"); origin.put("sender", sender != null ? sender : "UNKNOWN");
+            json.put("sourceEvidence", origin);
 
             String bodyString = json.toString();
             String sigPayload = bodyString + ":" + tsStr;
@@ -168,7 +171,7 @@ public class ApiClient {
         return false;
     }
 
-    public boolean sendObservation(long amountPaise, double amount, String bankRef, String senderVpa, String title, String text) {
+    public boolean sendObservation(long amountPaise, double amount, String bankRef, String senderVpa, String title, String text, String packageName, String certificateSha256) {
         if (!isPaired()) return false;
 
         String deviceId = prefs.getString("device_id", null);
@@ -190,6 +193,9 @@ public class ApiClient {
             json.put("senderVpa", senderVpa);
             json.put("observedAt", System.currentTimeMillis());
             json.put("rawNotification", raw);
+            JSONObject origin = new JSONObject();
+            origin.put("kind", "NOTIFICATION"); origin.put("packageName", packageName); origin.put("certificateSha256", certificateSha256);
+            json.put("sourceEvidence", origin);
 
             String bodyString = json.toString();
             String sigPayload = bodyString + ":" + tsStr;

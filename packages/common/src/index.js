@@ -19,3 +19,4 @@ export * from './dynamo-gmail.js';
 export * from './dynamo-sms.js';
 
 export * from './android-release.js';
+export * from './public-http.js';

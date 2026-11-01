@@ -74,7 +74,8 @@ test('Android pairing and signed notification ingress use the stored receiving b
  assert.equal((await request('/api/v1/pollers/android/pair',{merchantId:'foreign',enrollmentToken:pair.token})).status,401);
  const paired=await request('/api/v1/pollers/android/pair',{merchantId:mid,enrollmentToken:pair.token,version:'v1'});assert.equal(paired.status,200);const device=await paired.json();
  assert.equal((await request('/api/v1/pollers/android/pair',{merchantId:mid,enrollmentToken:pair.token})).status,401);
- const body={deviceId:device.deviceId,body:'Rs.100.00 credited to your account UPI Ref 123456789012',observedAt:Date.now()};
+ ctx.receivingMirror.setPolicy(mid,account.id,false,'Synthetic receiving source approval','test',{android:[],smsSenders:['TESTBANK']});
+ const body={sourceEvidence:{kind:'SMS',sender:'TESTBANK'},deviceId:device.deviceId,body:'Rs.100.00 credited to your account UPI Ref 123456789012',observedAt:Date.now()};
  const ts=String(Date.now()),headers={'x-device-id':device.deviceId,'x-timestamp':ts,'x-signature':generateHmac(JSON.stringify(body)+':'+ts,device.signingKey)};
  assert.equal((await request('/api/v1/pollers/android/events',body)).status,401);
  const event=await request('/api/v1/pollers/android/events',body,headers);assert.equal(event.status,200);assert.equal((await event.json()).status,'VERIFICATION_PENDING');
@@ -100,7 +101,7 @@ test('portal mirror requires a tenant session, CSRF and privileged MFA-bound pho
  const qr=await made.json();assert.equal(qr.pairingPayload.merchantId,mid);assert.ok(qr.qrSvg.startsWith('<svg'));
  const paired=await fetch(base+'/api/v1/pollers/android/pair',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({merchantId:mid,enrollmentToken:qr.pairingPayload.token})});const phone=await paired.json();assert.equal(paired.status,200);
  app.context.merchantRepo.update(mid,{webhookUrl:'https://merchant.example.test/callback'});
- const policy=await fetch(base+endpoint+'/policy?merchantId='+mid,{method:'POST',headers,body:JSON.stringify({receivingAccountId:account.id,autoSuccess:true,reason:'Owner accepts notifications as paid'})});assert.equal(policy.status,200);
+ const policy=await fetch(base+endpoint+'/policy?merchantId='+mid,{method:'POST',headers,body:JSON.stringify({receivingAccountId:account.id,autoSuccess:true,trustedSources:{android:[],smsSenders:['TESTBANK']},reason:'Owner accepts notifications as paid'})});assert.equal(policy.status,200);
  assert.equal(app.context.canActivateMerchant(mid),true,'approved notification setup is an alternative to a provider connection');
  const revoked=await fetch(base+endpoint+'/devices/'+phone.deviceId+'/revoke?merchantId='+mid,{method:'POST',headers,body:'{}'});assert.equal(revoked.status,200);
  const devices=(await(await fetch(base+endpoint+'?merchantId='+mid,{headers})).json()).devices;assert.equal(devices[0].status,'REVOKED');assert.ok(!JSON.stringify(devices).includes(phone.signingKey));

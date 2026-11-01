@@ -14,6 +14,7 @@ export function registerRefundsRoutes(server, ctx) {
   const poRepo = new PaymentOrderRepository(db);
   const ledgerRepo = new LedgerRepository(db);
   const providerRegistry = new ProviderRegistry({ db });
+  db.execute('CREATE TABLE IF NOT EXISTS pp_refund_requests(merchant_id TEXT NOT NULL,request_key TEXT NOT NULL,fingerprint TEXT NOT NULL,refund_id TEXT NOT NULL,PRIMARY KEY(merchant_id,request_key))');
 
   function getMerchantId(req) {
     if(req.platform?.merchantId)return req.platform.merchantId;
@@ -58,24 +59,33 @@ export function registerRefundsRoutes(server, ctx) {
     try{refundAmountPaise=body.amount===undefined?Number(order.amount_paise):Number(toPaise(body.amount));}
     catch{return HttpServer.json(res,400,{error:'Enter a positive refund amount with at most two decimal places.'});}
     if(!Number.isSafeInteger(refundAmountPaise)||refundAmountPaise<=0)return HttpServer.json(res,400,{error:'Invalid refund amount.'});
-    const refundId=body.refundId||`ref_${crypto.randomUUID()}`;
-    const existing=refundRepo.findByRefundId(refundId);
-    if(existing){
-      if(existing.merchant_id!==merchantId||existing.payment_order_id!==order.id||Number(existing.amount_paise)!==refundAmountPaise)return HttpServer.json(res,409,{error:'Refund ID is already used for a different request.'});
-      return HttpServer.json(res,200,{refundId:existing.refund_id,paymentId:order.id,status:existing.status,amount:(Number(existing.amount_paise)/100).toFixed(2)});
-    }
-    let refund;
+    const requestKey=req.headers['idempotency-key'];
+    if(requestKey!==undefined&&(typeof requestKey!=='string'||!/^[-A-Za-z0-9_:]{1,120}$/.test(requestKey)))return HttpServer.json(res,400,{error:'Supply a stable Idempotency-Key of 1-120 letters, digits, hyphens, underscores or colons.'});
+    if(body.refundId!==undefined&&(typeof body.refundId!=='string'||!/^[-A-Za-z0-9_:]{1,120}$/.test(body.refundId)))return HttpServer.json(res,400,{error:'Invalid refundId.'});
+    const refundId=body.refundId||(requestKey?'ref_'+crypto.createHash('sha256').update(merchantId+':'+requestKey).digest('hex'):`ref_${crypto.randomUUID()}`);
+    const fingerprint=crypto.createHash('sha256').update(JSON.stringify({orderId:order.id,amountPaise:refundAmountPaise,reason:body.reason||null,refundId})).digest('hex');
+    let refund,createdNew=false;
     try{
       refund=db.transaction(()=>{
         const locked=db.queryOne(`SELECT * FROM payment_orders WHERE id=?${db.dialect==='postgres'?' FOR UPDATE':''}`,[order.id]);
+        const claim=requestKey&&db.queryOne('SELECT * FROM pp_refund_requests WHERE merchant_id=? AND request_key=?',[merchantId,requestKey]);
+        if(claim&&(claim.fingerprint!==fingerprint||claim.refund_id!==refundId))throw Error('Idempotency-Key already belongs to another refund request.');
+        if(requestKey&&!claim)db.execute('INSERT INTO pp_refund_requests VALUES(?,?,?,?)',[merchantId,requestKey,fingerprint,refundId]);
+        const existing=refundRepo.findByRefundId(refundId);
+        if(existing){
+          if(existing.merchant_id!==merchantId||existing.payment_order_id!==order.id||Number(existing.amount_paise)!==refundAmountPaise)throw Error('Refund ID is already used for a different request.');
+          return existing;
+        }
         const reserved=Number(db.queryOne("SELECT COALESCE(SUM(amount_paise),0) AS n FROM refunds WHERE payment_order_id=? AND status NOT IN ('FAILED','REJECTED')",[order.id]).n);
         const manual=Number(db.queryOne("SELECT COALESCE(SUM(amount_paise),0) AS n FROM console_refund_requests WHERE payment_id IN (?,?) AND status!='REJECTED'",[order.id,order.payment_session_id||order.id]).n);
         if(reserved+manual+refundAmountPaise>Number(locked.amount_paise))throw Error('Amount exceeds remaining refundable balance.');
         const created=refundRepo.create({merchantId,paymentOrderId:order.id,refundId,amountPaise:refundAmountPaise,currency:order.currency,reason:body.reason||null,status:'SUBMITTING'});
         ledgerRepo.recordDoubleEntry(merchantId,'REFUND',created.id,`Refund reserved for ${order.merchant_order_id}`,'REFUND_LIABILITIES','PROVIDER_CLEARING',refundAmountPaise);
+        createdNew=true;
         return created;
       });
     }catch(error){return HttpServer.json(res,409,{error:error.message});}
+    if(!createdNew)return HttpServer.json(res,200,{refundId:refund.refund_id,paymentId:order.id,status:refund.status,amount:(Number(refund.amount_paise)/100).toFixed(2)});
     try{
       const provider=providerRegistry.getProvider(merchantId,order.provider_name,JSON.parse(order.metadata||'{}').connectionId||null);
       const result=await provider.createRefund({merchantOrderId:order.merchant_order_id,refundId,amountPaise:refundAmountPaise,reason:body.reason||'Merchant requested refund'});

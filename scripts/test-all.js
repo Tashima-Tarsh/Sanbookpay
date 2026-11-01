@@ -28,6 +28,7 @@ const testFiles = [
   'packages/core/src/__tests__/queue-timing.test.js',
   'packages/core/src/__tests__/verification-pending.test.js',
   'packages/core/src/__tests__/webhook-engine.test.js',
+  'packages/core/src/__tests__/callback-recovery.test.js',
   'packages/core/src/__tests__/webhook-failure-matrix.test.js',
   'packages/merchant-sdk/src/__tests__/merchant-sdk.test.js',
   'packages/merchant-sdk/src/__tests__/sanbook-pay-sdk.test.js',
@@ -74,7 +75,9 @@ const testFiles = [
   'scripts/postgres-acceptance.test.js',
   'scripts/production-infrastructure.test.js',
   'scripts/hosted-routing.test.js',
-  'scripts/clean-transaction-history.test.js'
+  'scripts/clean-transaction-history.test.js',
+  'scripts/production-audit-probes.test.js',
+  'scripts/check-merchant-onboarding.test.js'
 ];
 
 // Some suites crash with --test-force-exit on Windows (libuv async handle double-close).

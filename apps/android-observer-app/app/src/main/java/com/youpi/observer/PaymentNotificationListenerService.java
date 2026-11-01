@@ -26,6 +26,9 @@ public class PaymentNotificationListenerService extends NotificationListenerServ
     @Override
     public void onNotificationPosted(StatusBarNotification sbn) {
         if (sbn == null || !apiClient.isPaired()) return;
+        final String sourcePackage = sbn.getPackageName();
+        final String sourceCertificate = SourceIdentity.certificateSha256(this, sourcePackage);
+        if (sourceCertificate == null) return;
 
         Notification notif = sbn.getNotification();
         if (notif == null) return;
@@ -83,7 +86,7 @@ public class PaymentNotificationListenerService extends NotificationListenerServ
         new Thread(new Runnable() {
             @Override
             public void run() {
-                apiClient.sendObservation(amountPaise, finalAmount, finalBankRef, finalVpa, finalTitle, finalTex);
+                apiClient.sendObservation(amountPaise, finalAmount, finalBankRef, finalVpa, finalTitle, finalTex, sourcePackage, sourceCertificate);
             }
         }).start();
     }

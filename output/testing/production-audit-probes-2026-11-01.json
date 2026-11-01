@@ -1,0 +1,53 @@
+{
+  "checkedAt": "2026-11-01T07:37:27.701Z",
+  "meaning": "Regression assertions for repaired audit findings; historical outcome descriptions retained for traceability",
+  "observations": [
+    {
+      "id": "F02",
+      "fixed": true,
+      "outcome": "Combined title/body parser accepts the approved incoming alert"
+    },
+    {
+      "id": "F01",
+      "fixed": true,
+      "outcome": "Unapproved app is rejected; Java includes OS-derived package identity"
+    },
+    {
+      "id": "F03",
+      "fixed": true,
+      "outcome": "SUCCESS with missing URL retains an outbox event for recovery"
+    },
+    {
+      "id": "F04",
+      "fixed": true,
+      "outcome": "Pending order accepts the alert within its original payable deadline"
+    },
+    {
+      "id": "F05",
+      "fixed": true,
+      "outcome": "Connection transport rejects DNS resolving to loopback",
+      "dnsResolvedTo": "127.0.0.1",
+      "dnsResolutionCheck": "confirmed"
+    },
+    {
+      "id": "F06",
+      "fixed": true,
+      "outcome": "Repeated refund key returns one refund and calls the provider once"
+    },
+    {
+      "id": "F07",
+      "fixed": true,
+      "outcome": "Legacy collect accepts INR 1 under minimum 0"
+    },
+    {
+      "id": "F09",
+      "fixed": true,
+      "outcome": "Legacy wallet exposes INR 100 separately as notification clearing"
+    },
+    {
+      "id": "F08",
+      "fixed": true,
+      "outcome": "New merchant legacy credentials work without restart"
+    }
+  ]
+}

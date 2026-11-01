@@ -1,4 +1,4 @@
-import {toPaise, toRupeesString} from '@youpi/common';
+import {toPaise, toRupeesString, fetchPublic} from '@youpi/common';
 
 export const BANKING_CONNECTOR_KINDS=['PAYGATE','DJANGO_N8N','INDIA_BANKING'];
 const bankMethod='india_banking.india_banking.doctype.bank_connector.bank_connector.';
@@ -17,7 +17,7 @@ export class BankingConnector {
   if(c.kind==='PAYGATE'&&body)headers['idempotency-key']=body.external_id;
   let response;
   try{
-   response=await fetch(c.baseUrl.replace(/\/$/,'')+path,{method:body===undefined?'GET':'POST',headers,body:body===undefined?undefined:JSON.stringify(body),redirect:'error',signal:AbortSignal.timeout(10000)});
+   response=await fetchPublic(c.baseUrl.replace(/\/$/,'')+path,{method:body===undefined?'GET':'POST',headers,body:body===undefined?undefined:JSON.stringify(body),redirect:'error',signal:AbortSignal.timeout(10000)});
    if(response.status===404&&allowNotFound)return {authenticated:true};
    if(!response.ok)throw Error('Upstream unavailable');
    const data=await response.json();

@@ -1,3 +1,5 @@
+> Current implementation note (1 November 2026): see docs/merchant/CURRENT-MERCHANT-LAUNCH-FLOW.md for scoped merchant onboarding, approved notification-source acceptance, callback recovery and current handover steps. Historical verification-only and legacy minimum descriptions below do not override that explicit policy. Pending local fixes are not production deployment proof.
+
 # Current security-repair release note
 
 The active owner and merchant workspace is /platform. Existing owners enter through /admin -> Manage merchants. Add merchant sends a one-time owner invitation through the configured delivery adapter. Unconfigured delivery leaves activation pending. See docs/audit/ATTACHED_REQUIREMENTS_MATRIX.md for verified scope and external gates.

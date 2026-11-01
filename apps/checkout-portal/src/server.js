@@ -106,7 +106,9 @@ export class CheckoutServer {
     let html = this.template;
 
     const appName = state?.branding?.appName || PRODUCT_NAME || 'Dynamo Pay';
-    const primaryColor = state?.branding?.primaryColor || '#0f172a';
+    const primaryColor = /^#[a-f0-9]{6}$/i.test(state?.branding?.primaryColor||'')?state.branding.primaryColor:'#4b47df';
+    const rgb=primaryColor.slice(1).match(/../g).map(c=>parseInt(c,16)/255).map(c=>c<=0.04045?c/12.92:((c+0.055)/1.055)**2.4);
+    const luminance=0.2126*rgb[0]+0.7152*rgb[1]+0.0722*rgb[2],brandInk=(luminance+0.05)/0.05>=1.05/(luminance+0.05)?'#000000':'#ffffff';
     const merchantName = state?.merchantName || 'Dynamo Pay';
     const orderId = state?.orderId || '';
     const logoUrl = state?.branding?.logoUrl || '';
@@ -153,6 +155,8 @@ export class CheckoutServer {
     html = html.replaceAll('{{PAYMENT_ID}}', escapeHtml(paymentId));
     html = html.replaceAll('{{API_BASE_URL}}', clientApiBase);
     html = html.replaceAll('{{APP_NAME}}', escapeHtml(appName));
+    let logo='';try{const parsed=new URL(logoUrl);if(parsed.protocol==='https:'&&!parsed.username&&!parsed.password)logo='<img class="merchant-logo" src="'+escapeHtml(parsed.href)+'" alt="'+escapeHtml(appName)+' logo">';}catch{}
+    html=html.replaceAll('{{MERCHANT_LOGO}}',logo).replaceAll('{{BRAND_INK}}',brandInk);
     html = html.replaceAll('{{PRIMARY_COLOR}}', escapeHtml(primaryColor));
     html = html.replaceAll('{{MERCHANT_NAME}}', escapeHtml(merchantName));
     html = html.replaceAll('{{ORDER_ID}}', escapeHtml(orderId));

@@ -1,3 +1,5 @@
+> Current implementation note (1 November 2026): see docs/merchant/CURRENT-MERCHANT-LAUNCH-FLOW.md for scoped merchant onboarding, approved notification-source acceptance, callback recovery and current handover steps. Historical verification-only and legacy minimum descriptions below do not override that explicit policy. Pending local fixes are not production deployment proof.
+
 # Sanbook Pay Runtime Architecture
 
 ## Active Execution Path

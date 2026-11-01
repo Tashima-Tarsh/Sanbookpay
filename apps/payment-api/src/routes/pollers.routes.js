@@ -322,7 +322,8 @@ export function registerPollerRoutes(server, ctx) {
     let observedAt = body.observedAt ? new Date(body.observedAt) : new Date();
 
     // Check for raw SMS text inside body or rawNotification
-    const rawText = body.body || body.sms || body.rawSms || body.message || body.text || body.rawNotification?.text;
+    const rawText = body.body || body.sms || body.rawSms || body.message || body.text || [body.rawNotification?.title,body.rawNotification?.text].filter(x=>typeof x==='string').join('\n');
+    if(rawText&&rawText.length>MAX_OBSERVATION_TEXT_CHARS)return HttpServer.json(res,413,{error:'Observation text too long'});
     if (rawText && (!amountPaise || !bankRef)) {
       const parsedSms = BankSmsParser.parse({
         text: rawText,
@@ -347,7 +348,10 @@ export function registerPollerRoutes(server, ctx) {
       try{
         const parsed=rawText?BankSmsParser.parse({text:rawText,sender:body.sender||'ANDROID_NOTIFICATION',timestamp:observedAt}):null;
         if(!parsed)return HttpServer.json(res,200,{accepted:true,status:'NON_PAYMENT_ALERT'});
-        const detection=ctx.receivingMirror.record({device,accountId:receivingAccountId,source:'ANDROID_OBSERVER',rawText,observedAt,amountPaise:parsed.amountPaise,bankReference:parsed.bankReferenceNumber||null});
+        const sourceEvidence=body.sourceEvidence||null;
+        ctx.receivingMirror.observeSource(device.merchant_id,device.id,sourceEvidence);
+        if(!ctx.receivingMirror.sourceTrusted(device.merchant_id,sourceEvidence))return HttpServer.json(res,200,{accepted:true,status:'UNTRUSTED_SOURCE',message:'Super Admin must approve this app certificate or bank SMS sender before payment acceptance'});
+        const detection=ctx.receivingMirror.record({device,accountId:receivingAccountId,source:'ANDROID_OBSERVER',sourceEvidence,rawText,observedAt,amountPaise:parsed.amountPaise,bankReference:parsed.bankReferenceNumber||null});
         ctx.db.execute('UPDATE android_devices SET last_observation_at=? WHERE id=?',[new Date().toISOString(),deviceId]);
         return HttpServer.json(res,200,{accepted:true,status:detection.matchStatus==='NOTIFICATION_CONFIRMED'?'SUCCESS':'VERIFICATION_PENDING',detection});
       }catch(error){return HttpServer.json(res,error.statusCode||503,{error:error.statusCode?error.message:'Receiving mirror unavailable; retry the same observation'});}

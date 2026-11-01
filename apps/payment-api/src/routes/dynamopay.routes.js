@@ -1,17 +1,17 @@
 import {enforcePaymentControls} from '../payment-controls.js';
 /**
- * DYNAMO PAY — NATIVE API ROUTES
+ * DYNAMO PAY â€” NATIVE API ROUTES
  * Dynamo Pay-branded payment collection endpoints:
  *   POST /v1/dynamo/collect/upi   - Generate UPI payment (intent + QR)
  *   POST /v1/dynamo/checkstatus   - Check payment status
  *   POST /v1/dynamo/ifsc/{ifsc}   - IFSC bank validation
  *   POST /v1/dynamo/wallet        - Wallet balance (settled/unsettled/lien/loan)
- *   POST /v1/dynamo/merchant/webhook — Configure webhook URL + IP whitelist
- *   GET  /v1/dynamo/merchant/retry-policy — Webhook retry policy
+ *   POST /v1/dynamo/merchant/webhook â€” Configure webhook URL + IP whitelist
+ *   GET  /v1/dynamo/merchant/retry-policy â€” Webhook retry policy
  *
  * Authentication: Client-ID, Client-Secret, Service-Id headers
  * Security: IP whitelisting, webhook URL config, retry policy
- * All endpoints are Dynamo Pay branded — no third-party naming.
+ * All endpoints are Dynamo Pay branded â€” no third-party naming.
  */
 
 import { HttpServer, resolveClientIp } from '../server.js';
@@ -85,34 +85,12 @@ export function registerDynamoPayRoutes(server, ctx) {
   const ledgerRepo = new LedgerRepository(db);
   const sessionRepo = ctx.sessionRepo;
 
-  // Dynamo Pay merchant credentials store (in-memory, seeded from DB)
-  const dynamoMerchants = new Map(); // serviceId -> { clientId, clientSecret, merchantId, webhookUrl, ipWhitelist, isActive }
-
-  function loadDynamoMerchants() {
-    try {
-      const all = ctx.merchantRepo.findAll();
-      for (const m of all) {
-        // A persisted server secret keeps credentials stable without making them guessable from the public merchant ID.
-        const clientSecret = crypto.createHmac('sha256',resolveSecret('dynamo_client_master_key')).update(m.id).digest('hex');
-        dynamoMerchants.set(m.id, {
-          clientId: `dp_client_${m.id}`,
-          clientSecret,
-          merchantId: m.id,
-          webhookUrl: m.webhookUrl || null,
-          ipWhitelist: [],
-          isActive: true
-        });
-      }
-    } catch {}
-  }
-  loadDynamoMerchants();
-
   function resolveDynamoMerchant(clientId, clientSecret, serviceId) {
-    const m=dynamoMerchants.get(serviceId);
-    if(!m || !safeEqual(m.clientId,clientId) || !safeEqual(m.clientSecret,clientSecret) || !m.isActive)return null;
-    const current=merchantRepo.findById(m.merchantId);
+    const current=merchantRepo.findById(serviceId);
     if(!current)return null;
-    return {...m,webhookUrl:current.webhookUrl,ipWhitelist:current.branding?.apiIpWhitelist||[]};
+    const expected=crypto.createHmac('sha256',resolveSecret('dynamo_client_master_key')).update(current.id).digest('hex');
+    if(!safeEqual(`dp_client_${current.id}`,clientId)||!safeEqual(expected,clientSecret))return null;
+    return {merchantId:current.id,webhookUrl:current.webhookUrl,ipWhitelist:current.branding?.apiIpWhitelist||[],isActive:true};
   }
   function publicOrigin(){
     if(process.env.DYNAMO_PUBLIC_URL)return process.env.DYNAMO_PUBLIC_URL.replace(/\/+$/,'');
@@ -145,17 +123,19 @@ export function registerDynamoPayRoutes(server, ctx) {
     const clearing = Number(ledgerRepo.getAccount(merchantId, 'PROVIDER_CLEARING')?.balance_paise || 0);
     const lien = Number(ledgerRepo.getAccount(merchantId, 'PAYOUTS_IN_TRANSIT')?.balance_paise || 0);
     const unsettled = Math.max(0, clearing);
+    const notification = Number(ledgerRepo.getAccount(merchantId, 'NOTIFICATION_CLEARING')?.balance_paise || 0);
     const loan = Math.max(0, -Math.min(0, Number(ledgerRepo.getAccount(merchantId, 'FEES')?.balance_paise || 0)));
     return {
       settledwallet: Math.max(0, settled),
       unsettledbalance: Math.max(0, unsettled),
+      notificationclearingbalance: Math.max(0, notification),
       lienbalance: Math.max(0, lien),
       loanbalance: Math.max(0, loan)
     };
   }
 
   // ========================================================================
-  // POST /v1/dynamo/collect/upi  — Dynamo Pay UPI collection
+  // POST /v1/dynamo/collect/upi  â€” Dynamo Pay UPI collection
   // ========================================================================
   post('/v1/dynamo/collect/upi', async (req, res) => {
     const clientIp = getClientIp(req);
@@ -188,8 +168,8 @@ export function registerDynamoPayRoutes(server, ctx) {
     let amountPaise;
     try{
       if(!['string','number'].includes(typeof amount) || !/^\d+(?:\.\d{1,2})?$/.test(String(amount)))throw new Error();
-      amountPaise=toPaise(String(amount));if(amountPaise<10000n || amountPaise>BigInt(Number.MAX_SAFE_INTEGER))throw new Error();
-    }catch{return HttpServer.json(res,400,{error:'Amount must be at least INR 100.00 with at most two decimals',code:'INVALID_AMOUNT',platform:'dynamo-pay'});}
+      amountPaise=toPaise(String(amount));if(amountPaise<=0n || amountPaise>BigInt(Number.MAX_SAFE_INTEGER))throw new Error();
+    }catch{return HttpServer.json(res,400,{error:'Amount must be positive with at most two decimals',code:'INVALID_AMOUNT',platform:'dynamo-pay'});}
     if(typeof uniquetransactionid!=='string'||!/^[A-Za-z0-9_-]{1,120}$/.test(uniquetransactionid))return HttpServer.json(res,400,{error:'uniquetransactionid must contain 1-120 letters, digits, hyphens or underscores',code:'INVALID_ORDER_ID'});
     const orderId=uniquetransactionid;
     const existing=sessionRepo.findByOrderId(merchant.merchantId,orderId);
@@ -234,7 +214,7 @@ export function registerDynamoPayRoutes(server, ctx) {
   });
 
   // ========================================================================
-  // POST /v1/dynamo/checkstatus  — Dynamo Pay payment status check
+  // POST /v1/dynamo/checkstatus  â€” Dynamo Pay payment status check
   // ========================================================================
   post('/v1/dynamo/checkstatus', async (req, res) => {
     const clientIp = getClientIp(req);
@@ -310,7 +290,7 @@ export function registerDynamoPayRoutes(server, ctx) {
   });
 
   // ========================================================================
-  // POST /v1/dynamo/ifsc/{ifsc}  — Dynamo Pay IFSC validation
+  // POST /v1/dynamo/ifsc/{ifsc}  â€” Dynamo Pay IFSC validation
   // ========================================================================
   post('/v1/dynamo/ifsc/:ifsc', async (req, res, params) => {
     const clientIp = getClientIp(req);
@@ -361,7 +341,7 @@ export function registerDynamoPayRoutes(server, ctx) {
   });
 
   // ========================================================================
-  // POST /v1/dynamo/wallet  — Dynamo Pay wallet balance
+  // POST /v1/dynamo/wallet  â€” Dynamo Pay wallet balance
   // ========================================================================
   post('/v1/dynamo/wallet', async (req, res) => {
     const clientIp = getClientIp(req);
@@ -389,7 +369,7 @@ export function registerDynamoPayRoutes(server, ctx) {
   });
 
   // ========================================================================
-  // POST /v1/dynamo/merchant/webhook  — Dynamo Pay webhook config
+  // POST /v1/dynamo/merchant/webhook  â€” Dynamo Pay webhook config
   // ========================================================================
   post('/v1/dynamo/merchant/webhook', async (req, res) => {
     const clientIp = getClientIp(req);
@@ -432,7 +412,7 @@ export function registerDynamoPayRoutes(server, ctx) {
   });
 
   // ========================================================================
-  // GET /v1/dynamo/merchant/retry-policy  — Dynamo Pay retry policy
+  // GET /v1/dynamo/merchant/retry-policy  â€” Dynamo Pay retry policy
   // ========================================================================
   server.get('/v1/dynamo/merchant/retry-policy', async (req, res) => {
     const clientIp = getClientIp(req);
@@ -458,7 +438,7 @@ export function registerDynamoPayRoutes(server, ctx) {
   });
 
   return {
-    dynamoMerchants,
+
     resolveDynamoMerchant,
     DYNAMO_WEBHOOK_RETRY_POLICY
   };

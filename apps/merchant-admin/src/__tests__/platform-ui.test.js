@@ -37,6 +37,7 @@ function harness(authenticated = true, platformOwner = false) {
     '/me': { user, csrfToken: 'session-csrf' }, '/analytics': { transactions: 1, successful: 1, pending: 0, successfulAmountPaise: '450' },
     '/balance': { accounts: [{ code: 'CASH', balancePaise: '450' }] }, '/api-keys': { keys: [] }, '/webhook-deliveries': { deliveries: [] },
     '/transactions': { items: [], total: 0 }, '/settings': { businessName: 'Business', apiIpWhitelist: [], channel: { allowedVpas: [] } },
+    '/integration-readiness':{checks:[],configurationReady:false,liveAcceptance:'Real acceptance required'},
     '/receiving-mirror':{devices:[],events:[],setup:{receivingUpi:'receiver@bank',callbackConfigured:true,phonePaired:false},confirmationPolicy:'Alerts are evidence, not settlement.'},
     '/staff': { users: [] }, '/connections': { connections: [] }, '/receiving-accounts': { accounts: [] }, '/rules': { rules: [] },
     '/onboarding': { profile: {}, status: 'PROFILE_INCOMPLETE' }, '/cases': { items: [] }, '/operations/health': {},
