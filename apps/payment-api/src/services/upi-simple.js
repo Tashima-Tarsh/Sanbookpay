@@ -111,13 +111,18 @@ export function createUpiSimpleService(ctx) {
       }
       const id = merchantId;
       const secret = webhookSecret || crypto.randomBytes(32).toString('base64url');
-      return db.transaction(() => {
-        db.execute(
-          'INSERT INTO upi_simple_merchants (id, upi_vpa, callback_url, callback_secret, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET upi_vpa=excluded.upi_vpa, callback_url=excluded.callback_url, callback_secret=excluded.callback_secret, updated_at=excluded.updated_at',
-          [id, upiVpa.trim().toLowerCase(), callbackUrl || null, secret, now(), now()]
-        );
-        return { id, upiVpa: upiVpa.trim().toLowerCase(), callbackUrl: callbackUrl || null, secret };
-      });
+      try {
+        return db.transaction(() => {
+          db.execute(
+            'INSERT INTO upi_simple_merchants (id, upi_vpa, callback_url, callback_secret, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET upi_vpa=excluded.upi_vpa, callback_url=excluded.callback_url, callback_secret=excluded.callback_secret, updated_at=excluded.updated_at',
+            [id, upiVpa.trim().toLowerCase(), callbackUrl || null, secret, now(), now()]
+          );
+          return { id, upiVpa: upiVpa.trim().toLowerCase(), callbackUrl: callbackUrl || null, secret };
+        });
+      } catch (e) {
+        if (e.message && /UNIQUE|constraint/i.test(e.message)) fail('UPI VPA already registered', 409);
+        throw e;
+      }
     },
 
     getMerchant(merchantId) {
@@ -140,23 +145,28 @@ export function createUpiSimpleService(ctx) {
       const id = merchantId;
       const secret = webhookSecret || crypto.randomBytes(32).toString('base64url');
       const accessToken = crypto.randomBytes(32).toString('base64url');
-      return db.transaction(() => {
-        db.execute(
-          'INSERT INTO upi_simple_merchants (id, upi_vpa, callback_url, callback_secret, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET upi_vpa=excluded.upi_vpa, callback_url=excluded.callback_url, callback_secret=excluded.callback_secret, updated_at=excluded.updated_at',
-          [id, upiVpa.trim().toLowerCase(), callbackUrl, secret, now(), now()]
-        );
-        return {
-          merchantId: id,
-          businessName: businessName || 'Merchant',
-          upiVpa: upiVpa.trim().toLowerCase(),
-          callbackUrl,
-          webhookSecret: secret,
-          accessToken,
-          accessLink: `/merchant/${id}`,
-          apiBaseUrl: process.env.DYNAMO_PUBLIC_URL || 'http://localhost:6100',
-          createdAt: now()
-        };
-      });
+      try {
+        return db.transaction(() => {
+          db.execute(
+            'INSERT INTO upi_simple_merchants (id, upi_vpa, callback_url, callback_secret, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET upi_vpa=excluded.upi_vpa, callback_url=excluded.callback_url, callback_secret=excluded.callback_secret, updated_at=excluded.updated_at',
+            [id, upiVpa.trim().toLowerCase(), callbackUrl, secret, now(), now()]
+          );
+          return {
+            merchantId: id,
+            businessName: businessName || 'Merchant',
+            upiVpa: upiVpa.trim().toLowerCase(),
+            callbackUrl,
+            webhookSecret: secret,
+            accessToken,
+            accessLink: `/merchant/${id}`,
+            apiBaseUrl: process.env.DYNAMO_PUBLIC_URL || 'http://localhost:6100',
+            createdAt: now()
+          };
+        });
+      } catch (e) {
+        if (e.message && /UNIQUE|constraint/i.test(e.message)) fail('UPI VPA already registered', 409);
+        throw e;
+      }
     },
 
     createOrder({ merchantId, orderId, amount, currency = 'INR', callbackUrl }) {
@@ -170,6 +180,9 @@ export function createUpiSimpleService(ctx) {
         if (!check.valid) fail('Invalid callback URL');
       }
 
+      const existing = db.queryOne('SELECT id FROM upi_simple_orders WHERE merchant_id = ? AND order_id = ?', [merchantId, orderId]);
+      if (existing) fail('Order already exists', 409);
+
       const id = crypto.randomUUID();
       const qrUri = buildUpiPaymentUri({
         vpa: merchant.upi_vpa,
@@ -179,23 +192,28 @@ export function createUpiSimpleService(ctx) {
         note: `Payment ${orderId}`
       });
 
-      return db.transaction(() => {
-        db.execute(
-          `INSERT INTO upi_simple_orders (id, merchant_id, order_id, amount_paise, currency, status, callback_url, upi_vpa, qr_uri, created_at)
-           VALUES (?, ?, ?, ?, ?, 'PENDING', ?, ?, ?, ?)`,
-          [id, merchantId, orderId, Number(paise), currency, finalCallbackUrl || null, merchant.upi_vpa, qrUri, now()]
-        );
-        return {
-          id,
-          orderId,
-          amountPaise: Number(paise),
-          currency,
-          status: 'PENDING',
-          upiVpa: merchant.upi_vpa,
-          qrUri,
-          callbackUrl: finalCallbackUrl || null
-        };
-      });
+      try {
+        return db.transaction(() => {
+          db.execute(
+            `INSERT INTO upi_simple_orders (id, merchant_id, order_id, amount_paise, currency, status, callback_url, upi_vpa, qr_uri, created_at)
+             VALUES (?, ?, ?, ?, ?, 'PENDING', ?, ?, ?, ?)`,
+            [id, merchantId, orderId, Number(paise), currency, finalCallbackUrl || null, merchant.upi_vpa, qrUri, now()]
+          );
+          return {
+            id,
+            orderId,
+            amountPaise: Number(paise),
+            currency,
+            status: 'PENDING',
+            upiVpa: merchant.upi_vpa,
+            qrUri,
+            callbackUrl: finalCallbackUrl || null
+          };
+        });
+      } catch (e) {
+        if (e.message && /UNIQUE|constraint/i.test(e.message)) fail('Order already exists', 409);
+        throw e;
+      }
     },
 
     getOrder(merchantId, orderId) {
@@ -239,7 +257,9 @@ export function createUpiSimpleService(ctx) {
 
       let callbackData = null;
 
-      const result = db.transaction(() => {
+      let result;
+      try {
+        result = db.transaction(() => {
         let order = null;
         if (orderId) {
           order = db.queryOne('SELECT * FROM upi_simple_orders WHERE merchant_id = ? AND order_id = ?', [merchantId, orderId]);
@@ -299,6 +319,10 @@ export function createUpiSimpleService(ctx) {
         } catch (e) {
           result.callback = { sent: false, error: e.message };
         }
+      }
+    } catch (e) {
+        if (e.message && /UNIQUE|constraint/i.test(e.message)) fail('Database constraint violation', 409);
+        throw e;
       }
 
       return result;
