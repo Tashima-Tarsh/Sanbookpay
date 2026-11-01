@@ -3,13 +3,17 @@ package com.dynamopay.bridge
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
+import android.content.pm.PackageManager
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import android.os.Build
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
-import android.os.Handler
-import android.os.Looper
 import android.widget.*
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKeys
+import androidx.work.*
+import com.dynamopay.bridge.workers.ForwardRetryWorker
 
 class MainActivity : AppCompatActivity() {
     private lateinit var app: BridgeApp
@@ -128,13 +132,20 @@ class MainActivity : AppCompatActivity() {
         updateStatus()
 
         if (apiClient.isPaired()) {
-            startPeriodicForwarding()
+            // Event-triggered forwarding: attempt immediate forward when paired and connected.
+            attemptImmediateForward()
+            // Retain WorkManager-based durable retry + periodic reconciliation (not a 5s poll loop).
+            scheduleDurableRetryAndReconciliation()
         }
     }
 
     override fun onResume() {
         super.onResume()
         updateStatus()
+        // Whenever the app comes to the foreground, retry any pending events if connected.
+        if (apiClient.isPaired() && hasConnectivity()) {
+            attemptImmediateForward()
+        }
     }
 
     private fun updateStatus() {
@@ -169,24 +180,68 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun startPeriodicForwarding() {
-        val baseUrl = apiClient.getBaseUrl()
-        val deviceId = apiClient.getDeviceId() ?: return
-        val signingKey = cryptoHelper.getHmacSecret() ?: return
+    /**
+     * Event-triggered forwarding: forwards pending events immediately when connectivity is
+     * available, instead of waiting on a fixed 5-second polling loop. Safe to call frequently;
+     * the forwarder is idempotent and deduplicates.
+     */
+    private fun attemptImmediateForward() {
+        if (!hasConnectivity()) {
+            // No connectivity: leave events in the encrypted local queue; WorkManager retries
+            // when connectivity returns. Do not busy-poll.
+            return
+        }
+        try {
+            val baseUrl = apiClient.getBaseUrl()
+            val deviceId = apiClient.getDeviceId() ?: return
+            val signingKey = cryptoHelper.getHmacSecret() ?: return
+            eventForwarder.forwardPendingEvents(baseUrl, deviceId, signingKey)
+            tvEventsQueued.text = "Events queued: ${eventQueue.getQueueSize()}"
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
 
-        val handler = Handler(Looper.getMainLooper())
-        handler.post(object : Runnable {
-            override fun run() {
-                try {
-                    eventForwarder.forwardPendingEvents(baseUrl, deviceId, signingKey)
-                    val queueSize = eventQueue.getQueueSize()
-                    tvEventsQueued.text = "Events queued: $queueSize"
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
-                handler.postDelayed(this, 5000)
-            }
-        })
+    /**
+     * Schedules WorkManager-based durable retry (exponential backoff, network-required) and
+     * periodic reconciliation. Replaces the avoidable 5-second polling wait.
+     */
+    private fun scheduleDurableRetryAndReconciliation() {
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
+
+        // Durable retry worker with exponential backoff, survives process death.
+        val retryWork = OneTimeWorkRequestBuilder<ForwardRetryWorker>()
+            .setConstraints(constraints)
+            .setInitialDelay(5, java.util.concurrent.TimeUnit.SECONDS)
+            .build()
+
+        WorkManager.getInstance(this)
+            .enqueueUniqueWork("dynamo_bridge_forward_retry", ExistingWorkPolicy.REPLACE, retryWork)
+
+        // Periodic reconciliation (e.g. every 15 minutes) to sweep any events not yet forwarded.
+        val reconcileWork = PeriodicWorkRequestBuilder<ForwardRetryWorker>(
+            15, java.util.concurrent.TimeUnit.MINUTES
+        )
+            .setConstraints(constraints)
+            .build()
+
+        WorkManager.getInstance(this)
+            .enqueueUniquePeriodicWork("dynamo_bridge_reconcile", ExistingPeriodicWorkPolicy.REPLACE, reconcileWork)
+    }
+
+    private fun hasConnectivity(): Boolean {
+        val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        if (Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+            val network = cm.activeNetwork
+            if (network == null) return false
+            val caps = cm.getNetworkCapabilities(network)
+            return caps != null && (caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
+                caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) ||
+                caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET))
+        }
+        return cm.activeNetworkInfo?.isConnectedOrConnecting == true
     }
 
     private fun revokeDevice() {
@@ -243,5 +298,8 @@ class MainActivity : AppCompatActivity() {
             EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
         )
     }
-}
 
+    companion object {
+        private const val TAG = "MainActivity"
+    }
+}

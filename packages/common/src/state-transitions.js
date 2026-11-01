@@ -11,35 +11,75 @@ export const VALID_TRANSITIONS = Object.freeze({
   // EXPIRED is reachable from every non-terminal state: it is the universal "gave up"
   // outcome (timer elapsed, or an administrator clearing the queue), so it must never be
   // blocked just because the session had not reached the next stage yet.
+  [PaymentStatus.CREATED]: [
+    PaymentStatus.INITIATED,
+    PaymentStatus.INTENT_OPENED,
+    PaymentStatus.CANCELLED,
+    PaymentStatus.EXPIRED
+  ],
   [PaymentStatus.INITIATED]: [
     PaymentStatus.ACTIVE,
     PaymentStatus.QUEUED,
+    PaymentStatus.INTENT_OPENED,
     PaymentStatus.CANCELLED,
     PaymentStatus.EXPIRED
   ],
   [PaymentStatus.QUEUED]: [
     PaymentStatus.ACTIVE,
+    PaymentStatus.INTENT_OPENED,
     PaymentStatus.CANCELLED,
     PaymentStatus.EXPIRED
   ],
   [PaymentStatus.ACTIVE]: [
     PaymentStatus.PROCESSING,
+    PaymentStatus.INTENT_OPENED,
     // Tier-1 attribution settles a still-ACTIVE session as soon as the bank notification is
     // attributed, without waiting for the customer to press "I have paid". A bank-confirmed
     // credit is terminal regardless of whether the customer pressed the button.
     PaymentStatus.SUCCESS,
+    PaymentStatus.CREDIT_OBSERVED,
     PaymentStatus.FAILED,
     PaymentStatus.EXPIRED,
     PaymentStatus.CANCELLED
   ],
+  [PaymentStatus.INTENT_OPENED]: [
+    PaymentStatus.CLIENT_REPORTED_SUCCESS,
+    PaymentStatus.CREDIT_OBSERVED,
+    PaymentStatus.VERIFICATION_PENDING,
+    PaymentStatus.FAILED,
+    PaymentStatus.EXPIRED,
+    PaymentStatus.CANCELLED,
+    PaymentStatus.RECONCILIATION_REQUIRED
+  ],
   [PaymentStatus.PROCESSING]: [
     PaymentStatus.VERIFICATION_PENDING,
     PaymentStatus.SUCCESS,
+    PaymentStatus.CREDIT_OBSERVED,
     PaymentStatus.FAILED,
     PaymentStatus.EXPIRED
   ],
+  [PaymentStatus.CLIENT_REPORTED_SUCCESS]: [
+    PaymentStatus.CREDIT_OBSERVED,
+    PaymentStatus.VERIFICATION_PENDING,
+    PaymentStatus.MULTI_SIGNAL_MATCHED,
+    PaymentStatus.FAILED,
+    PaymentStatus.EXPIRED,
+    PaymentStatus.RECONCILIATION_REQUIRED
+  ],
+  [PaymentStatus.CREDIT_OBSERVED]: [
+    PaymentStatus.VERIFICATION_PENDING,
+    PaymentStatus.MULTI_SIGNAL_MATCHED,
+    PaymentStatus.PAID_VERIFIED,
+    PaymentStatus.SUCCESS,
+    PaymentStatus.FAILED,
+    PaymentStatus.EXPIRED,
+    PaymentStatus.RECONCILIATION_REQUIRED
+  ],
+  [PaymentStatus.VERIFICATION_PENDING]: [PaymentStatus.SUCCESS, PaymentStatus.PAID_VERIFIED, PaymentStatus.FAILED],
+  [PaymentStatus.MULTI_SIGNAL_MATCHED]: [PaymentStatus.PAID_VERIFIED, PaymentStatus.SUCCESS, PaymentStatus.FAILED, PaymentStatus.RECONCILIATION_REQUIRED],
+  [PaymentStatus.PAID_VERIFIED]: [PaymentStatus.SUCCESS],
+  [PaymentStatus.RECONCILIATION_REQUIRED]: [PaymentStatus.VERIFICATION_PENDING, PaymentStatus.FAILED, PaymentStatus.PAID_VERIFIED],
   [PaymentStatus.SUCCESS]: [],
-  [PaymentStatus.VERIFICATION_PENDING]: [PaymentStatus.SUCCESS, PaymentStatus.FAILED],
   [PaymentStatus.FAILED]: [],
   [PaymentStatus.EXPIRED]: [],
   [PaymentStatus.CANCELLED]: []
