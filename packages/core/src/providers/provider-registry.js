@@ -44,7 +44,8 @@ export class ProviderRegistry {
    */
   getProvider(merchantId, providerName = 'CASHFREE', connectionId = null) {
     const normalizedName = providerName.toUpperCase();
-    const cacheKey = `${merchantId}:${normalizedName}`;
+    const envPrefix = ['CASHFREE','PHONEPE','PAYTM'].includes(normalizedName) ? normalizedName : '';
+    const env = suffix => envPrefix ? process.env[`${envPrefix}_${suffix}`] || '' : '';
 
     let conn;
     if(connectionId){
@@ -59,14 +60,14 @@ export class ProviderRegistry {
 
     const clientSecret = conn?.client_secret_encrypted
       ? this._decryptSecret(conn.client_secret_encrypted)
-      : (process.env.CASHFREE_CLIENT_SECRET || process.env.PHONEPE_SALT_KEY || process.env.PAYTM_MERCHANT_KEY || '');
+      : (!conn ? env('CLIENT_SECRET') || env('SALT_KEY') || env('MERCHANT_KEY') : '');
 
     const webhookSecret = conn?.webhook_secret_encrypted
       ? this._decryptSecret(conn.webhook_secret_encrypted)
-      : (process.env.CASHFREE_WEBHOOK_SECRET || process.env.PHONEPE_SALT_KEY || process.env.PAYTM_MERCHANT_KEY || clientSecret);
+      : (!conn ? env('WEBHOOK_SECRET') || clientSecret : clientSecret);
 
-    const clientId = conn?.client_id || process.env.CASHFREE_CLIENT_ID || process.env.PHONEPE_MERCHANT_ID || process.env.PAYTM_MERCHANT_ID || '';
-    const environment = conn?.environment || process.env.CASHFREE_ENVIRONMENT || process.env.PHONEPE_ENVIRONMENT || process.env.PAYTM_ENVIRONMENT || 'PRODUCTION';
+    const clientId = conn?.client_id || (!conn ? env('CLIENT_ID') || env('MERCHANT_ID') : '');
+    const environment = conn?.environment || env('ENVIRONMENT') || 'PRODUCTION';
 
     const config = {
       merchantId,
@@ -77,15 +78,16 @@ export class ProviderRegistry {
       webhookSecret,
       extra: {
         connectionId: conn?.id,
+        businessMerchantId: conn?.business_merchant_id,
         capabilities: JSON.parse(conn?.diagnostics || '{}').capabilities || [],
         corporateId: conn?.corporate_id,
         merchantVpa: conn?.merchant_vpa,
         terminalId: conn?.terminal_id,
         // PhonePe specific
-        saltKey: conn?.salt_key_encrypted ? this._decryptSecret(conn.salt_key_encrypted) : (process.env.PHONEPE_SALT_KEY || ''),
+        saltKey: conn?.salt_key_encrypted ? this._decryptSecret(conn.salt_key_encrypted) : (normalizedName==='PHONEPE'?clientSecret:''),
         saltIndex: conn?.salt_index || process.env.PHONEPE_SALT_INDEX || '1',
         // Paytm specific
-        merchantKey: conn?.merchant_key_encrypted ? this._decryptSecret(conn.merchant_key_encrypted) : (process.env.PAYTM_MERCHANT_KEY || ''),
+        merchantKey: conn?.merchant_key_encrypted ? this._decryptSecret(conn.merchant_key_encrypted) : (normalizedName==='PAYTM'?clientSecret:''),
         website: conn?.website || process.env.PAYTM_WEBSITE || 'WEBSTAGING',
         industryType: conn?.industry_type || process.env.PAYTM_INDUSTRY_TYPE || 'Retail',
         channelId: conn?.channel_id || process.env.PAYTM_CHANNEL_ID || 'WEB'

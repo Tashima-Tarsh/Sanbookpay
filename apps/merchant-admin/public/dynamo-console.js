@@ -117,7 +117,7 @@
     $('gmailClientId').value=g.clientId||'';$('gmailRedirectUri').value=g.redirectUri||'';
     $('gmailConnectionStatus').textContent=g.status==='CONFIGURED'?'Configured'+(g.connectedEmail?' · '+g.connectedEmail:''):'Not connected';
     $('gmailClientSecret').placeholder=g.hasClientSecret?'Saved secret — leave blank to keep it':'Enter Google OAuth client secret';
-    $('gmailMessage').textContent=g.connectedEmail?'Linked account: '+g.connectedEmail:'Save your Google OAuth credentials, then connect the Gmail account.';
+    $('gmailMessage').textContent=g.connectedEmail?'Linked account: '+g.connectedEmail:(g.clientId&&g.hasClientSecret?'Ready to connect. Click Connect Gmail and choose your bank-alert inbox.':'Platform setup required: open Platform Gmail setup below and save the Google OAuth client once. Then click Connect Gmail.');
     const observers=[{name:'Gmail observer',...o.gmail},{name:'SMS observer',...o.sms},...(o.android?.devices||[])];
     $('observerList').innerHTML=observers.length?observers.map(r=>`<div class="summary-line"><span>${esc(r.type||r.observerType||r.name||r.id)}<small> ${esc(r.lastSeenAt||r.lastHeartbeatAt||'')}</small></span>${badge(r.status||'UNKNOWN')}</div>`).join(''):'<p>No observer heartbeat recorded. Connect the SMS or Gmail observer to verify incoming bank payments.</p>';
     $('alertList').innerHTML=a.alerts.length?a.alerts.map(r=>`<div class="summary-line"><span>${esc(r.message||r.title||r.alert_type)}</span><button class="btn small" data-ack="${esc(r.id)}">Acknowledge</button></div>`).join(''):'<p>No active operational alerts.</p>';

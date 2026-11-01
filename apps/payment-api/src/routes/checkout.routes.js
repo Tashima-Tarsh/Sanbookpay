@@ -1,5 +1,5 @@
 import { HttpServer } from '../server.js';
-import { toRupeesString, buildUpiUri, buildUpiIntentLinks, generateQrDataUri, PaymentStatus, PaymentMethod, UPI_PROVIDERS, isInternalServiceRequest } from '@youpi/common';
+import { toRupeesString, buildUpiUri, buildUpiPaymentUri, buildUpiPaymentIntentLinks, generateQrDataUri, PaymentStatus, PaymentMethod, UPI_PROVIDERS, isInternalServiceRequest } from '@youpi/common';
 import { validateSessionDeviceAccess } from '@youpi/core';
 import { SplitSettlementRepository } from '@youpi/db';
 
@@ -645,7 +645,7 @@ export function registerCheckoutRoutes(server, ctx) {
       serverNow: new Date().toISOString(),
       upiUri,
       upiQr: upiUri ? generateQrDataUri(upiUri) : null,
-      upiDeepLinks: upiUri ? buildUpiIntentLinks(upiUri) : null,
+      upiDeepLinks: upiUri ? buildUpiPaymentIntentLinks(upiUri) : null,
       payeeVpa,
       payeeName,
       isMerchantEnabled,
@@ -679,7 +679,7 @@ export function registerCheckoutRoutes(server, ctx) {
     if (!payeeVpa) return HttpServer.json(res, 400, { error: 'No VPA configured for this session' });
     let upiUri;
     try {
-      upiUri = buildUpiUri({
+      upiUri = buildUpiPaymentUri({
         vpa: payeeVpa,
         name: payeeName,
         amount: session.amountPaise / 100,
@@ -693,7 +693,7 @@ export function registerCheckoutRoutes(server, ctx) {
     HttpServer.json(res, 200, {
       upiUri,
       upiQr: generateQrDataUri(upiUri),
-      upiDeepLinks: buildUpiIntentLinks(upiUri)
+      upiDeepLinks: buildUpiPaymentIntentLinks(upiUri)
     });
   });
 
@@ -706,7 +706,7 @@ export function registerCheckoutRoutes(server, ctx) {
     if (!payeeVpa) return HttpServer.json(res, 400, { error: 'No VPA configured for this session' });
     let upiUri;
     try {
-      upiUri = buildUpiUri({
+      upiUri = buildUpiPaymentUri({
         vpa: payeeVpa,
         name: payeeName,
         amount: session.amountPaise / 100,
@@ -719,57 +719,17 @@ export function registerCheckoutRoutes(server, ctx) {
     }
     HttpServer.json(res, 200, {
       upiUri,
-      upiDeepLinks: buildUpiIntentLinks(upiUri)
+      upiDeepLinks: buildUpiPaymentIntentLinks(upiUri)
     });
   });
 
-  // POST /api/v1/payments/phonepe — Create PhonePe payment (requires PhonePe Business account)
-  server.post('/api/v1/payments/phonepe', async (req, res) => {
-    const body = await HttpServer.parseBody(req);
-    const { merchantId, orderId, amountPaise, customerPhone, customerName, returnUrl, notifyUrl, idempotencyKey } = body;
-    if (!merchantId || !orderId || !amountPaise) return HttpServer.json(res, 400, { error: 'merchantId, orderId, amountPaise required' });
-
-    const providerRegistry = new (require('@youpi/core').ProviderRegistry)(ctx.db);
-    const provider = providerRegistry.getProvider(merchantId, 'PHONEPE');
-    try {
-      const result = await provider.createCollection({
-        merchantOrderId: orderId,
-        amountPaise: Number(amountPaise),
-        customerPhone,
-        customerName,
-        returnUrl,
-        notifyUrl,
-        idempotencyKey
-      });
-      HttpServer.json(res, 201, result);
-    } catch (err) {
-      HttpServer.json(res, 400, { error: err.message, code: err.code });
-    }
-  });
-
-  // POST /api/v1/payments/paytm — Create Paytm payment (requires Paytm Business account)
-  server.post('/api/v1/payments/paytm', async (req, res) => {
-    const body = await HttpServer.parseBody(req);
-    const { merchantId, orderId, amountPaise, customerPhone, customerName, returnUrl, notifyUrl, idempotencyKey } = body;
-    if (!merchantId || !orderId || !amountPaise) return HttpServer.json(res, 400, { error: 'merchantId, orderId, amountPaise required' });
-
-    const providerRegistry = new (require('@youpi/core').ProviderRegistry)(ctx.db);
-    const provider = providerRegistry.getProvider(merchantId, 'PAYTM');
-    try {
-      const result = await provider.createCollection({
-        merchantOrderId: orderId,
-        amountPaise: Number(amountPaise),
-        customerPhone,
-        customerName,
-        returnUrl,
-        notifyUrl,
-        idempotencyKey
-      });
-      HttpServer.json(res, 201, result);
-    } catch (err) {
-      HttpServer.json(res, 400, { error: err.message, code: err.code });
-    }
-  });
+  // These aliases issued untracked PSP orders outside credential policy and accounting.
+  for (const provider of ['phonepe','paytm']) {
+    server.post(`/api/v1/payments/${provider}`, async (_req,res)=>HttpServer.json(res,410,{
+      error:'Use POST /v1/payments with an approved provider connection and scoped API key.',
+      code:'UNTRACKED_PROVIDER_ROUTE_RETIRED'
+    }));
+  }
 
   // POST /api/v1/checkout/:id/bind-customer
   server.post('/api/v1/checkout/:id/bind-customer', async (req, res, params) => {

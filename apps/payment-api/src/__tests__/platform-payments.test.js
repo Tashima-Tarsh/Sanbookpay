@@ -26,10 +26,19 @@ test('scoped keys enforce tenant, revocation, suspension, idempotency and persis
  const base='http://127.0.0.1:'+http.address().port;
  const call=async(path,body,headers={})=>{const res=await fetch(base+path,{method:body===undefined?'GET':'POST',headers:{'content-type':'application/json',...headers},body:body===undefined?undefined:JSON.stringify(body)});return {status:res.status,body:await res.json()};};
  try{
+ const channel=await call('/api/platform/v1/settings',{channel:{enabled:true,minAmountPaise:0,maxAmountPaise:2000000,allowedVpas:[]}},{'x-test-owner':'yes'});
+ assert.equal(channel.status,200,'zero minimum is a valid channel setting');
+ const connection=await call('/api/platform/v1/connections',{provider:'CASHFREE',environment:'SANDBOX',clientId:'test-client',clientSecret:'test-secret'},{'x-test-owner':'yes'});
+ assert.equal(connection.status,201);assert.equal(connection.body.connection.minAmountPaise,0,'new provider policy has no rupee floor');
+ const state=await call('/api/platform/v1/connections/'+connection.body.connection.id+'/state',{enabled:false,minAmountPaise:0,reason:'Remove minimum payment floor'},{'x-test-owner':'yes'});
+ assert.equal(state.status,200);
  const made=await call('/api/platform/v1/api-keys',{label:'Server',scopes:['payments.create','payments.read'],environment:'PRODUCTION',rateLimit:100},{'x-test-owner':'yes'});
  assert.equal(made.status,201);assert.match(made.body.secret,/^dp_live_/);
  assert.ok(!JSON.stringify(db.query('SELECT * FROM pp_api_keys')).includes(made.body.secret));
  const auth={authorization:'Bearer '+made.body.secret,'idempotency-key':'request-one'};
+ const small=await call('/v1/payments',{orderId:'one-paise',amount:'0.01'},{...auth,'idempotency-key':'one-paise'});
+ assert.equal(small.status,201);assert.equal(small.body.amountPaise,'1');
+ assert.equal((await call('/v1/payments',{orderId:'zero-money',amount:'0'},{...auth,'idempotency-key':'zero-money'})).status,400);
  let first=await call('/v1/payments',{orderId:'same-order',amount:'201.00',merchantId:b.id},auth);
  assert.equal(first.status,201);assert.equal(db.queryOne('SELECT merchant_id FROM payment_sessions WHERE id=?',[first.body.paymentId]).merchant_id,a.id);
  assert.equal((await call('/v1/payments',{orderId:'same-order',amount:'201.00'},auth)).body.paymentId,first.body.paymentId);

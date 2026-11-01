@@ -1,5 +1,5 @@
 export function upiChannelSettings(merchant){
-  return merchant?.branding?.upiChannel || {enabled:true,minAmountPaise:20000,maxAmountPaise:2000000,allowedVpas:[]};
+  return merchant?.branding?.upiChannel || {enabled:true,minAmountPaise:0,maxAmountPaise:2000000,allowedVpas:[]};
 }
 export function validateUpiChannel(merchant,amountPaise,vpa){
   const c=upiChannelSettings(merchant);

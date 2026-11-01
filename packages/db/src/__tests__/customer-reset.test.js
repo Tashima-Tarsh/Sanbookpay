@@ -2,11 +2,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import { Database, runMigrations } from '../index.js';
 
-test('Production & Development Database Safe Customer Reset and Zero Residue Invariant', () => {
+test('isolated production/development fixtures preserve merchant configuration during customer reset', () => {
+  const fixtureDir=fs.mkdtempSync(path.join(os.tmpdir(),'sanbook-reset-test-'));
   // 1. PROD RESET & VERIFICATION
-  const prodPath = path.resolve('data/youpi_pg.sqlite');
+  const prodPath = path.join(fixtureDir,'production.sqlite');
   if (!fs.existsSync(prodPath)) {
     const parentDir = path.dirname(prodPath);
     if (!fs.existsSync(parentDir)) {
@@ -18,7 +20,7 @@ test('Production & Development Database Safe Customer Reset and Zero Residue Inv
   }
   assert.ok(fs.existsSync(prodPath), `Production DB must exist at ${prodPath}`);
 
-  const prodBackupDir = path.resolve('data/backups');
+  const prodBackupDir = path.join(fixtureDir,'backups');
   if (!fs.existsSync(prodBackupDir)) {
     fs.mkdirSync(prodBackupDir, { recursive: true });
   }
@@ -53,9 +55,10 @@ test('Production & Development Database Safe Customer Reset and Zero Residue Inv
   prodDb.close();
 
   // 2. DEV RESET & VERIFICATION
-  const devPath = process.env.DEV_DB_PATH || path.resolve('data/youpi_pg_dev.sqlite');
+  const devPath = path.join(fixtureDir,'development.sqlite');
+  const devFixture=new Database({dbPath:devPath});runMigrations(devFixture);devFixture.close();
   if (fs.existsSync(devPath)) {
-    const devBackupDir = path.resolve('data/backups');
+    const devBackupDir = path.join(fixtureDir,'backups');
     if (!fs.existsSync(devBackupDir)) {
       fs.mkdirSync(devBackupDir, { recursive: true });
     }
