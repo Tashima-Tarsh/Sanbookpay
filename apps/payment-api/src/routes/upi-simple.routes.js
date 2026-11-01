@@ -1,4 +1,5 @@
 import { HttpServer } from '../server.js';
+import crypto from 'node:crypto';
 
 export function registerUpiSimpleRoutes(server, ctx) {
   const base = '/api/v1/upi';
@@ -19,7 +20,6 @@ export function registerUpiSimpleRoutes(server, ctx) {
       throw Object.assign(new Error('X-Merchant-Id and X-Merchant-Secret headers required'), { statusCode: 401 });
     }
     const merchant = upiSimple.getMerchant(merchantId);
-    const crypto = require('node:crypto');
     const expected = merchant.secret;
     const a = Buffer.from(String(secret || ''));
     const b = Buffer.from(String(expected || ''));
