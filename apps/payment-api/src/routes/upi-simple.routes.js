@@ -91,11 +91,11 @@ export function registerUpiSimpleRoutes(server, ctx) {
   server.post(`${base}/merchant/setup`, async (req, res) => {
     try {
       const body = await HttpServer.parseBody(req);
-      const { merchantId, upiVpa, callbackUrl, businessName, contactEmail, contactPhone } = body;
+      const { merchantId, upiVpa, callbackUrl, businessName, contactEmail, contactPhone, webhookSecret } = body;
       if (!merchantId || !upiVpa || !callbackUrl) {
         return HttpServer.json(res, 400, { error: 'merchantId, upiVpa and callbackUrl are required' });
       }
-      const result = upiSimple.setupMerchantFromPlatform(merchantId, upiVpa, callbackUrl, businessName, contactEmail, contactPhone);
+      const result = upiSimple.setupMerchantFromPlatform(merchantId, upiVpa, callbackUrl, businessName, contactEmail, contactPhone, webhookSecret);
       return HttpServer.json(res, 201, result);
     } catch (error) {
       return HttpServer.json(res, error.statusCode || 500, { error: error.message });

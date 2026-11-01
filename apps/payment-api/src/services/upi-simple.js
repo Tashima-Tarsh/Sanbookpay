@@ -89,9 +89,9 @@ export function createUpiSimpleService(ctx) {
         },
         body: payloadString
       });
-      return { sent: response.ok, status: response.status };
+      return { sent: response.ok, status: response.status, url: check.url.toString() };
     } catch (error) {
-      return { sent: false, error: error.message };
+      return { sent: false, error: error.message, url: check.url.toString() };
     }
   }
 
@@ -103,14 +103,14 @@ export function createUpiSimpleService(ctx) {
   }
 
   return {
-    registerMerchant(merchantId, upiVpa, callbackUrl) {
+    registerMerchant(merchantId, upiVpa, callbackUrl, webhookSecret) {
       if (!isValidVpa(upiVpa)) fail('Invalid UPI VPA');
       if (callbackUrl) {
         const check = validateOutboundWebhookUrl(callbackUrl);
         if (!check.valid) fail('Invalid callback URL');
       }
       const id = merchantId;
-      const secret = crypto.randomBytes(32).toString('base64url');
+      const secret = webhookSecret || crypto.randomBytes(32).toString('base64url');
       return db.transaction(() => {
         db.execute(
           'INSERT INTO upi_simple_merchants (id, upi_vpa, callback_url, callback_secret, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET upi_vpa=excluded.upi_vpa, callback_url=excluded.callback_url, callback_secret=excluded.callback_secret, updated_at=excluded.updated_at',
@@ -132,13 +132,13 @@ export function createUpiSimpleService(ctx) {
       return { id: row.id, upiVpa: row.upi_vpa, callbackUrl: row.callback_url, secret: row.callback_secret };
     },
 
-    setupMerchantFromPlatform(merchantId, upiVpa, callbackUrl, businessName, contactEmail, contactPhone) {
+    setupMerchantFromPlatform(merchantId, upiVpa, callbackUrl, businessName, contactEmail, contactPhone, webhookSecret) {
       if (!isValidVpa(upiVpa)) fail('Invalid UPI VPA');
       if (!callbackUrl) fail('Callback URL is required');
       const check = validateOutboundWebhookUrl(callbackUrl);
       if (!check.valid) fail('Invalid callback URL');
       const id = merchantId;
-      const secret = crypto.randomBytes(32).toString('base64url');
+      const secret = webhookSecret || crypto.randomBytes(32).toString('base64url');
       const accessToken = crypto.randomBytes(32).toString('base64url');
       return db.transaction(() => {
         db.execute(
@@ -230,14 +230,16 @@ export function createUpiSimpleService(ctx) {
       }));
     },
 
-    recordObservation({ merchantId, orderId, amountPaise, utr, senderVpa, source, rawText }) {
+    async recordObservation({ merchantId, orderId, amountPaise, utr, senderVpa, source, rawText }) {
       if (!utr || !/^\d{12}$/.test(String(utr))) fail('Invalid UTR (12 digits required)');
       const paise = Number(amountPaise);
       if (!Number.isSafeInteger(paise) || paise <= 0) fail('Invalid amount');
 
       const observationId = crypto.randomUUID();
 
-      return db.transaction(() => {
+      let callbackData = null;
+
+      const result = db.transaction(() => {
         let order = null;
         if (orderId) {
           order = db.queryOne('SELECT * FROM upi_simple_orders WHERE merchant_id = ? AND order_id = ?', [merchantId, orderId]);
@@ -282,16 +284,24 @@ export function createUpiSimpleService(ctx) {
           [utr, senderVpa || null, completedAt, order.id]
         );
 
-        const orderWithSecret = {
-          ...order,
-          callback_url: order.callback_url,
-          callback_secret: merchantRow ? merchantRow.callback_secret : ''
+        callbackData = {
+          order: { ...order, callback_url: order.callback_url, callback_secret: merchantRow ? merchantRow.callback_secret : '' },
+          observation: { utr, senderVpa, source }
         };
 
-        const callbackResult = sendCallback(orderWithSecret, { utr, senderVpa, source });
-
-        return { matched: true, orderId: order.order_id, status: 'SUCCESS', utr, callback: callbackResult };
+        return { matched: true, orderId: order.order_id, status: 'SUCCESS', utr };
       });
+
+      if (callbackData) {
+        try {
+          const callbackResult = await sendCallback(callbackData.order, callbackData.observation);
+          result.callback = callbackResult;
+        } catch (e) {
+          result.callback = { sent: false, error: e.message };
+        }
+      }
+
+      return result;
     }
   };
 }
