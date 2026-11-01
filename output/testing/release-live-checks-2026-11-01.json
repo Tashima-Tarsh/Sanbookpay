@@ -1,0 +1,54 @@
+{
+  "commit": "d7fae513dc3cb9e54d2013672155f01f1051760c",
+  "deploy": "dep-dbj8fi3bc2fs73c44kng",
+  "checkedAt": "2026-11-01T00:30:16.547Z",
+  "results": [
+    {
+      "path": "/_ready",
+      "status": 200,
+      "finalPath": "/_ready",
+      "body": "{\"status\":\"UP\",\"services\":4}"
+    },
+    {
+      "path": "/health",
+      "status": 200,
+      "finalPath": "/health",
+      "body": "{\"status\":\"UP\",\"service\":\"payment-api\",\"timestamp\":\"2026-11-01T00:30:16.442Z\",\"recoveryStats\":{\"expiredCount\":0,\"failedCount\":0,\"verificationPendingCount\":0,\"rescheduledCount\":0,\"promotedCount\":0}}"
+    },
+    {
+      "path": "/platform",
+      "status": 200,
+      "finalPath": "/platform"
+    },
+    {
+      "path": "/admin",
+      "status": 200,
+      "finalPath": "/admin",
+      "gmailConnectControl": true,
+      "collapsedPlatformSetup": true
+    },
+    {
+      "path": "/super-admin",
+      "status": 200,
+      "finalPath": "/platform"
+    },
+    {
+      "path": "/v1/payments",
+      "status": 401,
+      "finalPath": "/v1/payments",
+      "body": "{\"error\":\"A valid merchant API key is required.\",\"code\":\"AUTH_REQUIRED\"}"
+    },
+    {
+      "path": "/api/v1/admin/gmail/oauth/start",
+      "status": 401,
+      "finalPath": "/api/v1/admin/gmail/oauth/start",
+      "body": "{\"error\":\"Unauthorized\",\"code\":\"AUTH_REQUIRED\"}"
+    },
+    {
+      "path": "/api/v1/payments/phonepe",
+      "status": 410,
+      "finalPath": "/api/v1/payments/phonepe",
+      "body": "{\"error\":\"Use POST /v1/payments with an approved provider connection and scoped API key.\",\"code\":\"UNTRACKED_PROVIDER_ROUTE_RETIRED\"}"
+    }
+  ]
+}

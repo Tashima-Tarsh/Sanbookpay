@@ -6,6 +6,9 @@ import path from 'node:path';
 
 // A clean checkout must run without a live .env or production database.
 const testEnv = {
+  NTFY_TOPIC: '',
+  SMS_GATEWAY_URL: '',
+  GMAIL_SEND_CLIENT_ID: '',
   NODE_ENV: 'test',
   DATABASE_URL: '',
   YOUPI_MODE: 'localhost',
@@ -19,6 +22,9 @@ const testEnv = {
 };
 
 const testFiles = [
+  'scripts/notifications.test.js',
+  'scripts/gmail-auth.test.js',
+  'apps/payment-api/src/__tests__/notification-delivery.test.js',
   'packages/common/src/__tests__/common.test.js',
   'packages/db/src/__tests__/customer-reset.test.js',
   'packages/db/src/__tests__/auth-matrix.test.js',

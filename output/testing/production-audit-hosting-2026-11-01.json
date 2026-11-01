@@ -1,0 +1,13 @@
+{
+    "checkedAt":  "2026-11-01T06:50:38.6849120Z",
+    "service":  "dynamo-pay",
+    "branch":  "main",
+    "plan":  "free",
+    "region":  "singapore",
+    "autoDeployTrigger":  "checksPass",
+    "deployStatus":  "live",
+    "deployedCommit":  "8186e32b70bd4aa90318a490b90d89a373655a9a",
+    "postgresStatus":  "available",
+    "postgresPlan":  "free",
+    "postgresExpiresAt":  "2026-11-30T06:37:08.293173Z"
+}

@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE svg
+  PUBLIC '-//W3C//DTD SVG 1.0//EN'
+  'http://www.w3.org/TR/2001/REC-SVG-20010904/DTD/svg10.dtd'>
+<svg width="480" height="540" preserveAspectRatio="xMinYMin meet" viewBox="0 0 480 540" xmlns="http://www.w3.org/2000/svg" version="1.0" fill-rule="evenodd" xmlns:xlink="http://www.w3.org/1999/xlink">
+	<title>...</title>
+	<desc>...</desc>
+	<clipPath id="clip">
+		<rect x="0" y="0" width="480" height="540"/>
+	</clipPath>
+	<g id="group" transform="scale(1,-1) translate(0,-540)" style="clip-path: url(#clip)">
+		<g transform="">
+			<rect x="1" y="495" width="70" height="30" rx="4" ry="4" style="stroke: rgb(9%,40%,30%); stroke-linecap: butt; stroke-width: 1; fill: rgb(93%,96%,94%); fill-rule: evenodd;"/>
+			<text x="15.533203125" y="506" style="font-family: Bold; font-size: 8px;fill: rgb(9%,23%,20%); stroke:none;" transform="translate(0,1012) scale(1,-1)">Bank / app</text>
+			<path d="M 36,490 L 36,73 Z" style="stroke: rgb(72%,79%,74%); stroke-linecap: butt; stroke-width: 1; stroke-dasharray: 3, 3;"/>
+			<rect x="102" y="495" width="70" height="30" rx="4" ry="4" style="stroke: rgb(9%,40%,30%); stroke-linecap: butt; stroke-width: 1; fill: rgb(93%,96%,94%); fill-rule: evenodd;"/>
+			<text x="110.19140625" y="506" style="font-family: Bold; font-size: 8px;fill: rgb(9%,23%,20%); stroke:none;" transform="translate(0,1012) scale(1,-1)">Phone / Gmail</text>
+			<path d="M 137,490 L 137,73 Z" style="stroke: rgb(72%,79%,74%); stroke-linecap: butt; stroke-width: 1; stroke-dasharray: 3, 3;"/>
+			<rect x="204" y="495" width="70" height="30" rx="4" ry="4" style="stroke: rgb(9%,40%,30%); stroke-linecap: butt; stroke-width: 1; fill: rgb(93%,96%,94%); fill-rule: evenodd;"/>
+			<text x="215.576171875" y="506" style="font-family: Bold; font-size: 8px;fill: rgb(9%,23%,20%); stroke:none;" transform="translate(0,1012) scale(1,-1)">Dynamo API</text>
+			<path d="M 239,490 L 239,73 Z" style="stroke: rgb(72%,79%,74%); stroke-linecap: butt; stroke-width: 1; stroke-dasharray: 3, 3;"/>
+			<rect x="306" y="495" width="70" height="30" rx="4" ry="4" style="stroke: rgb(9%,40%,30%); stroke-linecap: butt; stroke-width: 1; fill: rgb(93%,96%,94%); fill-rule: evenodd;"/>
+			<text x="319.228515625" y="506" style="font-family: Bold; font-size: 8px;fill: rgb(9%,23%,20%); stroke:none;" transform="translate(0,1012) scale(1,-1)">PostgreSQL</text>
+			<path d="M 341,490 L 341,73 Z" style="stroke: rgb(72%,79%,74%); stroke-linecap: butt; stroke-width: 1; stroke-dasharray: 3, 3;"/>
+			<rect x="409" y="495" width="70" height="30" rx="4" ry="4" style="stroke: rgb(9%,40%,30%); stroke-linecap: butt; stroke-width: 1; fill: rgb(93%,96%,94%); fill-rule: evenodd;"/>
+			<text x="416.22265625" y="506" style="font-family: Bold; font-size: 8px;fill: rgb(9%,23%,20%); stroke:none;" transform="translate(0,1012) scale(1,-1)">Game backend</text>
+			<path d="M 444,490 L 444,73 Z" style="stroke: rgb(72%,79%,74%); stroke-linecap: butt; stroke-width: 1; stroke-dasharray: 3, 3;"/>
+			<path d="M 36,465 L 137,465 Z" style="stroke: rgb(9%,40%,30%); stroke-linecap: butt; stroke-width: 1;"/>
+			<polygon points="137 465, 131 468, 131 462" style="stroke: rgb(9%,40%,30%); stroke-linecap: butt; stroke-width: 1; fill: rgb(9%,40%,30%); fill-rule: evenodd;"/>
+			<text x="14.38671875" y="473" style="font-family: Regular; font-size: 8px;fill: rgb(9%,23%,20%); stroke:none;" transform="translate(0,946) scale(1,-1)">1. Receiving alert (bank-controlled delay)</text>
+			<path d="M 137,415 L 239,415 Z" style="stroke: rgb(9%,40%,30%); stroke-linecap: butt; stroke-width: 1;"/>
+			<polygon points="239 415, 233 418, 233 412" style="stroke: rgb(9%,40%,30%); stroke-linecap: butt; stroke-width: 1; fill: rgb(9%,40%,30%); fill-rule: evenodd;"/>
+			<text x="126.96484375" y="423" style="font-family: Regular; font-size: 8px;fill: rgb(9%,23%,20%); stroke:none;" transform="translate(0,846) scale(1,-1)">2. Signed / authenticated evidence</text>
+			<path d="M 239,365 L 341,365 Z" style="stroke: rgb(9%,40%,30%); stroke-linecap: butt; stroke-width: 1;"/>
+			<polygon points="341 365, 335 368, 335 362" style="stroke: rgb(9%,40%,30%); stroke-linecap: butt; stroke-width: 1; fill: rgb(9%,40%,30%); fill-rule: evenodd;"/>
+			<text x="207.33984375" y="373" style="font-family: Regular; font-size: 8px;fill: rgb(9%,23%,20%); stroke:none;" transform="translate(0,746) scale(1,-1)">3. Match UPI + amount + unique eligible order</text>
+			<rect x="180" y="267" width="260" height="68" rx="4" ry="4" style="stroke: rgb(9%,40%,30%); stroke-linecap: butt; stroke-width: 1; fill: rgb(93%,96%,94%); fill-rule: evenodd;"/>
+			<text x="246.64453125" y="315" style="font-family: Regular; font-size: 8px;fill: rgb(9%,23%,20%); stroke:none;" transform="translate(0,630) scale(1,-1)">Policy enabled + unused actual UTR</text>
+			<text x="216.396484375" y="298" style="font-family: Regular; font-size: 8px;fill: rgb(9%,23%,20%); stroke:none;" transform="translate(0,596) scale(1,-1)">Atomic: reference claim + SUCCESS + clearing ledger</text>
+			<text x="241.462890625" y="281" style="font-family: Regular; font-size: 8px;fill: rgb(9%,23%,20%); stroke:none;" transform="translate(0,562) scale(1,-1)">Audit + outgoing SUCCESS reservation</text>
+			<path d="M 341,245 L 239,245 Z" style="stroke: rgb(9%,40%,30%); stroke-linecap: butt; stroke-width: 1;"/>
+			<polygon points="239 245, 245 248, 245 242" style="stroke: rgb(9%,40%,30%); stroke-linecap: butt; stroke-width: 1; fill: rgb(9%,40%,30%); fill-rule: evenodd;"/>
+			<text x="254.857421875" y="253" style="font-family: Regular; font-size: 8px;fill: rgb(9%,23%,20%); stroke:none;" transform="translate(0,506) scale(1,-1)">4. Commit succeeds</text>
+			<path d="M 239,200 L 444,200 Z" style="stroke: rgb(9%,40%,30%); stroke-linecap: butt; stroke-width: 1;"/>
+			<polygon points="444 200, 438 203, 438 197" style="stroke: rgb(9%,40%,30%); stroke-linecap: butt; stroke-width: 1; fill: rgb(9%,40%,30%); fill-rule: evenodd;"/>
+			<text x="266.0703125" y="208" style="font-family: Regular; font-size: 8px;fill: rgb(9%,23%,20%); stroke:none;" transform="translate(0,416) scale(1,-1)">5. Immediate signed SUCCESS / delivery ID</text>
+			<path d="M 444,155 L 239,155 Z" style="stroke: rgb(9%,40%,30%); stroke-linecap: butt; stroke-width: 1;"/>
+			<polygon points="239 155, 245 158, 245 152" style="stroke: rgb(9%,40%,30%); stroke-linecap: butt; stroke-width: 1; fill: rgb(9%,40%,30%); fill-rule: evenodd;"/>
+			<text x="254.341796875" y="163" style="font-family: Regular; font-size: 8px;fill: rgb(9%,23%,20%); stroke:none;" transform="translate(0,326) scale(1,-1)">6. Durable credit-once transaction, then HTTP 2xx</text>
+			<text x="0" y="98" style="font-family: Bold; font-size: 9px;fill: rgb(9%,23%,20%); stroke:none;" transform="translate(0,196) scale(1,-1)">If delivery fails: database outbox retries; accepted payment remains Paid.</text>
+			<text x="0" y="48" style="font-family: Regular; font-size: 9px;fill: rgb(32%,39%,36%); stroke:none;" transform="translate(0,96) scale(1,-1)">NOTIFICATION / bankVerified=false. The merchant owns its wallet accounting.</text>
+			<text x="0" y="30" style="font-family: Regular; font-size: 8.5px;fill: rgb(32%,39%,36%); stroke:none;" transform="translate(0,60) scale(1,-1)">Missing UTR, duplicate/reused reference or ambiguity cannot take this success path.</text>
+		</g>
+	</g>
+</svg>

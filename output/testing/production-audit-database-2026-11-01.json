@@ -1,0 +1,22 @@
+{
+  "checkedAt": "2026-11-01T06:51:19.381Z",
+  "access": "read-only aggregate queries",
+  "merchants": 1,
+  "pp_merchants": 1,
+  "pp_api_keys": 0,
+  "provider_connections": 0,
+  "pp_receiver_devices": 0,
+  "pp_receiver_policies": 0,
+  "pp_receiver_events": 0,
+  "android_devices": 0,
+  "payment_sessions": 0,
+  "webhook_deliveries": 0,
+  "merchantStates": [
+    {
+      "status": "ACTIVE",
+      "count": "1"
+    }
+  ],
+  "activeNotificationPolicies": 0,
+  "activeDevices": 0
+}

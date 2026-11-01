@@ -101,6 +101,7 @@ import { createUpiSimpleService } from './services/upi-simple.js';
 import { registerUpiSimpleRoutes } from './routes/upi-simple.routes.js';
 import { getWhatsAppBerryService, WhatsAppBerryService } from './services/whatsapp-berry.service.js';
 import { ReceiptNotificationService } from './services/receipt-notification.service.js';
+import { NotificationDeliveryService } from './services/notification-delivery.service.js';
 
 export function createPaymentApp(customDb = null, options = {}) {
   const db = customDb || getDatabase();
@@ -134,7 +135,9 @@ export function createPaymentApp(customDb = null, options = {}) {
   const ticketRepo = new SupportTicketRepository(db);
   const auditRepo = new AuditLogRepository(db);
   const deviceRepo = new DeviceRepository(db);
-  const receiptService = new ReceiptNotificationService(db, auditRepo);
+  const notificationDeliveryService = new NotificationDeliveryService(db);
+  const receiptService = new ReceiptNotificationService(db, auditRepo, notificationDeliveryService);
+  notificationDeliveryService.start();
 
   // Super Admin repositories
   const superAdminRepo = new SuperAdminRepository(db);
@@ -723,6 +726,7 @@ export function createPaymentApp(customDb = null, options = {}) {
 
 
   function destroy() {
+    notificationDeliveryService.stop();
     clearInterval(webhookRetryTimer);
     webhookEngine.stop();providerWebhookEngine.stop();
     clearInterval(queueSyncDaemon);

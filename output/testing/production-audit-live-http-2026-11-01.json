@@ -1,0 +1,41 @@
+{
+  "checkedAt": "2026-11-01T06:53:40.945Z",
+  "checks": [
+    {
+      "path": "/_ready",
+      "status": 200,
+      "elapsedMs": 1268
+    },
+    {
+      "path": "/platform",
+      "status": 200,
+      "elapsedMs": 203
+    },
+    {
+      "path": "/developers",
+      "status": 200,
+      "elapsedMs": 124
+    },
+    {
+      "path": "/downloads",
+      "status": 200,
+      "elapsedMs": 114
+    },
+    {
+      "path": "/api/platform/v1/receiving-mirror",
+      "status": 401,
+      "elapsedMs": 112
+    },
+    {
+      "path": "/v1/payments",
+      "status": 401,
+      "elapsedMs": 192
+    },
+    {
+      "path": "/api/v1/admin/sms-gateway/download-apk",
+      "status": 503,
+      "elapsedMs": 129
+    }
+  ],
+  "note": "Anonymous read-only HTTP checks; no payment created"
+}

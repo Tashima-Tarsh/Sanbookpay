@@ -1,0 +1,6 @@
+{
+  "orderId": "ORDER-001",
+  "amount": "300.00",
+  "currency": "INR",
+  "callbackUrl": "http://127.0.0.1:4000/api/v1/payment-callback"
+}

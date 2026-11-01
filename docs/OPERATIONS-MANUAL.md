@@ -10,6 +10,10 @@ Cashfree uses the official JS v3 session checkout and requires genuine backend c
 
 # Dynamo Pay configuration and integration manual
 
+## Outgoing local receipt notifications (1 November 2026)
+
+The main Payment API now supports receipt submission through ntfy, Gmail API send-only OAuth and an authenticated SMSGate Android Local Server. Run npm run notifications:setup from the root package folder, then follow docs/LOCAL-NOTIFICATIONS.md for Gmail consent, phone connection and owner-only tests. Setup generates a private random push topic and preserves existing credentials. Email and SMS remain unconfigured until the owner connects their mailbox and phone. Submitted means accepted by an API, not confirmed delivery or bank settlement. Gmail/ntfy require internet access; SMS uses the owner's SIM allowance. No paid provider account is required. This change does not configure merchant invitation/reset email or deploy production.
+
 ## 1. Your installation
 Use https://dynamo-pay.onrender.com as the gateway base URL. Sign in at /admin; customer documentation is at /developers and /downloads. The demo store is disabled on the hosted gateway. Keep the current forest-green desktop layout, mobile navigation and checkout as the visual baseline.
 

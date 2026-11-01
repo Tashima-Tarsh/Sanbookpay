@@ -1,0 +1,18 @@
+{
+  "measuredAt": "2026-11-01T01:03:14.487Z",
+  "scope": "Unauthenticated readiness HTTP only; not payment/callback latency",
+  "samples": [
+    {
+      "status": 200,
+      "elapsedMs": 237
+    },
+    {
+      "status": 200,
+      "elapsedMs": 103
+    },
+    {
+      "status": 200,
+      "elapsedMs": 106
+    }
+  ]
+}
