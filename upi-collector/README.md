@@ -5,8 +5,8 @@ Free, open-source UPI collection-notification backend. No paid services, no clou
 ## Stack
 
 - **Express** + **sqlite3** (SQLite file on disk)
-- **Email**: Gmail API OAuth2 via nodemailer, scope `gmail.send` ONLY
-- **SMS send**: android-sms-gateway (https://github.com/capcom6/android-sms-gateway)
+- **Email**: Gmail API OAuth2 via nodemailer, scope `gmail.send` ONLY — works with ANY Gmail ID
+- **SMS send**: android-sms-gateway (https://github.com/capcom6/android-sms-gateway) — works with ANY phone, no paid gateway
 - **SMS/notification detect on phone**: SmsForwarder (https://github.com/pppscn/SmsForwarder), fallback NotificationForwarder (https://github.com/ItsAzni/NotificationForwarder)
 - **Push**: ntfy (https://github.com/binwiederhier/ntfy, public ntfy.sh)
 - **Crypto**: Node `crypto` for HMAC. No ORM, no TypeScript, no Docker.
@@ -14,22 +14,50 @@ Free, open-source UPI collection-notification backend. No paid services, no clou
 ## Repo layout
 
 ```
-src/server.js        express app, boots on PORT from .env
-src/db.js            sqlite schema + migrations, WAL mode
-src/verify.js        device-key + HMAC verification middleware
-src/parse.js         bank SMS parser (sender allowlist + per-bank regex)
-src/notify.js        ntfy POST + gmail send, both with retry+backoff
-src/reconcile.js     CSV statement import + match job
-src/routes/upi.js    POST /api/v1/upi/notify
-src/routes/orders.js POST/GET orders, POST /orders/:id/close
-src/routes/admin.js  GET unmatched, POST match, GET health
-scripts/gmail-auth.js    one-time OAuth2 consent -> prints refresh token
-scripts/gen-secrets.ps1  generate DEVICE_KEY and WH_SECRET
-scripts/bootstrap.ps1    full install
-scripts/test-webhook.ps1 curl.exe test battery
-scripts/heartbeat.ps1    poll /api/v1/health, alert via ntfy if stale >10min
-test/seed.js             create fake orders for testing
+upi-collector/
+├── src/server.js        express app, boots on PORT from .env
+├── src/db.js            sqlite schema + migrations, WAL mode
+├── src/verify.js        device-key + HMAC verification middleware
+├── src/parse.js         bank SMS parser (sender allowlist + per-bank regex)
+├── src/notify.js        ntfy POST + gmail send + sms send, universal adapters
+├── src/reconcile.js     CSV statement import + match job
+├── src/routes/upi.js    POST /api/v1/upi/notify
+├── src/routes/orders.js POST/GET orders, POST /orders/:id/close
+├── src/routes/admin.js  GET unmatched, POST match, GET health
+├── scripts/gmail-auth.js    one-time OAuth2 consent -> prints refresh token
+├── scripts/gen-secrets.ps1  generate DEVICE_KEY and WH_SECRET
+├── scripts/bootstrap.ps1    full install
+├── scripts/test-webhook.ps1 curl.exe test battery
+├── scripts/heartbeat.ps1    poll /api/v1/health, alert via ntfy if stale >10min
+├── test/seed.js             create fake orders for testing
+├── .env.example
+├── .gitignore
+└── README.md
 ```
+
+## Universal adapters (no per-user code changes)
+
+### Gmail — any Gmail ID works
+
+Each merchant runs `npm run gmail-auth` **once**:
+
+1. Creates a Google Cloud project, enables Gmail API
+2. OAuth consent screen in **Testing** mode, adds their own email as test user
+3. Runs `npm run gmail-auth` → opens consent URL → signs in → authorizes → prints refresh token
+4. Puts `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN`, `GMAIL_FROM` in `.env`
+
+After that, email works for that Gmail forever. No code changes, no per-merchant setup in code.
+
+### SMS — any phone works, no paid gateway
+
+1. Install **android-sms-gateway** APK on your own Android phone
+2. The app exposes a local HTTP API on port 9090
+3. Set `SMS_GATEWAY_URL=http://<phone-lan-ip>:9090` in `.env`
+4. SMS sends through your own SIM — free, no API key, no Twilio
+
+### ntfy push — free, self-hostable later
+
+Set `NTFY_TOPIC=your-topic` in `.env`. Uses public ntfy.sh by default.
 
 ## Endpoint contract
 
@@ -112,22 +140,13 @@ Prerequisites:
 npm run test-webhook
 ```
 
-Uses `curl.exe` (not Invoke-WebRequest). 7 cases:
-1. valid signed payload → 200
-2. bad device key → 401
-3. bad HMAC → 401
-4. disallowed sender → 422
-5. duplicate UTR replay → 200, row count unchanged
-6. garbage body → 200, lands in `unparsed`
-7. unsigned valid payload → 401
-
-Prints PASS/FAIL per case, exits non-zero on failure.
+Uses `curl.exe` (not Invoke-WebRequest). 7 cases, all must PASS.
 
 ## Running
 
 ```
-npm ci
-# copy .env.example to .env, fill in DEVICE_KEY, WH_SECRET, NTFY_TOPIC
+npm install
+# copy .env.example to .env, fill in DEVICE_KEY, WH_SECRET, NTFY_TOPIC, GMAIL_*, SMS_GATEWAY_URL
 npm run dev
 ```
 
