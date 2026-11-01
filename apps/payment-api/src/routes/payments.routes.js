@@ -56,6 +56,10 @@ export function registerPaymentRoutes(server, ctx) {
   server.post('/api/v1/payments', async (req, res) => {
     try {
       const body = await HttpServer.parseBody(req);
+      if (body.usePaiseOffset) return HttpServer.json(res,503,{
+        code:'PAISE_OFFSET_UNAVAILABLE',
+        error:'Paise-offset checkout is unavailable until durable multi-instance allocation is supported. Use the standard queued checkout.'
+      });
       const idempotencyKey = req.headers['idempotency-key'] || body.idempotencyKey;
 
       // Resolve merchant (default to first/demo merchant if none passed in header)
@@ -79,7 +83,7 @@ export function registerPaymentRoutes(server, ctx) {
 
       const originalExternal=ctx.sessionRepo.findByOrderId(merchant.id,body.orderId)?.metadata?.externalCollection;
       const useExternalDefault=(!body.method||String(body.method).toUpperCase()==='UPI')&&ctx.externalCollections?.getDefault(merchant.id);
-      if(ctx.externalCollections&&(originalExternal||useExternalDefault)&&process.env.NODE_ENV!=='test'){
+      if(ctx.externalCollections&&(originalExternal||useExternalDefault)){
         if(!isAdminRequest(req)&&!(req.headers['x-merchant-key']&&merchant.webhookSecret&&safeEqual(String(req.headers['x-merchant-key']),merchant.webhookSecret)))return HttpServer.json(res,401,{error:'Merchant authentication required.'});
         return ctx.externalCollections.createFromLegacy(req,res,body,merchant.id);
       }
@@ -203,23 +207,6 @@ export function registerPaymentRoutes(server, ctx) {
         payeeName: receivingAccount.payeeName,
         isMerchantEnabled: receivingAccount.isMerchantEnabled
       };
-
-      // Paise Offset Engine: allocate a unique paise offset (₹0.00–₹0.99) per VPA
-      // so multiple concurrent buyers can pay the same base amount without queueing.
-      // Opt-in via body.usePaiseOffset === true.
-      if (body.usePaiseOffset && ctx.paiseOffsetAllocator) {
-        const allocation = ctx.paiseOffsetAllocator.allocateOffset(receivingAccountId, amountPaise);
-        if (allocation) {
-          paiseOffset = allocation.offset;
-          totalAmountPaise = allocation.totalAmountPaise;
-        } else {
-          HttpServer.json(res, 409, {
-            error: 'PAYMENT_SLOT_UNAVAILABLE',
-            message: 'All paise offsets are in use for this receiving account. Please try again.'
-          });
-          return;
-        }
-      }
     }
 
     // Multi-VPA Auto-Rotation Guard: check if this VPA can handle the payment volume
@@ -236,17 +223,10 @@ export function registerPaymentRoutes(server, ctx) {
             payeeName: alternative.payeeName,
             isMerchantEnabled: alternative.isMerchantEnabled
           };
-          // Re-allocate paise offset for the new VPA
-          const newAllocation = ctx.paiseOffsetAllocator.allocateOffset(receivingAccountId, amountPaise);
-          if (!newAllocation) {
-            HttpServer.json(res, 409, {
-              error: 'PAYMENT_SLOT_UNAVAILABLE',
-              message: 'All paise offsets are in use for all available receiving accounts. Please try again.'
-            });
-            return;
-          }
-          paiseOffset = newAllocation.offset;
-          totalAmountPaise = newAllocation.totalAmountPaise;
+          const denied=enforcePaymentControls(ctx,merchant.id,{RECEIVING_VPA:alternative.upiId});
+          if(denied)return HttpServer.json(res,403,denied);
+          const channel=validateUpiChannel(merchant,amountPaise,alternative.upiId);
+          if(channel)return HttpServer.json(res,400,channel);
         } else {
           HttpServer.json(res, 409, {
             error: 'VPA_CAPACITY_EXCEEDED',

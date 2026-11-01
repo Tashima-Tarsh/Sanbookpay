@@ -10,6 +10,7 @@
  * - Sensitive data redaction for logs
  */
 import crypto from 'node:crypto';
+import { isIP } from 'node:net';
 
 const RATE_LIMIT_WINDOW_MS = 60000; // 1 minute
 const MAX_EVENTS_PER_DEVICE_PER_MIN = 120;
@@ -29,7 +30,7 @@ function cleanupRateLimits() {
     if (now > val.resetAt) merchantRateLimits.delete(key);
   }
 }
-setInterval(cleanupRateLimits, 60000);
+setInterval(cleanupRateLimits, 60000).unref();
 
 export class SecurityMiddleware {
   /**
@@ -178,7 +179,9 @@ export class IpAllowlist {
 
   _cidrMatch(ip, cidr) {
     const [range, bits] = cidr.split('/');
-    const netMask = ~((1 << (32 - Number(bits))) - 1) >>> 0;
+    if (!bits) return isIP(ip) !== 0 && ip === range;
+    if (isIP(ip) !== 4 || isIP(range) !== 4 || !/^\d+$/.test(bits) || Number(bits)>32) return false;
+    const netMask = Number(bits) === 0 ? 0 : (0xffffffff << (32 - Number(bits))) >>> 0;
     const ipNum = this._ipToNumber(ip);
     const rangeNum = this._ipToNumber(range);
     return (ipNum & netMask) === (rangeNum & netMask);

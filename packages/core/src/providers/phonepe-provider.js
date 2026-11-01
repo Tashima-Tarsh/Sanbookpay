@@ -6,10 +6,7 @@
  *   • Check status:     GET  /pg/v1/status/{merchantId}/{merchantTransactionId}
  *   • Webhook:          POST to merchant callbackUrl (IP allowlist recommended)
  * 
- * Signature: X-VERIFY = sha256(path + body + saltKey) + '###' + saltIndex
- * 
- * No bank approval required. Sign up at https://developer.phonepe.com (free, KYC takes 1-3 days).
- * Money settles directly to your linked bank account via NPCI/UPI.
+ * Legacy v1 salt-key adapter. Merchant onboarding and provider acceptance are required.
  */
 import crypto from 'node:crypto';
 import { PaymentProvider } from './payment-provider.interface.js';
@@ -29,15 +26,17 @@ export class PhonePeProvider extends PaymentProvider {
     const isSandbox = (this.environment || '').toUpperCase() === 'SANDBOX';
     this.baseUrl = isSandbox ? PHONEPE_BASE.SANDBOX : PHONEPE_BASE.PRODUCTION;
     // PhonePe saltKey/index come from extra config or env
-    this.saltKey = config.extra?.saltKey || process.env.PHONEPE_SALT_KEY || '';
+    this.saltKey = config.extra?.saltKey ?? process.env.PHONEPE_SALT_KEY ?? '';
     this.saltIndex = config.extra?.saltIndex !== undefined ? config.extra.saltIndex : (process.env.PHONEPE_SALT_INDEX || '1');
+    this.providerMerchantId = config.extra?.businessMerchantId || this.clientId || this.merchantId;
   }
 
   /**
-   * Builds PhonePe X-VERIFY header: sha256(path + body + saltKey)###saltIndex
+   * Pay uses base64 JSON before the path; status uses the path alone.
    */
   _xVerify(path, bodyString) {
-    const hash = crypto.createHmac('sha256', this.saltKey).update(path + bodyString + this.saltKey).digest('hex');
+    if (!this.saltKey) throw new Error('PhonePe salt key is required');
+    const hash = crypto.createHash('sha256').update(bodyString + path + this.saltKey).digest('hex');
     return `${hash}###${this.saltIndex}`;
   }
 
@@ -51,7 +50,7 @@ export class PhonePeProvider extends PaymentProvider {
         ...options,
         headers: {
           'Content-Type': 'application/json',
-          'X-MERCHANT-ID': this.merchantId,
+          'X-MERCHANT-ID': this.providerMerchantId,
           ...(options.headers || {})
         },
         signal: controller.signal
@@ -70,12 +69,13 @@ export class PhonePeProvider extends PaymentProvider {
   }
 
   async validateCredentials() {
-    if (!this.merchantId || !this.saltKey) {
+    if (!this.providerMerchantId || !this.saltKey) {
       return { valid: false, error: 'PhonePe Merchant ID and Salt Key are required.' };
     }
     // Lightweight check: status endpoint with a dummy transaction ID returns 404 but proves connectivity
-    const res = await this._request(`/pg/v1/status/${this.merchantId}/verify_credential_check`);
-    return { valid: res.status === 404 || res.ok, details: { environment: this.environment, checkedAt: new Date().toISOString() } };
+    const path = `/pg/v1/status/${encodeURIComponent(this.providerMerchantId)}/verify_credential_check`;
+    const res = await this._request(path, {headers:{'X-VERIFY':this._xVerify(path,'')}});
+    return { valid: res.ok && res.data?.success === true, details: { environment: this.environment, checkedAt: new Date().toISOString() } };
   }
 
   async getCapabilities() {
@@ -94,29 +94,31 @@ export class PhonePeProvider extends PaymentProvider {
   async createCollection(order) {
     if (!order.merchantOrderId) throw new Error('merchantOrderId is required');
     const amountPaise = Number(order.amountPaise);
-    if (!amountPaise || amountPaise <= 0) throw new Error('amountPaise must be a positive integer');
+    if (!Number.isSafeInteger(amountPaise) || amountPaise <= 0) throw new Error('amountPaise must be a positive integer');
 
     const payload = {
-      merchantId: this.merchantId,
+      merchantId: this.providerMerchantId,
       merchantTransactionId: order.merchantOrderId,
       amount: amountPaise, // PhonePe expects amount in paise
       merchantUserId: order.customerId || order.customerPhone || 'guest',
       callbackUrl: order.notifyUrl || order.returnUrl || '',
+      redirectUrl: order.returnUrl || undefined,
+      redirectMode: 'REDIRECT',
       mobileNumber: order.customerPhone || undefined,
       paymentInstrument: { type: 'PAY_PAGE' }
     };
 
-    const bodyString = JSON.stringify(payload);
+    const bodyString = Buffer.from(JSON.stringify(payload)).toString('base64');
     const xVerify = this._xVerify('/pg/v1/pay', bodyString);
 
     const res = await this._request('/pg/v1/pay', {
       method: 'POST',
-      body: bodyString,
+      body: JSON.stringify({request:bodyString}),
       headers: {
         'X-VERIFY': xVerify,
-        'X-MERCHANT-ID': this.merchantId
-      },
-      headers: order.idempotencyKey ? { 'X-IDempotency-Key': order.idempotencyKey } : {}
+        'X-MERCHANT-ID': this.providerMerchantId,
+        ...(order.idempotencyKey ? { 'X-IDempotency-Key': order.idempotencyKey } : {})
+      }
     });
 
     if (!res.ok) {
@@ -139,7 +141,7 @@ export class PhonePeProvider extends PaymentProvider {
 
   async getCollectionStatus(providerOrderId) {
     if (!providerOrderId) throw new Error('providerOrderId is required');
-    const path = `/pg/v1/status/${this.merchantId}/${encodeURIComponent(providerOrderId)}`;
+    const path = `/pg/v1/status/${encodeURIComponent(this.providerMerchantId)}/${encodeURIComponent(providerOrderId)}`;
     const xVerify = this._xVerify(path, '');
 
     const res = await this._request(path, { method: 'GET', headers: { 'X-VERIFY': xVerify } });
@@ -149,14 +151,17 @@ export class PhonePeProvider extends PaymentProvider {
     }
 
     const data = res.data;
+    if (data.data?.merchantId !== this.providerMerchantId || data.data?.merchantTransactionId !== providerOrderId) throw new Error('PhonePe status order ownership mismatch');
     const state = (data.data?.state || data.state || '').toUpperCase();
-    const statusMap = { SUCCESS: 'SUCCESS', FAILED: 'FAILED', PENDING: 'PENDING', TIMEOUT: 'EXPIRED', CANCELLED: 'CANCELLED' };
+    if (['COMPLETED','SUCCESS'].includes(state) && !data.data.transactionId) throw new Error('PhonePe success requires a payment reference');
+    const statusMap = { COMPLETED:'SUCCESS', SUCCESS: 'SUCCESS', FAILED: 'FAILED', PENDING: 'PENDING', TIMEOUT: 'EXPIRED', CANCELLED: 'CANCELLED' };
 
     return {
       status: statusMap[state] || 'PENDING',
-      amountPaise: Math.round(Number(data.data?.amount || data.amount || 0)),
+      amountPaise: Number(data.data?.amount ?? data.amount),
+      currency: 'INR',
       bankReference: data.data?.transactionId || null,
-      providerPaymentId: String(data.data?.transactionId || providerOrderId),
+      providerPaymentId: data.data?.transactionId || null,
       paymentMethod: data.data?.paymentInstrument?.type || 'UPI',
       rawResponse: data
     };
@@ -164,9 +169,7 @@ export class PhonePeProvider extends PaymentProvider {
 
   /**
    * Verifies PhonePe webhook signature.
-   * PhonePe sends body as { response: base64(JSON) }. The X-VERIFY header is
-   * sha256(/pg/v1/pay + callback body + saltKey)###saltIndex for verification.
-   * Simplest robust check: decode the response and verify merchantTransactionId matches.
+   * Callback signing covers the received base64 response plus the salt, without an API path.
    */
   verifyCollectionWebhook({ rawBody, headers }) {
     try {
@@ -177,17 +180,15 @@ export class PhonePeProvider extends PaymentProvider {
       try { payload = JSON.parse(rawBody); } catch { return false; }
 
       const responseB64 = payload.response;
-      if (!responseB64) return false;
+      if (typeof responseB64 !== 'string' || !responseB64) return false;
 
       const decoded = Buffer.from(responseB64, 'base64').toString('utf8');
       let response;
       try { response = JSON.parse(decoded); } catch { return false; }
 
-      // PhonePe X-VERIFY = sha256('/pg/v1/pay' + responseBody + saltKey)###saltIndex
-      const expected = this._xVerify('/pg/v1/pay', decoded);
-      const sigParts = signature.split('###');
-      if (sigParts.length !== 2) return false;
-      return crypto.timingSafeEqual(Buffer.from(expected.split('###')[0]), Buffer.from(sigParts[0]));
+      if ((response.data || response).merchantId !== this.providerMerchantId) return false;
+      const expected = this._xVerify('', responseB64);
+      return typeof signature === 'string' && signature.length === expected.length && crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
     } catch {
       return false;
     }
@@ -202,11 +203,12 @@ export class PhonePeProvider extends PaymentProvider {
       const payload = JSON.parse(rawBody);
       const decoded = Buffer.from(payload.response, 'base64').toString('utf8');
       const response = JSON.parse(decoded);
+      const data = response.data || response;
       return {
-        merchantTransactionId: response.merchantTransactionId,
-        transactionId: response.transactionId,
-        amountPaise: Math.round(Number(response.amount || 0)),
-        state: (response.state || '').toUpperCase(),
+        merchantTransactionId: data.merchantTransactionId,
+        transactionId: data.transactionId,
+        amountPaise: Number(data.amount),
+        state: data.state === 'COMPLETED' ? 'SUCCESS' : (data.state || '').toUpperCase(),
         code: response.code,
         message: response.message,
         rawResponse: response

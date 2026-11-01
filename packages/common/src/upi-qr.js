@@ -4,7 +4,7 @@
  * ZERO merchant account or bank approval required — just need a VPA.
  * All features are 100% free (Government of India mandates 0% MDR on UPI since 2020).
  */
-import { generateQrSvg } from './qr-lib.js';
+import { generateQrSvg } from '@youpi/core';
 
 /**
  * Builds a standard NPCI UPI payment URI.
@@ -20,7 +20,7 @@ import { generateQrSvg } from './qr-lib.js';
  * @param {string} [params.merchantCode] - Merchant category code (optional)
  * @returns {string} UPI payment URI (e.g. upi://pay?pa=merchant@upi&pn=Store&mode=04&am=100.00&cu=INR&tr=ORD123)
  */
-export function buildUpiUri({ vpa, name, amount, orderId, note = '', mode = 'fixed', merchantCode = '' }) {
+export function buildUpiPaymentUri({ vpa, name, amount, orderId, note = '', mode = 'fixed', merchantCode = '' }) {
   if (!vpa || typeof vpa !== 'string') throw new Error('VPA is required');
   if (!name || typeof name !== 'string') throw new Error('Payee name is required');
 
@@ -44,10 +44,10 @@ export function buildUpiUri({ vpa, name, amount, orderId, note = '', mode = 'fix
  * Builds app-specific UPI deep links from a UPI URI.
  * These links open the payment directly in the respective UPI app.
  *
- * @param {string} upiUri - Full upi://pay URI from buildUpiUri()
+ * @param {string} upiUri - Full upi://pay URI from buildUpiPaymentUri()
  * @returns {Object} Map of app name → deep link URL
  */
-export function buildUpiIntentLinks(upiUri) {
+export function buildUpiPaymentIntentLinks(upiUri) {
   if (!upiUri || !upiUri.startsWith('upi://pay?')) throw new Error('Invalid UPI URI');
   const query = upiUri.slice('upi://pay?'.length);
 

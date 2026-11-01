@@ -2,164 +2,96 @@ import crypto from 'node:crypto';
 import {encryptAtRest} from '@youpi/common';
 import { toPaise } from '@youpi/common';
 import { confirmProviderCollection, publishProviderCollection } from '../services/provider-confirmation.js';
-import { HttpServer } from '../server.js';
+import { HttpServer, resolveClientIp } from '../server.js';
 import {
   PaymentOrderRepository,
   PayoutRepository,
   LedgerRepository
 } from '@youpi/db';
 import { ProviderRegistry } from '@youpi/core';
-import { SecurityMiddleware } from '@youpi/core';
+import { IpAllowlist } from '@youpi/core';
+import { PhonePeProvider } from '../../../../packages/core/src/providers/phonepe-provider.js';
+import { PaytmProvider } from '../../../../packages/core/src/providers/paytm-provider.js';
 
-/**
- * Provider Webhook Ingress Routes
- * Handles authoritative server-to-server callbacks from Cashfree, PhonePe, and Paytm PG.
- *
- * Security:
- *   • IP allowlisting (PSP documented callback IPs)
- *   • HMAC signature verification over raw body
- *   • Acknowledge-first: respond 200 immediately, then process in background
- *   • Idempotent event dedup via event hash
- */
+// Acknowledge only after verified financial processing commits; failures remain retryable.
 export function registerProviderWebhooksRoutes(server, ctx) {
   const db = ctx.db;
   const poRepo = new PaymentOrderRepository(db);
   const payoutRepo = new PayoutRepository(db);
   const ledgerRepo = new LedgerRepository(db);
   const providerRegistry = new ProviderRegistry({ db });
-  const ipAllowlist = new SecurityMiddleware.IpAllowlist(
+  const ipAllowlist = new IpAllowlist(
     process.env.WEBHOOK_ALLOWED_IPS ? process.env.WEBHOOK_ALLOWED_IPS.split(',').map(s => s.trim()).filter(Boolean) : []
   );
   db.execute(`CREATE TABLE IF NOT EXISTS pp_provider_events(id TEXT PRIMARY KEY,merchant_id TEXT NOT NULL,payment_order_id TEXT NOT NULL,provider_name TEXT NOT NULL,provider_payment_id TEXT,event_type TEXT NOT NULL,payload_encrypted TEXT NOT NULL,status TEXT NOT NULL,received_at TEXT NOT NULL)`);
 
-  // Helper: acknowledge-first webhook processor shared across PSPs
   async function handleProviderWebhook(req, res, providerName) {
-    // 1. IP allowlist check
-    const clientIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
-                     req.headers['x-real-ip']?.trim() ||
-                     req.socket?.remoteAddress ||
-                     '';
-    if (!ipAllowlist.isAllowed(clientIp)) {
-      return HttpServer.json(res, 403, { error: 'Webhook source IP not in allowlist' });
+    // Forwarded headers are untrusted here. Empty allowlist disables only IP filtering;
+    // provider signature verification remains mandatory.
+    if (!ipAllowlist.isAllowed(resolveClientIp(req))) {
+      return HttpServer.json(res, 403, {error:'Webhook source IP not in allowlist'});
     }
-
-    // 2. Read raw body (do NOT parse before signature check)
-    let rawBody;
+    let rawBody, payload;
+    try { rawBody = await HttpServer.parseRawBody(req); }
+    catch { return HttpServer.json(res,400,{error:'Failed to read request body'}); }
     try {
-      rawBody = await HttpServer.parseRawBody(req);
-    } catch {
-      return HttpServer.json(res, 400, { error: 'Failed to read request body' });
-    }
-
-    // 3. Respond 200 IMMEDIATELY (acknowledge-first), then process in background.
-    // PSPs retry on non-2xx; returning 200 stops retry storms and gives real-time callback feel.
-    const ackSent = new Promise(resolve => {
-      res.on('close', () => resolve());
-      res.on('error', () => resolve());
-      setTimeout(() => resolve(), 5000);
-    });
-
-    // 4. Process in background (fire and forget — does not block the HTTP response)
-    (async () => {
-      try {
-        let payload;
-        try { payload = JSON.parse(rawBody); } catch {
-          console.error(`[${providerName} webhook] Malformed JSON payload`);
-          return;
-        }
-
-        let merchantOrderId;
-        let paymentData;
-        let eventType;
-
-        if (providerName === 'PHONEPE') {
-          const provider = providerRegistry.getProvider('x', 'PHONEPE');
-          const decoded = provider.decodeWebhookResponse?.(rawBody);
-          if (!decoded) { console.error(`[PhonePe webhook] Failed to decode response`); return; }
-          merchantOrderId = decoded.merchantTransactionId;
-          paymentData = { ...decoded.rawResponse, payment_status: decoded.state, cf_payment_id: decoded.transactionId, bank_reference: decoded.transactionId, payment_amount: decoded.amountPaise / 100, payment_currency: 'INR' };
-          eventType = decoded.state;
-        } else if (providerName === 'PAYTM') {
-          const provider = providerRegistry.getProvider('x', 'PAYTM');
-          const decoded = provider.decodeWebhookResponse?.(rawBody);
-          if (!decoded) { console.error(`[Paytm webhook] Failed to decode response`); return; }
-          merchantOrderId = decoded.merchantTransactionId;
-          paymentData = { ...decoded.rawResponse, payment_status: decoded.state, cf_payment_id: decoded.transactionId, bank_reference: decoded.transactionId, payment_amount: decoded.amountPaise / 100, payment_currency: 'INR' };
-          eventType = decoded.state;
-        } else {
-          // Cashfree
-          const orderData = payload.data?.order || payload.order || payload.data || {};
-          paymentData = payload.data?.payment || payload.payment || {};
-          merchantOrderId = orderData.order_id || payload.order_id;
-          eventType = payload.type || paymentData.payment_status || 'UNKNOWN';
-        }
-
-        if (!merchantOrderId) {
-          console.error(`[${providerName} webhook] Missing order_id`);
-          return;
-        }
-
-        const candidates = db.query("SELECT * FROM payment_orders WHERE (provider_order_id=? OR merchant_order_id=?) AND provider_name=?", [merchantOrderId, merchantOrderId, providerName]);
-        if (candidates.length > 1) {
-          console.error(`[${providerName} webhook] Ambiguous provider order reference`);
-          return;
-        }
-        const order = candidates[0];
-        if (!order) {
-          console.error(`[${providerName} webhook] Payment order ${merchantOrderId} not found`);
-          return;
-        }
-
-        const merchantId = order.merchant_id;
-        const connectionId = JSON.parse(order.metadata || '{}').connectionId || null;
-        const provider = providerRegistry.getProvider(merchantId, providerName, connectionId);
-
-        // Authoritative HMAC signature verification over raw body
-        const isValid = provider.verifyCollectionWebhook({ rawBody, headers: req.headers });
-        if (!isValid) {
-          console.error(`[${providerName} webhook] Invalid signature for order ${merchantOrderId}`);
-          return;
-        }
-
-        // Idempotent event dedup
-        const eventId = crypto.createHash('sha256').update(rawBody).digest('hex');
-        db.execute('INSERT INTO pp_provider_events(id,merchant_id,payment_order_id,provider_name,provider_payment_id,event_type,payload_encrypted,status,received_at) VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO NOTHING',
-          [eventId, merchantId, order.id, providerName, paymentData?.cf_payment_id ? String(paymentData.cf_payment_id) : null, eventType, encryptAtRest(rawBody.toString()), 'RECEIVED', new Date().toISOString()]);
-
-        const paymentStatus = paymentData.payment_status;
-        if (paymentStatus === 'SUCCESS') {
-          let amountPaise;
-          try { amountPaise = Number(toPaise(paymentData.payment_amount)); } catch { console.error(`[${providerName} webhook] Invalid amount`); return; }
-          try {
-            const result = confirmProviderCollection(ctx, order.id, {
-              amountPaise,
-              currency: paymentData.payment_currency || 'INR',
-              bankReference: paymentData.bank_reference || null,
-              providerPaymentId: paymentData.cf_payment_id ? String(paymentData.cf_payment_id) : null,
-              actorType: 'PROVIDER_WEBHOOK',
-              rawResponse: payload
-            });
-            publishProviderCollection(server, ctx, result);
-            db.execute('UPDATE pp_provider_events SET status=? WHERE id=?', ['PROCESSED', eventId]);
-          } catch (error) {
-            db.execute('UPDATE pp_provider_events SET status=? WHERE id=?', ['RECONCILIATION_REQUIRED', eventId]);
-            console.error(`[${providerName} webhook] Confirmation failed:`, error.message);
-          }
-        } else if (paymentStatus === 'FAILED') {
-          db.transaction(() => {
-            const current = db.queryOne(`SELECT * FROM payment_orders WHERE id=?${db.dialect === 'postgres' ? ' FOR UPDATE' : ''}`, [order.id]);
-            if (current.status === 'SUCCESS' || current.status === 'FAILED') return;
-            poRepo.update(order.id, { status: 'FAILED', actorType: 'PROVIDER_WEBHOOK', providerResponse: payload });
-          });
-          server.broadcastSse(`console_${merchantId}`, 'activity', { paymentId: order.id });
-        }
-      } catch (err) {
-        console.error(`[${providerName} webhook] Processing error:`, err.message);
+      let merchantOrderId, paymentData, eventType;
+      if (providerName === 'PHONEPE' || providerName === 'PAYTM') {
+        // Decoding is untrusted routing input, never payment evidence.
+        const decoder = providerName === 'PHONEPE' ? new PhonePeProvider() : new PaytmProvider();
+        const decoded = decoder.decodeWebhookResponse(rawBody);
+        if (!decoded) return HttpServer.json(res,400,{error:'Malformed provider callback'});
+        payload = decoded.rawResponse;
+        merchantOrderId = decoded.merchantTransactionId;
+        paymentData = {payment_status:decoded.state,cf_payment_id:decoded.transactionId,bank_reference:decoded.transactionId,amountPaise:decoded.amountPaise,payment_currency:'INR'};
+        eventType = decoded.state;
+      } else {
+        try { payload = JSON.parse(rawBody); }
+        catch { return HttpServer.json(res,400,{error:'Malformed JSON payload'}); }
+        merchantOrderId = payload.data?.order?.order_id || payload.order?.order_id || payload.order_id;
+        paymentData = payload.data?.payment || payload.payment || {};
+        eventType = payload.type || paymentData.payment_status || 'UNKNOWN';
       }
-    })();
-
-    // 5. Return 200 immediately — do NOT wait for background processing
-    return HttpServer.json(res, 200, { received: true });
+      if (!merchantOrderId) return HttpServer.json(res,400,{error:'Missing provider order reference'});
+      const candidates=db.query('SELECT * FROM payment_orders WHERE provider_order_id=? AND provider_name=?',[merchantOrderId,providerName]);
+      if(candidates.length!==1) return HttpServer.json(res,candidates.length?409:404,{error:'Unknown or ambiguous provider order'});
+      const order=candidates[0],connectionId=JSON.parse(order.metadata||'{}').connectionId||null;
+      const provider=providerRegistry.getProvider(order.merchant_id,providerName,connectionId);
+      if(!provider.verifyCollectionWebhook({rawBody,headers:req.headers})) return HttpServer.json(res,401,{error:'Invalid provider signature'});
+      const eventId=crypto.createHash('sha256').update(rawBody).digest('hex');
+      let result;
+      try {
+        db.transaction(()=>{
+          db.execute('INSERT INTO pp_provider_events(id,merchant_id,payment_order_id,provider_name,provider_payment_id,event_type,payload_encrypted,status,received_at) VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO NOTHING',
+            [eventId,order.merchant_id,order.id,providerName,paymentData.cf_payment_id?String(paymentData.cf_payment_id):null,eventType,encryptAtRest(rawBody.toString()),'RECEIVED',new Date().toISOString()]);
+          if(paymentData.payment_status==='SUCCESS') {
+            const amountPaise=paymentData.amountPaise ?? Number(toPaise(paymentData.payment_amount));
+            if(!Number.isSafeInteger(amountPaise)||amountPaise<=0) throw Error('Invalid provider amount');
+            result=confirmProviderCollection(ctx,order.id,{amountPaise,currency:paymentData.payment_currency,bankReference:paymentData.bank_reference||null,providerPaymentId:paymentData.cf_payment_id?String(paymentData.cf_payment_id):null,actorType:'PROVIDER_WEBHOOK',rawResponse:payload});
+          } else if(paymentData.payment_status==='FAILED') {
+            const current=db.queryOne(`SELECT * FROM payment_orders WHERE id=?${db.dialect==='postgres'?' FOR UPDATE':''}`,[order.id]);
+            if(!['SUCCESS','FAILED'].includes(current.status)) poRepo.update(order.id,{status:'FAILED',actorType:'PROVIDER_WEBHOOK',providerResponse:payload});
+          }
+          db.execute('UPDATE pp_provider_events SET status=? WHERE id=?',['PROCESSED',eventId]);
+        });
+      } catch(error) {
+        const stamp=new Date().toISOString();
+        db.transaction(()=>{
+          db.execute('INSERT INTO pp_provider_events(id,merchant_id,payment_order_id,provider_name,provider_payment_id,event_type,payload_encrypted,status,received_at) VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET status=excluded.status',
+            [eventId,order.merchant_id,order.id,providerName,paymentData.cf_payment_id?String(paymentData.cf_payment_id):null,eventType,encryptAtRest(rawBody.toString()),'RECONCILIATION_REQUIRED',stamp]);
+          db.execute('INSERT INTO pp_cases(id,merchant_id,kind,title,description,payment_id,status,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO NOTHING',
+            ['provider-'+eventId,order.merchant_id,'RECONCILIATION','Provider callback rejected',error.message,order.id,'OPEN','PROVIDER_WEBHOOK',stamp,stamp]);
+        });
+        console.error(`[${providerName} webhook] Processing rejected:`,error.message);
+        return HttpServer.json(res,409,{error:'Provider event requires reconciliation'});
+      }
+      // Outgoing delivery has its own durable outbox; publication cannot undo a commit.
+      if(result) try { publishProviderCollection(server,ctx,result); } catch(error) { console.error('[Provider event publication]',error.message); }
+      return HttpServer.json(res,200,{received:true});
+    } catch(error) {
+      console.error(`[${providerName} webhook] Processing failed:`,error.message);
+      return HttpServer.json(res,503,{error:'Provider callback processing unavailable; retry required'});
+    }
   }
 
   // 1. POST /api/v1/webhooks/cashfree/collections — Cashfree PG Webhooks
