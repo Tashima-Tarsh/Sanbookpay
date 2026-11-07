@@ -280,13 +280,13 @@ describe('Feature 65: Developer Payment Simulator Integration & Acceptance Suite
     assert.equal(res.body.stages.stage1.status, 'LOADED');
   });
 
-  test('14. Invalid SMS sender (personal mobile not matching customer) is rejected by REAL Stage 2', async () => {
+  test('14. SMS is rejected by REAL Stage 2', async () => {
     await enableTestMode();
 
     const res = await request('/api/v1/admin/dev/simulator/inject', {
       method: 'POST',
       body: {
-        source: 'PROVIDER_WEBHOOK',
+        source: 'SMS',
         sender: '+918888888888', // Ordinary personal phone number not matching customer
         content: 'A/C XX1234 credited with Rs 499.00 CR. Ref 123456789012'
       }
@@ -300,13 +300,13 @@ describe('Feature 65: Developer Payment Simulator Integration & Acceptance Suite
     assert.equal(res.body.stages.stage4.status, 'FAILED');
   });
 
-  test('15. Invalid Gmail sender (unrecognized domain) is rejected by REAL Stage 2', async () => {
+  test('15. Gmail is rejected by REAL Stage 2', async () => {
     await enableTestMode();
 
     const res = await request('/api/v1/admin/dev/simulator/inject', {
       method: 'POST',
       body: {
-        source: 'PROVIDER_WEBHOOK',
+        source: 'GMAIL',
         sender: 'test@gmail.com', // Not authorized bank domain
         content: 'INR 499 credited CR 123456789012'
       }

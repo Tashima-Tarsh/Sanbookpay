@@ -2149,6 +2149,12 @@ export function registerAdminRoutes(server, ctx) {
     const merchant = checkSimulatorAuth(req, res);
     if (!merchant) return;
 
+    // Synthetic provider proof must never settle a payment on a deployed gateway.
+    if (process.env.NODE_ENV !== 'test') {
+      HttpServer.json(res, 403, { success: false, error: 'Synthetic injection is only available in isolated tests.' });
+      return;
+    }
+
     // Developer Test Mode Compatibility (Section 27 & Acceptance Test 36)
     const until = merchant?.branding?.testModeUntil;
     const isTestModeActive = Boolean(until && Number(until) > Date.now());

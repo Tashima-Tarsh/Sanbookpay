@@ -785,7 +785,7 @@ describe('YOUPI PG: Parser Rule Correction & Exact Fraud/Ban System (All 29 Acce
   // REAL-TIME FAKE SMS/EMAIL DETECTION & CHECKOUT GATEWAY INVESTIGATION SCREEN
   // =========================================================================
 
-  test('30. When user pushes fake SMS: server detects fraud instantly, auto-bans customer, terminates ongoing session, and checkout state reports BLOCKED under-investigation screen', async () => {
+  test('30. Rejected SMS leaves the customer and checkout active without a fraud notice', async () => {
     const cust = customerRepo.create({
       merchantId,
       name: 'Realtime Fake SMS Pusher',

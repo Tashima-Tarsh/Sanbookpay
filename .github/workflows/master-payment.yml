@@ -65,13 +65,29 @@ jobs:
         working-directory: packages/master-android-sdk
     steps:
       - uses: actions/checkout@v4
+      - name: Check whether the Android SDK is present
+        id: sdk
+        working-directory: .
+        run: |
+          if test -d packages/master-android-sdk; then
+            echo 'present=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'present=false' >> "$GITHUB_OUTPUT"
+            echo 'Android SDK was removed by the provider-first migration; no native build to run.' >> "$GITHUB_STEP_SUMMARY"
+          fi
       - uses: actions/setup-java@v4
+        if: steps.sdk.outputs.present == 'true'
         with:
           distribution: temurin
           java-version: "17"
+      - name: Set up Android SDK and accept licenses
+        if: steps.sdk.outputs.present == 'true'
+        uses: android-actions/setup-android@v3
       - name: Build AAR and run SDK tests
+        if: steps.sdk.outputs.present == 'true'
         run: bash ./gradlew :assembleRelease :testDebugUnitTest :sample:assembleDebug --console=plain
       - uses: actions/upload-artifact@v4
+        if: steps.sdk.outputs.present == 'true'
         with:
           name: sanbookpay-master-android-sdk
           path: packages/master-android-sdk/build/outputs/aar/*.aar
